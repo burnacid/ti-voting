@@ -12,6 +12,130 @@
         </div>
     @endif
 
+    <!-- Speaker Controls -->
+    @if($player->is_speaker)
+        <div class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-bold text-yellow-800 dark:text-yellow-200">Speaker Controls</h2>
+                <div class="flex space-x-2">
+                    @if(!$currentAgenda)
+                        <button wire:click="toggleCreateAgenda"
+                                class="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-md transition-colors">
+                            {{ $showCreateAgenda ? 'Cancel' : 'Create New Agenda' }}
+                        </button>
+                    @elseif($currentAgenda->status === 'voting')
+                        <button wire:click="toggleSpeakerResults"
+                                class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition-colors">
+                            {{ $speakerViewResults ? 'Hide Results' : 'View Results' }}
+                        </button>
+                        <button wire:click="endVoting"
+                                wire:confirm="Are you sure you want to end voting? This will make results visible to all players."
+                                class="bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-md transition-colors">
+                            End Voting
+                        </button>
+                    @endif
+                </div>
+            </div>
+
+            <!-- Create Agenda Form -->
+            @if($showCreateAgenda && !$currentAgenda)
+                <div class="bg-white dark:bg-gray-800 rounded-lg p-6 border">
+                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Create New Agenda</h3>
+
+                    <form wire:submit="createAgenda" class="space-y-4">
+                        <div>
+                            <label for="newAgendaTitle" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                Agenda Title
+                            </label>
+                            <input type="text"
+                                   id="newAgendaTitle"
+                                   wire:model="newAgendaTitle"
+                                   placeholder="e.g., Elect New Speaker, Trade Agreement"
+                                   class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white">
+                            @error('newAgendaTitle') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
+                        </div>
+
+                        <div>
+                            <label for="newAgendaDescription" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                Description
+                            </label>
+                            <textarea id="newAgendaDescription"
+                                      wire:model="newAgendaDescription"
+                                      rows="3"
+                                      placeholder="Describe what this agenda is about..."
+                                      class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"></textarea>
+                            @error('newAgendaDescription') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                Voting Type
+                            </label>
+                            <div class="space-y-2">
+                                <label class="flex items-center">
+                                    <input type="radio"
+                                           wire:model.live="agendaType"
+                                           value="for_against"
+                                           class="mr-2 text-blue-600">
+                                    <span class="text-gray-900 dark:text-white">For / Against</span>
+                                </label>
+                                <label class="flex items-center">
+                                    <input type="radio"
+                                           wire:model.live="agendaType"
+                                           value="elect_player"
+                                           class="mr-2 text-blue-600">
+                                    <span class="text-gray-900 dark:text-white">Elect a Player</span>
+                                </label>
+                                <label class="flex items-center">
+                                    <input type="radio"
+                                           wire:model.live="agendaType"
+                                           value="custom"
+                                           class="mr-2 text-blue-600">
+                                    <span class="text-gray-900 dark:text-white">Custom Options</span>
+                                </label>
+                            </div>
+                            @error('agendaType') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
+                        </div>
+
+                        @if($agendaType === 'custom')
+                            <div>
+                                <label for="customOptions" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                    Custom Options (comma separated)
+                                </label>
+                                <input type="text"
+                                       id="customOptions"
+                                       wire:model="customOptions"
+                                       placeholder="Option 1, Option 2, Option 3"
+                                       class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white">
+                                @error('customOptions') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
+                            </div>
+                        @endif
+
+                        @if($agendaType === 'elect_player')
+                            <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                                <p class="text-sm text-blue-800 dark:text-blue-200">
+                                    Players will be able to vote for any player currently in the game.
+                                </p>
+                            </div>
+                        @endif
+
+                        <div class="flex space-x-3">
+                            <button type="submit"
+                                    class="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-md transition-colors">
+                                Create Agenda
+                            </button>
+                            <button type="button"
+                                    wire:click="toggleCreateAgenda"
+                                    class="bg-gray-500 hover:bg-gray-600 text-white font-medium py-2 px-4 rounded-md transition-colors">
+                                Cancel
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            @endif
+        </div>
+    @endif
+
     <!-- Players List -->
     <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
         <div class="flex justify-between items-center mb-4">
@@ -62,75 +186,63 @@
         <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
             <div class="flex justify-between items-start mb-4">
                 <div>
-                    <h2 class="text-2xl font-bold text-gray-900 dark:text-white">{{ $currentAgenda->title }}</h2>
-                    <p class="text-gray-600 dark:text-gray-300 mt-2">{{ $currentAgenda->description }}</p>
+                    <h2 class="text-xl font-bold text-gray-900 dark:text-white">{{ $currentAgenda->title }}</h2>
+                    <p class="text-gray-600 dark:text-gray-300 mt-1">{{ $currentAgenda->description }}</p>
                 </div>
-                @if($player->is_speaker)
-                    <div class="flex space-x-2">
-                        <button wire:click="toggleResults"
-                                class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm transition-colors">
-                            {{ $showResults ? 'Hide' : 'Show' }} Results
-                        </button>
-                        <button wire:click="endVoting"
-                                wire:confirm="Are you sure you want to end voting on this agenda?"
-                                class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm transition-colors">
-                            End Voting
-                        </button>
-                    </div>
-                @endif
+                <div class="text-right">
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                        {{ $currentAgenda->status === 'voting' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200' }}">
+                        {{ ucfirst($currentAgenda->status) }}
+                    </span>
+                </div>
             </div>
 
-            <!-- Voting Interface -->
             @if($currentAgenda->status === 'voting' && !$hasVoted)
-                <div class="border-t pt-4">
-                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Cast Your Vote</h3>
-                    <form wire:submit="submitVote" class="space-y-4">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                Choose Option
-                            </label>
-                            <div class="space-y-2">
-                                @foreach($currentAgenda->options as $option)
-                                    <label class="flex items-center">
-                                        <input type="radio"
-                                               wire:model="selectedOption"
-                                               value="{{ $option }}"
-                                               class="mr-2 text-blue-600">
-                                        <span class="text-gray-900 dark:text-white">{{ $option }}</span>
-                                    </label>
-                                @endforeach
-                            </div>
-                            @error('selectedOption') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
+                <!-- Voting Form -->
+                <form wire:submit="submitVote" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Choose your option:
+                        </label>
+                        <div class="space-y-2">
+                            @foreach($currentAgenda->options as $option)
+                                <label class="flex items-center">
+                                    <input type="radio"
+                                           wire:model="selectedOption"
+                                           value="{{ $option }}"
+                                           class="mr-2 text-blue-600">
+                                    <span class="text-gray-900 dark:text-white">{{ $option }}</span>
+                                </label>
+                            @endforeach
                         </div>
+                        @error('selectedOption') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
+                    </div>
 
-                        <div>
-                            <label for="influenceSpent" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                Influence Tokens to Spend
-                            </label>
-                            <input type="number"
-                                   id="influenceSpent"
-                                   wire:model="influenceSpent"
-                                   min="0"
-                                   max="99"
-                                   class="w-20 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white">
-                            @error('influenceSpent') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
-                        </div>
+                    <div>
+                        <label for="influenceSpent" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Influence to spend (0-99):
+                        </label>
+                        <input type="number"
+                               id="influenceSpent"
+                               wire:model="influenceSpent"
+                               min="0"
+                               max="99"
+                               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                               @if($selectedOption === 'Abstain') disabled @endif>
+                        @error('influenceSpent') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
+                    </div>
 
-                        <button type="submit"
-                                class="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-md transition-colors">
-                            Submit Vote
-                        </button>
-                    </form>
-                </div>
-            @elseif($hasVoted)
-                <div class="border-t pt-4">
-                    <div class="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
-                        <div class="flex items-center">
-                            <svg class="w-5 h-5 text-green-600 dark:text-green-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                            </svg>
-                            <span class="text-green-800 dark:text-green-200 font-medium">You have voted on this agenda</span>
-                        </div>
+                    <button type="submit"
+                            class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition-colors">
+                        Submit Vote
+                    </button>
+                </form>
+            @elseif($hasVoted && $currentAgenda->status === 'voting')
+                <div class="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+                    <div class="flex items-center">
+                        <svg class="w-5 h-5 text-green-600 dark:text-green-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5</svg>
+                        <span class="text-green-800 dark:text-green-200 font-medium">You have voted on this agenda</span>
                     </div>
                 </div>
             @endif
@@ -150,7 +262,7 @@
             </div>
 
             <!-- Results (Speaker Only or when voting ended) -->
-            @if($voteResults)
+            @if($speakerViewResults || $currentAgenda->status === 'completed')
                 <div class="border-t pt-4 mt-4">
                     <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Voting Results</h3>
                     <div class="space-y-3">
@@ -164,9 +276,9 @@
                                     <div class="bg-blue-600 h-2 rounded-full"
                                          style="width: {{ $result['percentage'] }}%"></div>
                                 </div>
-                                <div class="mt-2 text-sm text-gray-600 dark:text-gray-300">
-                                    {{ $result['count'] }} votes • {{ $result['influence_total'] }} influence
-                                </div>
+{{--                                <div class="mt-2 text-sm text-gray-600 dark:text-gray-300">--}}
+{{--                                    {{ $result['count'] }} votes • {{ $result['influence_total'] }} influence--}}
+{{--                                </div>--}}
                             </div>
                         @endforeach
                     </div>
@@ -175,3 +287,19 @@
         </div>
     @endif
 </div>
+
+<script>
+    document.addEventListener('livewire:initialized', () => {
+        Livewire.on('option-selected', (event) => {
+            const isAbstain = event.detail.option === 'Abstain';
+            const influenceInput = document.getElementById('influenceSpent');
+
+            if (isAbstain) {
+                influenceInput.value = '0';
+                influenceInput.disabled = true;
+            } else {
+                influenceInput.disabled = false;
+            }
+        });
+    });
+</script>

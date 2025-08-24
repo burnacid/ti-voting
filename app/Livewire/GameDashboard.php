@@ -15,13 +15,14 @@ class GameDashboard extends Component
     public Player $player;
     public $selectedOption = '';
     public $influenceSpent = 0;
-    public $showResults = false;
 
-    // Speaker-only properties
+    // Speaker-only properties for creating agendas
     public $newAgendaTitle = '';
     public $newAgendaDescription = '';
-    public $agendaOptions = ['For', 'Against'];
+    public $agendaType = 'for_against'; // 'for_against', 'elect_player', 'custom'
     public $customOptions = '';
+    public $showCreateAgenda = false;
+    public $speakerViewResults = false; // Speaker can toggle results view
 
     public function mount(Game $game, Player $player)
     {
@@ -36,6 +37,8 @@ class GameDashboard extends Component
             'influenceSpent' => 'required|integer|min:0|max:99',
             'newAgendaTitle' => 'required|string|max:255',
             'newAgendaDescription' => 'required|string|max:1000',
+            'agendaType' => 'required|in:for_against,elect_player,custom',
+            'customOptions' => 'required_if:agendaType,custom|string|max:500',
         ];
     }
 
@@ -44,6 +47,109 @@ class GameDashboard extends Component
         // Refresh the game and player data from the database
         $this->game = $this->game->fresh();
         $this->player = $this->player->fresh();
+
+        session()->flash('success', 'Data refreshed successfully!');
+    }
+
+    public function toggleCreateAgenda()
+    {
+        if (!$this->player->is_speaker) {
+            session()->flash('error', 'Only the Speaker can create agendas.');
+            return;
+        }
+
+        $this->showCreateAgenda = !$this->showCreateAgenda;
+
+        if (!$this->showCreateAgenda) {
+            $this->reset(['newAgendaTitle', 'newAgendaDescription', 'agendaType', 'customOptions']);
+        }
+    }
+
+    public function toggleSpeakerResults()
+    {
+        if (!$this->player->is_speaker) {
+            session()->flash('error', 'Only the Speaker can view results during voting.');
+            return;
+        }
+
+        $this->speakerViewResults = !$this->speakerViewResults;
+    }
+
+    public function createAgenda()
+    {
+        if (!$this->player->is_speaker) {
+            session()->flash('error', 'Only the Speaker can create agendas.');
+            return;
+        }
+
+        // Check if there's already an active agenda
+        $currentAgenda = $this->game->currentAgenda();
+        if ($currentAgenda) {
+            session()->flash('error', 'There is already an active agenda. Please end the current voting first.');
+            return;
+        }
+
+        $this->validate([
+            'newAgendaTitle' => 'required|string|max:255',
+            'newAgendaDescription' => 'required|string|max:1000',
+            'agendaType' => 'required|in:for_against,elect_player,custom',
+        ]);
+
+        // Determine options based on agenda type
+        $options = $this->getAgendaOptions();
+
+        if (empty($options)) {
+            session()->flash('error', 'Please provide valid options for the agenda.');
+            return;
+        }
+
+        Agenda::create([
+            'game_id' => $this->game->id,
+            'title' => $this->newAgendaTitle,
+            'description' => $this->newAgendaDescription,
+            'options' => $options,
+            'status' => 'voting',
+            'voting_started_at' => now(),
+        ]);
+
+        $this->reset(['newAgendaTitle', 'newAgendaDescription', 'agendaType', 'customOptions', 'showCreateAgenda']);
+        session()->flash('success', 'New agenda created and voting has started!');
+        $this->refreshData();
+    }
+
+    private function getAgendaOptions(): array
+    {
+        $options = [];
+
+        switch ($this->agendaType) {
+            case 'for_against':
+                $options = ['For', 'Against'];
+                break;
+
+            case 'elect_player':
+                // Get all players in the game as options
+                $options = $this->game->players()->pluck('name')->toArray();
+                break;
+
+            case 'custom':
+                if (empty($this->customOptions)) {
+                    return [];
+                }
+                // Split custom options by comma and clean them up
+                $options = array_map('trim', explode(',', $this->customOptions));
+                $options = array_filter($options, function($option) {
+                    return !empty($option);
+                });
+                break;
+
+            default:
+                return [];
+        }
+
+        // Add Abstain option to all agenda types
+        $options[] = 'Abstain';
+
+        return $options;
     }
 
     public function transferSpeaker($playerId)
@@ -65,15 +171,10 @@ class GameDashboard extends Component
         }
 
         try {
-            // Use the Game model's setSpeaker method
             $this->game->setSpeaker($newSpeaker);
 
             session()->flash('success', "Speaker token transferred to {$newSpeaker->name}!");
-
-            // Refresh the data to reflect the change
             $this->refreshData();
-
-            // Dispatch an event to notify other components
             $this->dispatch('speaker-changed', playerId: $newSpeaker->id);
 
         } catch (\Exception $e) {
@@ -97,8 +198,13 @@ class GameDashboard extends Component
 
         $this->validate([
             'selectedOption' => 'required|string',
-            'influenceSpent' => 'required|integer|min:0|max:99',
+            'influenceSpent' => $this->selectedOption === 'Abstain' ? 'integer|in:0' : 'required|integer|min:0|max:99',
         ]);
+
+        // Force influence to 0 when abstaining
+        if ($this->selectedOption === 'Abstain') {
+            $this->influenceSpent = 0;
+        }
 
         Vote::create([
             'agenda_id' => $currentAgenda->id,
@@ -110,46 +216,7 @@ class GameDashboard extends Component
         $this->selectedOption = '';
         $this->influenceSpent = 0;
 
-        session()->flash('success', 'Your vote has been submitted!');
-
-        // Refresh the component
         $this->dispatch('vote-submitted');
-        $this->refreshData();
-    }
-
-    public function createAgenda()
-    {
-        if (!$this->player->is_speaker) {
-            session()->flash('error', 'Only the Speaker can create agendas.');
-            return;
-        }
-
-        $this->validate([
-            'newAgendaTitle' => 'required|string|max:255',
-            'newAgendaDescription' => 'required|string|max:1000',
-        ]);
-
-        // Parse custom options if provided
-        $options = $this->agendaOptions;
-        if (!empty($this->customOptions)) {
-            $customOptionsList = array_map('trim', explode(',', $this->customOptions));
-            $options = array_filter($customOptionsList);
-        }
-
-        // End any current voting
-        $this->game->agendas()->where('status', 'voting')->update(['status' => 'completed']);
-
-        Agenda::create([
-            'game_id' => $this->game->id,
-            'title' => $this->newAgendaTitle,
-            'description' => $this->newAgendaDescription,
-            'options' => $options,
-            'status' => 'voting',
-            'voting_started_at' => now(),
-        ]);
-
-        $this->reset(['newAgendaTitle', 'newAgendaDescription', 'customOptions']);
-        session()->flash('success', 'New agenda created and voting has started!');
         $this->refreshData();
     }
 
@@ -167,19 +234,9 @@ class GameDashboard extends Component
                 'voting_ended_at' => now(),
             ]);
 
-            $this->showResults = true;
-            session()->flash('success', 'Voting has ended. Results are now visible.');
+            session()->flash('success', 'Voting has ended. Results are now visible to all players.');
             $this->refreshData();
         }
-    }
-
-    public function toggleResults()
-    {
-        if (!$this->player->is_speaker) {
-            return;
-        }
-
-        $this->showResults = !$this->showResults;
     }
 
     #[On('vote-submitted')]
@@ -195,15 +252,24 @@ class GameDashboard extends Component
         $players = $this->game->players()->get();
         $hasVoted = $currentAgenda ? $this->player->hasVotedOn($currentAgenda) : false;
         $allVoted = $currentAgenda ? $currentAgenda->allPlayersVoted() : false;
-        $voteResults = ($currentAgenda && ($this->showResults || $this->player->is_speaker))
-            ? $currentAgenda->getVoteResults()
-            : null;
+
+        // Show results if:
+        // 1. Voting is completed (for everyone)
+        // 2. Speaker wants to see results during voting (speaker only)
+
+        $showResults = $currentAgenda && (
+            $currentAgenda->status === 'completed' ||
+            ($this->player->is_speaker && $this->speakerViewResults)
+        );
+
+        $voteResults = $showResults ? $currentAgenda->getVoteResults() : null;
 
         return view('livewire.game-dashboard', [
             'currentAgenda' => $currentAgenda,
             'players' => $players,
             'hasVoted' => $hasVoted,
             'allVoted' => $allVoted,
+            'showResults' => $showResults,
             'voteResults' => $voteResults,
         ]);
     }
