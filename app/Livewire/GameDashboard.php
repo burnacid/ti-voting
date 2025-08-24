@@ -39,6 +39,13 @@ class GameDashboard extends Component
         ];
     }
 
+    public function refreshData()
+    {
+        // Refresh the game and player data from the database
+        $this->game = $this->game->fresh();
+        $this->player = $this->player->fresh();
+    }
+
     public function submitVote()
     {
         $currentAgenda = $this->game->currentAgenda();
@@ -72,6 +79,7 @@ class GameDashboard extends Component
 
         // Refresh the component
         $this->dispatch('vote-submitted');
+        $this->refreshData();
     }
 
     public function createAgenda()
@@ -107,6 +115,7 @@ class GameDashboard extends Component
 
         $this->reset(['newAgendaTitle', 'newAgendaDescription', 'customOptions']);
         session()->flash('success', 'New agenda created and voting has started!');
+        $this->refreshData();
     }
 
     public function endVoting()
@@ -125,6 +134,7 @@ class GameDashboard extends Component
 
             $this->showResults = true;
             session()->flash('success', 'Voting has ended. Results are now visible.');
+            $this->refreshData();
         }
     }
 
@@ -157,7 +167,7 @@ class GameDashboard extends Component
     #[On('vote-submitted')]
     public function refreshComponent()
     {
-        $this->game = $this->game->fresh();
+        $this->refreshData();
     }
 
     public function render()
