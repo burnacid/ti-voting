@@ -17,6 +17,10 @@ return new class extends Migration
             $table->boolean('is_speaker')->default(false);
             $table->timestamps();
         });
+
+        Schema::table('games', function (Blueprint $table) {
+            $table->foreign('speaker_id')->references('id')->on('players')->onDelete('cascade');
+        });
     }
 
     public function down(): void

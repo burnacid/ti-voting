@@ -15,8 +15,6 @@ return new class extends Migration
             $table->foreignUuid('speaker_id')->nullable();
             $table->enum('status', ['waiting', 'active', 'completed'])->default('waiting');
             $table->timestamps();
-
-            $table->foreign('speaker_id')->references('id')->on('players')->onDelete('cascade');
         });
     }
 
