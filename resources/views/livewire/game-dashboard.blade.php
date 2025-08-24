@@ -46,8 +46,9 @@
                     </div>
 
                     @if($player->is_speaker && $gamePlayer->id !== $player->id)
-                        <button wire:click="transferSpeaker({{ $gamePlayer->id }})"
-                                class="text-xs bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded">
+                        <button wire:click="transferSpeaker('{{ $gamePlayer->id }}')"
+                                wire:confirm="Are you sure you want to transfer the Speaker token to {{ $gamePlayer->name }}?"
+                                class="text-xs bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded transition-colors">
                             Make Speaker
                         </button>
                     @endif
@@ -67,11 +68,12 @@
                 @if($player->is_speaker)
                     <div class="flex space-x-2">
                         <button wire:click="toggleResults"
-                                class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm">
+                                class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm transition-colors">
                             {{ $showResults ? 'Hide' : 'Show' }} Results
                         </button>
                         <button wire:click="endVoting"
-                                class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm">
+                                wire:confirm="Are you sure you want to end voting on this agenda?"
+                                class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm transition-colors">
                             End Voting
                         </button>
                     </div>
@@ -115,7 +117,7 @@
                         </div>
 
                         <button type="submit"
-                                class="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-md">
+                                class="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-md transition-colors">
                             Submit Vote
                         </button>
                     </form>
@@ -163,7 +165,7 @@
                                          style="width: {{ $result['percentage'] }}%"></div>
                                 </div>
                                 <div class="mt-2 text-sm text-gray-600 dark:text-gray-300">
-                                    {{ $result['count'] }} votes
+                                    {{ $result['count'] }} votes • {{ $result['influence_total'] }} influence
                                 </div>
                             </div>
                         @endforeach

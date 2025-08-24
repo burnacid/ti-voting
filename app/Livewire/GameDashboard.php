@@ -46,6 +46,41 @@ class GameDashboard extends Component
         $this->player = $this->player->fresh();
     }
 
+    public function transferSpeaker($playerId)
+    {
+        if (!$this->player->is_speaker) {
+            session()->flash('error', 'Only the Speaker can transfer the Speaker token.');
+            return;
+        }
+
+        $newSpeaker = $this->game->players()->find($playerId);
+        if (!$newSpeaker) {
+            session()->flash('error', 'Player not found.');
+            return;
+        }
+
+        if ($newSpeaker->id === $this->player->id) {
+            session()->flash('error', 'You are already the Speaker.');
+            return;
+        }
+
+        try {
+            // Use the Game model's setSpeaker method
+            $this->game->setSpeaker($newSpeaker);
+
+            session()->flash('success', "Speaker token transferred to {$newSpeaker->name}!");
+
+            // Refresh the data to reflect the change
+            $this->refreshData();
+
+            // Dispatch an event to notify other components
+            $this->dispatch('speaker-changed', playerId: $newSpeaker->id);
+
+        } catch (\Exception $e) {
+            session()->flash('error', 'Failed to transfer speaker token: ' . $e->getMessage());
+        }
+    }
+
     public function submitVote()
     {
         $currentAgenda = $this->game->currentAgenda();
@@ -147,24 +182,8 @@ class GameDashboard extends Component
         $this->showResults = !$this->showResults;
     }
 
-    public function transferSpeaker($playerId)
-    {
-        if (!$this->player->is_speaker) {
-            session()->flash('error', 'Only the Speaker can transfer the Speaker token.');
-            return;
-        }
-
-        $newSpeaker = $this->game->players()->find($playerId);
-        if ($newSpeaker) {
-            $this->game->setSpeaker($newSpeaker);
-            session()->flash('success', "Speaker token transferred to {$newSpeaker->name}!");
-
-            // Refresh the page since speaker status changed
-            return redirect()->route('game.show', $this->game->code);
-        }
-    }
-
     #[On('vote-submitted')]
+    #[On('speaker-changed')]
     public function refreshComponent()
     {
         $this->refreshData();

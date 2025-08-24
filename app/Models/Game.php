@@ -43,6 +43,25 @@ class Game extends Model
         return $this->agendas()->where('status', 'voting')->first();
     }
 
+    public function setSpeaker(Player $player): void
+    {
+        if ($player->game_id !== $this->id) {
+            throw new \InvalidArgumentException('Player does not belong to this game');
+        }
+
+        // Start a database transaction to ensure consistency
+        \DB::transaction(function () use ($player) {
+            // Remove speaker status from all players in this game
+            $this->players()->update(['is_speaker' => false]);
+
+            // Set the new speaker
+            $player->update(['is_speaker' => true]);
+
+            // Update the game's speaker_id
+            $this->update(['speaker_id' => $player->id]);
+        });
+    }
+
     public static function generateCode(): string
     {
         do {
