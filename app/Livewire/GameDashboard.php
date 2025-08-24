@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use App\Services\PlanetService;
 use Livewire\Component;
 use App\Models\Game;
 use App\Models\Player;
@@ -36,7 +37,7 @@ class GameDashboard extends Component
             'influenceSpent' => 'required|integer|min:0|max:99',
             'newAgendaTitle' => 'required|string|max:255',
             'newAgendaDescription' => 'required|string|max:1000',
-            'agendaType' => 'required|in:for_against,elect_player,custom',
+            'agendaType' => 'required|in:for_against,elect_player,elect_planet_any,elect_planet_industrial,elect_planet_cultural,elect_planet_hazardous,elect_planet_non_home,custom',
             'customOptions' => 'required_if:agendaType,custom|string|max:500',
         ];
     }
@@ -106,7 +107,7 @@ class GameDashboard extends Component
         $this->validate([
             'newAgendaTitle' => 'required|string|max:255',
             'newAgendaDescription' => 'required|string|max:1000',
-            'agendaType' => 'required|in:for_against,elect_player,custom',
+            'agendaType' => 'required|in:for_against,elect_player,elect_planet_any,elect_planet_industrial,elect_planet_cultural,elect_planet_hazardous,elect_planet_non_home,custom'
         ]);
 
         // Determine options based on agenda type
@@ -149,6 +150,36 @@ class GameDashboard extends Component
             case 'elect_player':
                 // Get all players in the game as options
                 $options = $this->game->players()->pluck('name')->toArray();
+                break;
+
+            case 'elect_planet_any':
+                // Get all planets in the game as options
+                $planets = $this->game->getPlanets()->pluck('name');
+                $options = $planets->toArray();
+                break;
+
+            case 'elect_planet_industrial':
+                // Get all planets in the game as options
+                $planets = $this->game->getPlanets('industrial')->pluck('name');
+                $options = $planets->toArray();
+                break;
+
+            case 'elect_planet_cultural':
+                // Get all planets in the game as options
+                $planets = $this->game->getPlanets('cultural')->pluck('name');
+                $options = $planets->toArray();
+                break;
+
+            case 'elect_planet_hazardous':
+                // Get all planets in the game as options
+                $planets = $this->game->getPlanets('hazardous')->pluck('name');
+                $options = $planets->toArray();
+                break;
+
+            case 'elect_planet_non_home':
+                // Get all planets in the game as options
+                $planets = $this->game->getPlanets('non_home')->pluck('name');
+                $options = $planets->toArray();
                 break;
 
             case 'custom':

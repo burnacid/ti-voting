@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\PlanetService;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -78,5 +79,81 @@ class Game extends Model
         } while (self::where('code', $code)->exists());
 
         return $code;
+    }
+
+    public function getPlanets($type = null)
+    {
+        if(!$this->milty_draft_data) {
+            return collect([]);
+        }
+
+        $planetService = new PlanetService();
+
+        $Slices = $this->miltySelectedSlices();
+        $Tiles = $this->miltyTilesFromSlices($Slices);
+        $Factions = $this->miltyFactionNames();
+        $HomePlanets = $planetService->getFactionPlanets($Factions->toArray());
+        $HomePlanets = collect($HomePlanets);
+
+        $planetInfo = $planetService->getPlanetsByTileNumber($Tiles->toArray());
+        $planetInfo = collect($planetInfo);
+        $planetInfo = $planetInfo->sortBy('name');
+
+        if($type == 'industrial'){
+            return $planetInfo->where('trait', '==', 'industrial');
+        }
+
+        if($type == 'cultural'){
+            return $planetInfo->where('trait', '==', 'cultural');
+        }
+
+        if($type == 'hazardous'){
+            return $planetInfo->where('trait', '==', 'hazardous');
+        }
+
+        if($type == 'non_home'){
+            return $planetInfo->where('tile_id', '!=', 18);
+        }
+
+        $planetInfo = $planetInfo->merge($HomePlanets);
+        $planetInfo = $planetInfo->sortBy('name');
+        return $planetInfo;
+    }
+
+    public function miltySelectedSlices()
+    {
+        if(!$this->milty_draft_data) {
+            return collect([]);
+        }
+
+        $selectedSlices = collect($this->milty_draft_data['draft']['draft']['players'])->pluck('slice');
+
+        $slices = collect([]);
+        foreach($selectedSlices as $slice) {
+            $slices->push($this->milty_draft_data['draft']['slices'][$slice]);
+        }
+
+        return $slices;
+    }
+
+    public function miltyTilesFromSlices($slices)
+    {
+        $tiles = collect([18]);
+        foreach($slices as $slice) {
+            $tiles = $tiles->merge(collect($slice['tiles']));
+        }
+
+        return $tiles;
+    }
+
+    public function miltyFactionNames()
+    {
+        if(!$this->milty_draft_data) {
+            return collect([]);
+        }
+
+        $factionNames = collect($this->milty_draft_data['draft']['draft']['players'])->pluck('faction');
+
+        return $factionNames;
     }
 }

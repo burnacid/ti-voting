@@ -83,6 +83,41 @@
                                 <label class="flex items-center">
                                     <input type="radio"
                                            wire:model.live="agendaType"
+                                           value="elect_planet_any"
+                                           class="mr-2 text-blue-600">
+                                    <span class="text-gray-900 dark:text-white">Elect a Planet</span>
+                                </label>
+                                <label class="flex items-center">
+                                    <input type="radio"
+                                           wire:model.live="agendaType"
+                                           value="elect_planet_industrial"
+                                           class="mr-2 text-blue-600">
+                                    <span class="text-gray-900 dark:text-white">Elect an Industrial Planet</span>
+                                </label>
+                                <label class="flex items-center">
+                                    <input type="radio"
+                                           wire:model.live="agendaType"
+                                           value="elect_planet_hazardous"
+                                           class="mr-2 text-blue-600">
+                                    <span class="text-gray-900 dark:text-white">Elect a Hazardous Planet</span>
+                                </label>
+                                <label class="flex items-center">
+                                    <input type="radio"
+                                           wire:model.live="agendaType"
+                                           value="elect_planet_cultural"
+                                           class="mr-2 text-blue-600">
+                                    <span class="text-gray-900 dark:text-white">Elect a Cultural Planet</span>
+                                </label>
+                                <label class="flex items-center">
+                                    <input type="radio"
+                                           wire:model.live="agendaType"
+                                           value="elect_planet_non_home"
+                                           class="mr-2 text-blue-600">
+                                    <span class="text-gray-900 dark:text-white">Elect a Non-Home Planet other than Mecatol Rex</span>
+                                </label>
+                                <label class="flex items-center">
+                                    <input type="radio"
+                                           wire:model.live="agendaType"
                                            value="custom"
                                            class="mr-2 text-blue-600">
                                     <span class="text-gray-900 dark:text-white">Custom Options</span>
@@ -109,6 +144,46 @@
                             <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
                                 <p class="text-sm text-blue-800 dark:text-blue-200">
                                     Players will be able to vote for any player currently in the game.
+                                </p>
+                            </div>
+                        @endif
+
+                        @if($agendaType === 'elect_planet_any')
+                            <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                                <p class="text-sm text-blue-800 dark:text-blue-200">
+                                    Players will be able to vote for any planet in the game.
+                                </p>
+                            </div>
+                        @endif
+
+                        @if($agendaType === 'elect_planet_industrial')
+                            <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                                <p class="text-sm text-blue-800 dark:text-blue-200">
+                                    Players will be able to vote for any industrial planet in the game.
+                                </p>
+                            </div>
+                        @endif
+
+                        @if($agendaType === 'elect_planet_hazardous')
+                            <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                                <p class="text-sm text-blue-800 dark:text-blue-200">
+                                    Players will be able to vote for any hazardous planet in the game.
+                                </p>
+                            </div>
+                        @endif
+
+                        @if($agendaType === 'elect_planet_cultural')
+                            <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                                <p class="text-sm text-blue-800 dark:text-blue-200">
+                                    Players will be able to vote for any cultural planet in the game.
+                                </p>
+                            </div>
+                        @endif
+
+                        @if($agendaType === 'elect_planet_non_home')
+                            <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                                <p class="text-sm text-blue-800 dark:text-blue-200">
+                                    Players will be able to vote for any non-home planet in the game except Mecatol Rex.
                                 </p>
                             </div>
                         @endif

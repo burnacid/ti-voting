@@ -33,9 +33,8 @@ class PlanetService
                     $planet,
                     [
                         'tile_id' => $tileId,
-                        'faction' => $tile['faction'],
                         'type' => $tile['type'],
-                        'wormhole' => $tile['wormhole'],
+                        'faction' => isset($tile['faction']) ? $tile['faction'] : null,
                     ]
                 );
             }
@@ -76,5 +75,72 @@ class PlanetService
         asort($options);
 
         return $options;
+    }
+
+    public function getPlanetsByTileNumber(int|array $tileNumbers): array
+    {
+        // Convert single tile number to array for consistent handling
+        if (!is_array($tileNumbers)) {
+            $tileNumbers = [$tileNumbers];
+        }
+
+        return array_filter($this->flattenedPlanets, function ($planet) use ($tileNumbers) {
+            return in_array($planet['tile_id'], $tileNumbers);
+        });
+    }
+
+    public function getPlanetOptionsByTileNumber(int|array $tileNumbers): array
+    {
+        $planets = $this->getPlanetsByTileNumber($tileNumbers);
+        $options = [];
+
+        foreach ($planets as $name => $planet) {
+            $resources = $planet['resources'];
+            $influence = $planet['influence'];
+            $options[$name] = "{$name} (R:{$resources}/I:{$influence})";
+        }
+
+        asort($options);
+
+        return $options;
+    }
+
+    public function getFactionPlanets(string|array $factions): array
+    {
+        if (!is_array($factions)) {
+            $factions = [$factions];
+        }
+
+        // Simple exact matching
+        $result = array_filter($this->flattenedPlanets, function ($planet) use ($factions) {
+            // Skip planets without a faction
+            if (empty($planet['faction'])) {
+                return false;
+            }
+
+            // Check if the planet's faction is in our list of factions
+            $planetFaction = $planet['faction'];
+
+            // Try exact match first
+            if (in_array($planetFaction, $factions)) {
+                return true;
+            }
+
+            // Try normalized comparison (remove "The " prefix and convert to lowercase)
+            $normalizedPlanetFaction = strtolower(preg_replace('/^The\s+/i', '', $planetFaction));
+
+            foreach ($factions as $faction) {
+                $normalizedFaction = strtolower(preg_replace('/^The\s+/i', '', $faction));
+
+                // If normalized versions match, it's the same faction
+                if ($normalizedPlanetFaction === $normalizedFaction) {
+                    return true;
+                }
+            }
+
+            return false;
+        });
+
+        return $result;
     }
 }
