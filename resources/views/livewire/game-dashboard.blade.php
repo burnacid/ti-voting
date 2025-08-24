@@ -188,6 +188,22 @@
                             </div>
                         @endif
 
+                        @if(str_starts_with($agendaType, 'elect_planet_'))
+                            <div>
+                                <label for="customTileNumbers" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                    Additional Tile Numbers (comma separated, optional)
+                                </label>
+                                <input type="text"
+                                       id="customTileNumbers"
+                                       wire:model="customTileNumbers"
+                                       placeholder="18, 25, 32"
+                                       class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white">
+                                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                    Add specific tile numbers to include their planets in the voting options
+                                </p>
+                            </div>
+                        @endif
+
                         <div class="flex space-x-3">
                             <button type="submit"
                                     class="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-md transition-colors">
@@ -273,33 +289,36 @@
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                             Choose your option:
                         </label>
-                        <div class="space-y-2">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
                             @foreach($currentAgenda->options as $option)
-                                <label class="flex items-center">
+                                <label class="flex items-center p-2 rounded-md
+                                    {{ $option === 'Abstain' ? 'bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/30 border border-red-200 dark:border-red-800' : 'hover:bg-gray-50 dark:hover:bg-gray-700' }}
+                                    transition-colors">
                                     <input type="radio"
-                                           wire:model="selectedOption"
+                                           wire:model.live="selectedOption"
                                            value="{{ $option }}"
-                                           class="mr-2 text-blue-600">
-                                    <span class="text-gray-900 dark:text-white">{{ $option }}</span>
+                                           class="{{ $option === 'Abstain' ? 'text-red-600' : 'text-blue-600' }} mr-2">
+                                    <span class="{{ $option === 'Abstain' ? 'text-red-800 dark:text-red-200' : 'text-gray-900 dark:text-white' }}">{{ $option }}</span>
                                 </label>
                             @endforeach
                         </div>
                         @error('selectedOption') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
                     </div>
 
+                    @if($selectedOption !== 'Abstain')
                     <div>
                         <label for="influenceSpent" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Influence to spend (0-99):
+                            Influence to spend (1-99):
                         </label>
                         <input type="number"
                                id="influenceSpent"
                                wire:model="influenceSpent"
-                               min="0"
+                               min="1"
                                max="99"
-                               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-                               @if($selectedOption === 'Abstain') disabled @endif>
+                               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white">
                         @error('influenceSpent') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
                     </div>
+                    @endif
 
                     <button type="submit"
                             class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition-colors">

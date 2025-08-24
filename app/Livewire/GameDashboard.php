@@ -21,6 +21,7 @@ class GameDashboard extends Component
     public $newAgendaDescription = '';
     public $agendaType = 'for_against'; // 'for_against', 'elect_player', 'custom'
     public $customOptions = '';
+    public $customTileNumbers = '';
     public $showCreateAgenda = false;
     public $speakerViewResults = false; // Speaker can toggle results view
 
@@ -39,6 +40,7 @@ class GameDashboard extends Component
             'newAgendaDescription' => 'required|string|max:1000',
             'agendaType' => 'required|in:for_against,elect_player,elect_planet_any,elect_planet_industrial,elect_planet_cultural,elect_planet_hazardous,elect_planet_non_home,custom',
             'customOptions' => 'required_if:agendaType,custom|string|max:500',
+            'customTileNumbers' => 'nullable|string|max:255',
         ];
     }
 
@@ -67,7 +69,7 @@ class GameDashboard extends Component
         $this->showCreateAgenda = !$this->showCreateAgenda;
 
         if (!$this->showCreateAgenda) {
-            $this->reset(['newAgendaTitle', 'newAgendaDescription', 'agendaType', 'customOptions']);
+            $this->reset(['newAgendaTitle', 'newAgendaDescription', 'agendaType', 'customOptions', 'customTileNumbers']);
         }
     }
 
@@ -141,6 +143,17 @@ class GameDashboard extends Component
     private function getAgendaOptions(): array
     {
         $options = [];
+        $planetService = app(PlanetService::class);
+        $customTileNumbers = [];
+
+        // Parse custom tile numbers if provided
+        if (!empty($this->customTileNumbers)) {
+            $customTileNumbers = array_map('trim', explode(',', $this->customTileNumbers));
+            $customTileNumbers = array_filter($customTileNumbers, function($num) {
+                return is_numeric($num);
+            });
+            $customTileNumbers = array_map('intval', $customTileNumbers);
+        }
 
         switch ($this->agendaType) {
             case 'for_against':
@@ -153,33 +166,78 @@ class GameDashboard extends Component
                 break;
 
             case 'elect_planet_any':
-                // Get all planets in the game as options
-                $planets = $this->game->getPlanets()->pluck('name');
-                $options = $planets->toArray();
+                // Get all planets in the game
+                $planets = $this->game->getPlanets();
+
+                // Add planets from custom tile numbers
+                if (!empty($customTileNumbers)) {
+                    $customPlanets = $planetService->getPlanetsByTileNumber($customTileNumbers);
+                    foreach ($customPlanets as $name => $planet) {
+                        $planets[$name] = $planet;
+                    }
+                }
+
+                $options = $planets->pluck('name')->sort()->toArray();
                 break;
 
             case 'elect_planet_industrial':
-                // Get all planets in the game as options
-                $planets = $this->game->getPlanets('industrial')->pluck('name');
-                $options = $planets->toArray();
+                // Get industrial planets
+                $planets = $this->game->getPlanets('industrial');
+
+                // Add planets from custom tile numbers
+                if (!empty($customTileNumbers)) {
+                    $customPlanets = $planetService->getPlanetsByTileNumber($customTileNumbers);
+                    foreach ($customPlanets as $name => $planet) {
+                        $planets[$name] = $planet;
+                    }
+                }
+
+                $options = $planets->pluck('name')->sort()->toArray();
                 break;
 
             case 'elect_planet_cultural':
-                // Get all planets in the game as options
-                $planets = $this->game->getPlanets('cultural')->pluck('name');
-                $options = $planets->toArray();
+                // Get cultural planets
+                $planets = $this->game->getPlanets('cultural');
+
+                // Add planets from custom tile numbers
+                if (!empty($customTileNumbers)) {
+                    $customPlanets = $planetService->getPlanetsByTileNumber($customTileNumbers);
+                    foreach ($customPlanets as $name => $planet) {
+                        $planets[$name] = $planet;
+                    }
+                }
+
+                $options = $planets->pluck('name')->sort()->toArray();
                 break;
 
             case 'elect_planet_hazardous':
-                // Get all planets in the game as options
-                $planets = $this->game->getPlanets('hazardous')->pluck('name');
-                $options = $planets->toArray();
+                // Get hazardous planets
+                $planets = $this->game->getPlanets('hazardous');
+
+                // Add planets from custom tile numbers
+                if (!empty($customTileNumbers)) {
+                    $customPlanets = $planetService->getPlanetsByTileNumber($customTileNumbers);
+                    foreach ($customPlanets as $name => $planet) {
+                        $planets[$name] = $planet;
+                    }
+                }
+
+                $options = $planets->pluck('name')->sort()->toArray();
                 break;
 
             case 'elect_planet_non_home':
-                // Get all planets in the game as options
-                $planets = $this->game->getPlanets('non_home')->pluck('name');
-                $options = $planets->toArray();
+                // Get non-home planets
+                $planets = $this->game->getPlanets('non_home');
+
+                // Add planets from custom tile numbers
+                if (!empty($customTileNumbers)) {
+                    $customPlanets = $planetService->getPlanetsByTileNumber($customTileNumbers);
+                    foreach ($customPlanets as $name => $planet) {
+                        $planets[$name] = $planet;
+                    }
+                }
+
+                $options = $planets->pluck('name')->sort()->toArray();
                 break;
 
             case 'custom':
@@ -270,7 +328,7 @@ class GameDashboard extends Component
 
         $this->validate([
             'selectedOption' => 'required|string',
-            'influenceSpent' => $this->selectedOption === 'Abstain' ? 'integer|in:0' : 'required|integer|min:0|max:99',
+            'influenceSpent' => $this->selectedOption === 'Abstain' ? 'integer' : 'required|integer|min:1|max:99',
         ]);
 
         // Force influence to 0 when abstaining
