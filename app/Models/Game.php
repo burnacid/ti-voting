@@ -1,0 +1,54 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
+class Game extends Model
+{
+    use HasFactory, HasUuids;
+
+    protected $fillable = [
+        'code',
+        'name',
+        'speaker_id',
+        'status',
+    ];
+
+    protected $casts = [
+        'status' => 'string',
+    ];
+
+    public function players(): HasMany
+    {
+        return $this->hasMany(Player::class);
+    }
+
+    public function speaker(): BelongsTo
+    {
+        return $this->belongsTo(Player::class, 'speaker_id');
+    }
+
+    public function agendas(): HasMany
+    {
+        return $this->hasMany(Agenda::class);
+    }
+
+    public function currentAgenda(): ?Agenda
+    {
+        return $this->agendas()->where('status', 'voting')->first();
+    }
+
+    public static function generateCode(): string
+    {
+        do {
+            $code = strtoupper(substr(str_shuffle('ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'), 0, 6));
+        } while (self::where('code', $code)->exists());
+
+        return $code;
+    }
+}
