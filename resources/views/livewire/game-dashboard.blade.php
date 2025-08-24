@@ -24,10 +24,17 @@
                             {{ $showCreateAgenda ? 'Cancel' : 'Create New Agenda' }}
                         </button>
                     @elseif($currentAgenda->status === 'voting')
-                        <button wire:click="toggleSpeakerResults"
-                                class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition-colors">
-                            {{ $speakerViewResults ? 'Hide Results' : 'View Results' }}
-                        </button>
+                        @if($currentAgenda->allPlayersVoted())
+                            <button wire:click="toggleSpeakerResults"
+                                    class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition-colors">
+                                {{ $speakerViewResults ? 'Hide Results' : 'View Results' }}
+                            </button>
+                        @else
+                            <button wire:click="refreshData"
+                                    class="inline-flex items-center px-3 py-2 border border-gray-300 dark:border-gray-600 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
+                                Check Votes
+                            </button>
+                        @endif
                         <button wire:click="endVoting"
                                 wire:confirm="Are you sure you want to end voting? This will make results visible to all players."
                                 class="bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-md transition-colors">
@@ -240,8 +247,6 @@
             @elseif($hasVoted && $currentAgenda->status === 'voting')
                 <div class="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
                     <div class="flex items-center">
-                        <svg class="w-5 h-5 text-green-600 dark:text-green-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5</svg>
                         <span class="text-green-800 dark:text-green-200 font-medium">You have voted on this agenda</span>
                     </div>
                 </div>
@@ -267,19 +272,21 @@
                     <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Voting Results</h3>
                     <div class="space-y-3">
                         @foreach($voteResults as $option => $result)
-                            <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                                <div class="flex justify-between items-center mb-2">
-                                    <span class="font-medium text-gray-900 dark:text-white">{{ $option }}</span>
-                                    <span class="text-sm text-gray-600 dark:text-gray-300">{{ $result['percentage'] }}%</span>
+                            @if($result['influence'] > 0)
+                                <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                                    <div class="flex justify-between items-center mb-2">
+                                        <span class="font-medium text-gray-900 dark:text-white">{{ $option }}</span>
+                                        <span class="text-sm text-gray-600 dark:text-gray-300">{{ $result['percentage'] }}%</span>
+                                    </div>
+                                    <div class="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2">
+                                        <div class="bg-blue-600 h-2 rounded-full"
+                                             style="width: {{ $result['percentage'] }}%"></div>
+                                    </div>
+                                    <div class="mt-2 text-sm text-gray-600 dark:text-gray-300">
+                                        {{ $result['influence'] }} influence
+                                    </div>
                                 </div>
-                                <div class="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2">
-                                    <div class="bg-blue-600 h-2 rounded-full"
-                                         style="width: {{ $result['percentage'] }}%"></div>
-                                </div>
-{{--                                <div class="mt-2 text-sm text-gray-600 dark:text-gray-300">--}}
-{{--                                    {{ $result['count'] }} votes • {{ $result['influence_total'] }} influence--}}
-{{--                                </div>--}}
-                            </div>
+                            @endif
                         @endforeach
                     </div>
                 </div>

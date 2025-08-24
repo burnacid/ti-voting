@@ -41,16 +41,14 @@ class Agenda extends Model
     public function getVoteResults(): array
     {
         $results = [];
-        $totalVotes = $this->votes()->count();
+        $totalInfluence = $this->votes()->sum('influence_spent');
 
         foreach ($this->options as $option) {
-            $voteCount = $this->votes()->where('option', $option)->count();
             $influenceTotal = $this->votes()->where('option', $option)->sum('influence_spent');
 
             $results[$option] = [
-                'votes' => $voteCount,
                 'influence' => $influenceTotal,
-                'percentage' => $totalVotes > 0 ? round(($voteCount / $totalVotes) * 100, 1) : 0,
+                'percentage' => $totalInfluence > 0 ? round(($influenceTotal / $totalInfluence) * 100, 1) : 0,
             ];
         }
 
