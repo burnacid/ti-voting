@@ -2,12 +2,11 @@
 
 namespace App\Livewire;
 
+use Livewire\Component;
 use App\Models\Game;
 use App\Models\Player;
 use App\Models\Agenda;
 use App\Models\Vote;
-use Livewire\Component;
-use Livewire\Attributes\On;
 
 class GameDashboard extends Component
 {
@@ -48,13 +47,19 @@ class GameDashboard extends Component
         $this->game = $this->game->fresh();
         $this->player = $this->player->fresh();
 
-        session()->flash('success', 'Data refreshed successfully!');
+        $this->dispatch('flashMessage', [
+            'Data refreshed successfully!',
+            'success'
+        ]);
     }
 
     public function toggleCreateAgenda()
     {
         if (!$this->player->is_speaker) {
-            session()->flash('error', 'Only the Speaker can create agendas.');
+            $this->dispatch('flashMessage', [
+                'Only the Speaker can create agendas.',
+                'error'
+            ]);
             return;
         }
 
@@ -68,7 +73,10 @@ class GameDashboard extends Component
     public function toggleSpeakerResults()
     {
         if (!$this->player->is_speaker) {
-            session()->flash('error', 'Only the Speaker can view results during voting.');
+            $this->dispatch('flashMessage', [
+                'Only the Speaker can view results during voting.',
+                'error'
+            ]);
             return;
         }
 
@@ -78,14 +86,20 @@ class GameDashboard extends Component
     public function createAgenda()
     {
         if (!$this->player->is_speaker) {
-            session()->flash('error', 'Only the Speaker can create agendas.');
+            $this->dispatch('flashMessage', [
+                'Only the Speaker can create agendas.',
+                'error'
+            ]);
             return;
         }
 
         // Check if there's already an active agenda
         $currentAgenda = $this->game->currentAgenda();
         if ($currentAgenda) {
-            session()->flash('error', 'There is already an active agenda. Please end the current voting first.');
+            $this->dispatch('flashMessage', [
+                'There is already an active agenda. Please end the current voting first.',
+                'error'
+            ]);
             return;
         }
 
@@ -99,7 +113,10 @@ class GameDashboard extends Component
         $options = $this->getAgendaOptions();
 
         if (empty($options)) {
-            session()->flash('error', 'Please provide valid options for the agenda.');
+            $this->dispatch('flashMessage', [
+                'Please provide valid options for the agenda.',
+                'error'
+            ]);
             return;
         }
 
@@ -113,7 +130,10 @@ class GameDashboard extends Component
         ]);
 
         $this->reset(['newAgendaTitle', 'newAgendaDescription', 'agendaType', 'customOptions', 'showCreateAgenda']);
-        session()->flash('success', 'New agenda created and voting has started!');
+        $this->dispatch('flashMessage', [
+            'New agenda created and voting has started!',
+            'success'
+        ]);
         $this->refreshData();
     }
 
@@ -155,30 +175,45 @@ class GameDashboard extends Component
     public function transferSpeaker($playerId)
     {
         if (!$this->player->is_speaker) {
-            session()->flash('error', 'Only the Speaker can transfer the Speaker token.');
+            $this->dispatch('flashMessage', [
+                'Only the Speaker can transfer the Speaker token.',
+                'error'
+            ]);
             return;
         }
 
         $newSpeaker = $this->game->players()->find($playerId);
         if (!$newSpeaker) {
-            session()->flash('error', 'Player not found.');
+            $this->dispatch('flashMessage', [
+                'Player not found.',
+                'error'
+            ]);
             return;
         }
 
         if ($newSpeaker->id === $this->player->id) {
-            session()->flash('error', 'You are already the Speaker.');
+            $this->dispatch('flashMessage', [
+                'You are already the Speaker.',
+                'error'
+            ]);
             return;
         }
 
         try {
             $this->game->setSpeaker($newSpeaker);
 
-            session()->flash('success', "Speaker token transferred to {$newSpeaker->name}!");
+            $this->dispatch('flashMessage', [
+                "Speaker token transferred to {$newSpeaker->name}!",
+                'success'
+            ]);
             $this->refreshData();
             $this->dispatch('speaker-changed', playerId: $newSpeaker->id);
 
         } catch (\Exception $e) {
-            session()->flash('error', 'Failed to transfer speaker token: ' . $e->getMessage());
+            $this->dispatch('flashMessage', [
+                'Failed to transfer speaker token: ' . $e->getMessage(),
+                'error'
+            ]);
         }
     }
 
@@ -187,12 +222,18 @@ class GameDashboard extends Component
         $currentAgenda = $this->game->currentAgenda();
 
         if (!$currentAgenda) {
-            session()->flash('error', 'No active agenda to vote on.');
+            $this->dispatch('flashMessage', [
+                'No active agenda to vote on.',
+                'error'
+            ]);
             return;
         }
 
         if ($this->player->hasVotedOn($currentAgenda)) {
-            session()->flash('error', 'You have already voted on this agenda.');
+            $this->dispatch('flashMessage', [
+                'You have already voted on this agenda.',
+                'error'
+            ]);
             return;
         }
 
@@ -216,6 +257,10 @@ class GameDashboard extends Component
         $this->selectedOption = '';
         $this->influenceSpent = 0;
 
+        $this->dispatch('flashMessage', [
+            'Your vote has been recorded!',
+            'success'
+        ]);
         $this->dispatch('vote-submitted');
         $this->refreshData();
     }
@@ -223,7 +268,10 @@ class GameDashboard extends Component
     public function endVoting()
     {
         if (!$this->player->is_speaker) {
-            session()->flash('error', 'Only the Speaker can end voting.');
+            $this->dispatch('flashMessage', [
+                'Only the Speaker can end voting.',
+                'error'
+            ]);
             return;
         }
 
@@ -234,13 +282,14 @@ class GameDashboard extends Component
                 'voting_ended_at' => now(),
             ]);
 
-            session()->flash('success', 'Voting has ended. Results are now visible to all players.');
+            $this->dispatch('flashMessage', [
+                'Voting has ended. Results are now visible to all players.',
+                'info'
+            ]);
             $this->refreshData();
         }
     }
 
-    #[On('vote-submitted')]
-    #[On('speaker-changed')]
     public function refreshComponent()
     {
         $this->refreshData();

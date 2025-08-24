@@ -16,11 +16,15 @@ class Game extends Model
         'code',
         'name',
         'speaker_id',
+        'milty_url',
+        'milty_draft_id',
+        'milty_draft_data',
         'status',
     ];
 
     protected $casts = [
         'status' => 'string',
+        'milty_draft_data' => 'array'
     ];
 
     public function players(): HasMany

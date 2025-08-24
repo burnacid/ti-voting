@@ -15,6 +15,18 @@
         </div>
 
         <div>
+            <label for="miltyUrl" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Your Name
+            </label>
+            <input type="text"
+                   id="miltyUrl"
+                   wire:model="miltyUrl"
+                   class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                   placeholder="https://milty.shenanigans.be/d/...">
+            @error('miltyUrl') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
+        </div>
+
+        <div>
             <label for="playerName" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Your Name
             </label>
