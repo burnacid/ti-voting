@@ -301,7 +301,7 @@
             <div class="flex justify-between items-start mb-4">
                 <div>
                     <h2 class="text-xl font-bold text-gray-900 dark:text-white">{{ $currentAgenda->title }}</h2>
-                    <p class="text-gray-600 dark:text-gray-300 mt-1">{{ $currentAgenda->description }}</p>
+                    <p class="text-gray-600 dark:text-gray-300 mt-1">{!! nl2br($currentAgenda->formatted_description ) !!}</p>
                 </div>
                 <div class="text-right">
                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium

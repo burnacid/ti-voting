@@ -59,4 +59,11 @@ class Agenda extends Model
     {
         return $this->votes()->count() >= $this->game->players()->count();
     }
+
+    public function getFormattedDescriptionAttribute(): string
+    {
+        $description = str_replace("FOR :", "<strong>FOR</strong> :", e($this->description));
+        $description = str_replace("AGAINST :", "<strong>AGAINST</strong> :", $description);
+        return nl2br($description);
+    }
 }
