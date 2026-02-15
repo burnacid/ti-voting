@@ -19,16 +19,89 @@ class GameDashboard extends Component
     // Speaker-only properties for creating agendas
     public $newAgendaTitle = '';
     public $newAgendaDescription = '';
-    public $agendaType = 'for_against'; // 'for_against', 'elect_player', 'custom'
+    public $agendaType = 'for_against';
     public $customOptions = '';
     public $customTileNumbers = '';
     public $showCreateAgenda = false;
-    public $speakerViewResults = false; // Speaker can toggle results view
+    public $speakerViewResults = false;
+    public $selectedPresetAgenda = ''; // New property for preset agenda selection
+    public $availableAgendas = []; // New property to store available agendas
 
     public function mount(Game $game, Player $player)
     {
         $this->game = $game;
         $this->player = $player;
+        $this->loadAvailableAgendas();
+    }
+
+    private function loadAvailableAgendas()
+    {
+        $jsonPath = resource_path('data/agendas.json');
+        if (file_exists($jsonPath)) {
+            $agendas = json_decode(file_get_contents($jsonPath), true);
+            $this->availableAgendas = collect($agendas)->sortBy('Name')->values()->all();
+        }
+    }
+
+    public function updatedSelectedPresetAgenda($value)
+    {
+        if (empty($value)) {
+            return;
+        }
+
+        $agenda = collect($this->availableAgendas)->firstWhere('Name', $value);
+
+        if (!$agenda) {
+            return;
+        }
+
+        // Populate form fields based on selected agenda
+        $this->newAgendaTitle = $agenda['Name'];
+        $this->newAgendaDescription = $agenda['Effect'];
+
+        // Determine agenda type based on Elect field
+        $electType = strtolower($agenda['Elect'] ?? '');
+
+        switch ($electType) {
+            case 'for_against':
+                $this->agendaType = 'for_against';
+                break;
+            case 'player':
+                $this->agendaType = 'elect_player';
+                break;
+            case 'planet':
+            case 'non_home_non_mecathol':
+                $this->agendaType = 'elect_planet_non_home';
+                break;
+            case 'industrial_planet':
+                $this->agendaType = 'elect_planet_industrial';
+                break;
+            case 'cultural_planet':
+                $this->agendaType = 'elect_planet_cultural';
+                break;
+            case 'hazardous_planet':
+                $this->agendaType = 'elect_planet_hazardous';
+                break;
+            case 'law':
+            case 'secret_objective':
+                // These are special cases that might need custom handling
+                $this->agendaType = 'custom';
+                $this->customOptions = $electType === 'law' ? 'Law 1, Law 2, Law 3' : 'Secret Objective 1, Secret Objective 2';
+                break;
+            default:
+                $this->agendaType = 'for_against';
+        }
+
+        $this->dispatch('flashMessage', [
+            'Agenda template loaded. You can modify the details before creating.',
+            'success'
+        ]);
+    }
+
+    public function clearPresetSelection()
+    {
+        $this->selectedPresetAgenda = '';
+        $this->reset(['newAgendaTitle', 'newAgendaDescription', 'agendaType', 'customOptions', 'customTileNumbers']);
     }
 
     public function rules()

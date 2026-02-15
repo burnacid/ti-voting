@@ -37,6 +37,35 @@
                     <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Create New Agenda</h3>
 
                     <form wire:submit="createAgenda" class="space-y-4">
+                        <!-- Preset Agenda Selection -->
+                        <div>
+                            <label for="selectedPresetAgenda" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                Select Preset Agenda (Optional)
+                            </label>
+                            <div class="flex space-x-2">
+                                <select id="selectedPresetAgenda"
+                                        wire:model.live="selectedPresetAgenda"
+                                        class="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white">
+                                    <option value="">-- Create Custom Agenda --</option>
+                                    @foreach($availableAgendas as $agenda)
+                                        <option value="{{ $agenda['Name'] }}">
+                                            {{ $agenda['Name'] }} ({{ ucfirst($agenda['Type']) }})
+                                        </option>
+                                    @endforeach
+                                </select>
+                                @if($selectedPresetAgenda)
+                                    <button type="button"
+                                            wire:click="clearPresetSelection"
+                                            class="px-3 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-md transition-colors">
+                                        Clear
+                                    </button>
+                                @endif
+                            </div>
+                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                Select a preset agenda to auto-fill the form, or create a custom one from scratch
+                            </p>
+                        </div>
+
                         <div>
                             <label for="newAgendaTitle" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                                 Agenda Title
