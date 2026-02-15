@@ -17,7 +17,7 @@ class MiltyService
     public function extractDraftId(string $url): ?string
     {
         // Extract draft ID from URL like https://milty.shenanigans.be/d/688cc17676088
-        if (preg_match('/\/d\/([a-zA-Z0-9]+)/', $url, $matches)) {
+        if (preg_match('/\/d\/([a-zA-Z0-9_]+)/', $url, $matches)) {
             return $matches[1];
         }
 
@@ -38,9 +38,7 @@ class MiltyService
                 'verify' => !App::environment('local'),
             ]);
 
-            $response = $http->get("https://milty.shenanigans.be/api/data", [
-                'draft' => $draftId
-            ]);
+            $response = $http->get("https://milty.shenanigans.be/api/draft/{$draftId}");
 
             if ($response->successful()) {
                 return $response->json();

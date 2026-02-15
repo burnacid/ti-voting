@@ -126,11 +126,11 @@ class Game extends Model
             return collect([]);
         }
 
-        $selectedSlices = collect($this->milty_draft_data['draft']['draft']['players'])->pluck('slice');
+        $selectedSlices = collect($this->milty_draft_data['draft']['players'])->pluck('slice');
 
         $slices = collect([]);
         foreach($selectedSlices as $slice) {
-            $slices->push($this->milty_draft_data['draft']['slices'][$slice]);
+            $slices->push($this->milty_draft_data['slices'][$slice]);
         }
 
         return $slices;
@@ -152,7 +152,7 @@ class Game extends Model
             return collect([]);
         }
 
-        $factionNames = collect($this->milty_draft_data['draft']['draft']['players'])->pluck('faction');
+        $factionNames = collect($this->milty_draft_data['draft']['players'])->pluck('faction');
 
         return $factionNames;
     }

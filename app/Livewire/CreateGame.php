@@ -5,6 +5,7 @@ namespace App\Livewire;
 use App\Models\Game;
 use App\Models\Player;
 use App\Services\MiltyService;
+use Illuminate\Support\Facades\Log;
 use Livewire\Component;
 
 class CreateGame extends Component
