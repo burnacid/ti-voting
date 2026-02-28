@@ -11,17 +11,6 @@
                             {{ $showCreateAgenda ? 'Cancel' : 'Create New Agenda' }}
                         </button>
                     @elseif($currentAgenda->status === 'voting')
-                        @if($currentAgenda->allPlayersVoted())
-                            <button wire:click="toggleSpeakerResults"
-                                    class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition-colors">
-                                {{ $speakerViewResults ? 'Hide Results' : 'View Results' }}
-                            </button>
-                        @else
-                            <button wire:click="refreshData"
-                                    class="inline-flex items-center px-3 py-2 border border-gray-300 dark:border-gray-600 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
-                                Check Votes
-                            </button>
-                        @endif
                         <button wire:click="endVoting"
                                 wire:confirm="Are you sure you want to end voting? This will make results visible to all players."
                                 class="bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-md transition-colors">
@@ -380,7 +369,12 @@
             @if($speakerViewResults || $currentAgenda->status === 'completed')
                 <div class="border-t pt-4 mt-4">
                     <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Voting Results</h3>
+                    @if(collect($voteResults)->sum('influence') == 0)
+                        <h4 class="font-semibold text-gray-900 dark:text-white mb-4">All players abstained or no influence was spent on votes. No results to display.</h4>
+                    @endif
                     <div class="space-y-3">
+
+
                         @foreach($voteResults as $option => $result)
                             @if($result['influence'] > 0)
                                 <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
