@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use App\Events\TriggerRefresh;
 use App\Models\Game;
 use App\Models\Player;
 use Livewire\Component;
@@ -55,6 +56,8 @@ class JoinGameForm extends Component
             'faction' => $this->faction,
             'is_speaker' => false,
         ]);
+
+        TriggerRefresh::dispatch($game);
 
         // Store session token in session
         session(['player_token' => $player->session_token]);

@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use App\Events\TriggerRefresh;
 use App\Models\Game;
 use Livewire\Component;
 
@@ -31,6 +32,8 @@ class JoinGame extends Component
             $this->addError('gameCode', 'This game has already ended.');
             return;
         }
+
+        TriggerRefresh::dispatch($game);
 
         // Redirect to the join page for this specific game
         return redirect()->route('join-group', strtoupper($this->gameCode));
