@@ -2,12 +2,16 @@
 
 namespace App\Livewire;
 
+use App\Events\TriggerRefresh;
+use App\Events\VoteCasted;
 use App\Services\PlanetService;
+use Livewire\Attributes\On;
 use Livewire\Component;
 use App\Models\Game;
 use App\Models\Player;
 use App\Models\Agenda;
 use App\Models\Vote;
+use Illuminate\Support\Facades\Log;
 
 class GameDashboard extends Component
 {
@@ -32,6 +36,12 @@ class GameDashboard extends Component
         $this->game = $game;
         $this->player = $player;
         $this->loadAvailableAgendas();
+
+        // Listen for game-specific channel
+        Log::info('Listening to: games.' . $this->game->id);
+        $this->js('window.Echo.channel("games.' . $this->game->id . '").listen("TriggerRefresh", () => {
+            Livewire.dispatch("triggerRefresh");
+        })');
     }
 
     private function loadAvailableAgendas()
@@ -117,16 +127,22 @@ class GameDashboard extends Component
         ];
     }
 
+    #[On('triggerRefresh')]
+    public function listenForRefresh(){
+        Log::info("Event Triggered");
+        $this->refreshData();
+    }
+
     public function refreshData()
     {
         // Refresh the game and player data from the database
         $this->game = $this->game->fresh();
         $this->player = $this->player->fresh();
 
-        $this->dispatch('flashMessage', [
-            'Data refreshed successfully!',
-            'success'
-        ]);
+//        $this->dispatch('flashMessage', [
+//            'Data refreshed successfully!',
+//            'success'
+//        ]);
     }
 
     public function toggleCreateAgenda()
@@ -210,6 +226,9 @@ class GameDashboard extends Component
             'New agenda created and voting has started!',
             'success'
         ]);
+
+        TriggerRefresh::dispatch($this->game);
+
         $this->refreshData();
     }
 
@@ -369,7 +388,7 @@ class GameDashboard extends Component
                 'success'
             ]);
             $this->refreshData();
-            $this->dispatch('speaker-changed', playerId: $newSpeaker->id);
+            TriggerRefresh::dispatch($this->game);
 
         } catch (\Exception $e) {
             $this->dispatch('flashMessage', [
@@ -409,7 +428,7 @@ class GameDashboard extends Component
             $this->influenceSpent = 0;
         }
 
-        Vote::create([
+        $vote = Vote::create([
             'agenda_id' => $currentAgenda->id,
             'player_id' => $this->player->id,
             'option' => $this->selectedOption,
@@ -423,7 +442,9 @@ class GameDashboard extends Component
             'Your vote has been recorded!',
             'success'
         ]);
-        $this->dispatch('vote-submitted');
+
+        TriggerRefresh::dispatch($this->game);
+
         $this->refreshData();
     }
 
@@ -449,6 +470,7 @@ class GameDashboard extends Component
                 'info'
             ]);
             $this->refreshData();
+            TriggerRefresh::dispatch($this->game);
         }
     }
 
@@ -463,6 +485,14 @@ class GameDashboard extends Component
         $players = $this->game->players()->get();
         $hasVoted = $currentAgenda ? $this->player->hasVotedOn($currentAgenda) : false;
         $allVoted = $currentAgenda ? $currentAgenda->allPlayersVoted() : false;
+
+        if($currentAgenda) {
+            if ($currentAgenda->votes()->count() === $players->count() && $this->player->is_speaker) {
+                $this->speakerViewResults = true;
+            }else{
+                $this->speakerViewResults = false;
+            }
+        }
 
         // Show results if:
         // 1. Voting is completed (for everyone)
