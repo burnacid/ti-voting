@@ -102,36 +102,36 @@
                                     <input type="radio"
                                            wire:model.live="agendaType"
                                            value="elect_planet_any"
-                                           class="mr-2 text-blue-600">
-                                    <span class="text-gray-900 dark:text-white">Elect a Planet</span>
+                                           class="mr-2 text-blue-600" @if($game->milty_draft_data == null) disabled @endif>
+                                    <span class="@if($game->milty_draft_data == null) text-red-800 @else text-gray-900 dark:text-white @endif">Elect a Planet</span>
                                 </label>
                                 <label class="flex items-center">
                                     <input type="radio"
                                            wire:model.live="agendaType"
                                            value="elect_planet_industrial"
-                                           class="mr-2 text-blue-600">
-                                    <span class="text-gray-900 dark:text-white">Elect an Industrial Planet</span>
+                                           class="mr-2 text-blue-600" @if($game->milty_draft_data == null) disabled @endif>
+                                    <span class="@if($game->milty_draft_data == null) text-red-800 @else text-gray-900 dark:text-white @endif">Elect an Industrial Planet</span>
                                 </label>
                                 <label class="flex items-center">
                                     <input type="radio"
                                            wire:model.live="agendaType"
                                            value="elect_planet_hazardous"
-                                           class="mr-2 text-blue-600">
-                                    <span class="text-gray-900 dark:text-white">Elect a Hazardous Planet</span>
+                                           class="mr-2 text-blue-600" @if($game->milty_draft_data == null) disabled @endif>
+                                    <span class="@if($game->milty_draft_data == null) text-red-800 @else text-gray-900 dark:text-white @endif">Elect a Hazardous Planet</span>
                                 </label>
                                 <label class="flex items-center">
                                     <input type="radio"
                                            wire:model.live="agendaType"
                                            value="elect_planet_cultural"
-                                           class="mr-2 text-blue-600">
-                                    <span class="text-gray-900 dark:text-white">Elect a Cultural Planet</span>
+                                           class="mr-2 text-blue-600" @if($game->milty_draft_data == null) disabled @endif>
+                                    <span class="@if($game->milty_draft_data == null) text-red-800 @else text-gray-900 dark:text-white @endif">Elect a Cultural Planet</span>
                                 </label>
                                 <label class="flex items-center">
                                     <input type="radio"
                                            wire:model.live="agendaType"
                                            value="elect_planet_non_home"
-                                           class="mr-2 text-blue-600">
-                                    <span class="text-gray-900 dark:text-white">Elect a Non-Home Planet other than Mecatol Rex</span>
+                                           class="mr-2 text-blue-600" @if($game->milty_draft_data == null) disabled @endif>
+                                    <span class="@if($game->milty_draft_data == null) text-red-800 @else text-gray-900 dark:text-white @endif">Elect a Non-Home Planet other than Mecatol Rex</span>
                                 </label>
                                 <label class="flex items-center">
                                     <input type="radio"
@@ -220,6 +220,12 @@
                                     Add specific tile numbers to include their planets in the voting options
                                 </p>
                             </div>
+                        @endif
+
+                        @if($game->milty_draft_data == null)
+                            <p class="text-sm text-red-500">
+                                Not all options are available as this game was not created with Milty's Draft Tool. To use all agenda types, create a new game using the draft tool and import your players and factions from this game.
+                            </p>
                         @endif
 
                         <div class="flex space-x-3">

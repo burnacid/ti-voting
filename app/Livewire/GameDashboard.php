@@ -80,16 +80,36 @@ class GameDashboard extends Component
                 $this->agendaType = 'elect_player';
                 break;
             case 'planet':
+                if($this->game->milty_draft_data==null) {
+                    $this->agendaType = 'custom';
+                    break;
+                }
             case 'non_home_non_mecathol':
+            if($this->game->milty_draft_data==null) {
+                $this->agendaType = 'custom';
+                break;
+            }
                 $this->agendaType = 'elect_planet_non_home';
                 break;
             case 'industrial_planet':
+                if($this->game->milty_draft_data==null) {
+                    $this->agendaType = 'custom';
+                    break;
+                }
                 $this->agendaType = 'elect_planet_industrial';
                 break;
             case 'cultural_planet':
+                if($this->game->milty_draft_data==null) {
+                    $this->agendaType = 'custom';
+                    break;
+                }
                 $this->agendaType = 'elect_planet_cultural';
                 break;
             case 'hazardous_planet':
+                if($this->game->milty_draft_data==null) {
+                    $this->agendaType = 'custom';
+                    break;
+                }
                 $this->agendaType = 'elect_planet_hazardous';
                 break;
             case 'law':
