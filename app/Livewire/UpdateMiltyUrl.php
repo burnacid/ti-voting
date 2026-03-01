@@ -4,6 +4,8 @@ namespace App\Livewire;
 
 use App\Events\TriggerRefresh;
 use App\Services\MiltyService;
+use Illuminate\Contracts\View\Factory;
+use Illuminate\Contracts\View\View;
 use Livewire\Component;
 
 class UpdateMiltyUrl extends Component
@@ -12,23 +14,23 @@ class UpdateMiltyUrl extends Component
     public $miltyUrl = '';
     public $showModal = false;
 
-    public function mount($game)
+    public function mount($game): void
     {
         $this->game = $game;
         $this->miltyUrl = $game->milty_url ?? '';
     }
 
-    public function openModal()
+    public function openModal(): void
     {
         $this->showModal = true;
     }
 
-    public function closeModal()
+    public function closeModal(): void
     {
         $this->showModal = false;
     }
 
-    public function updateMiltyUrl()
+    public function updateMiltyUrl(): void
     {
         $this->validate([
             'miltyUrl' => 'required|url',
@@ -71,7 +73,7 @@ class UpdateMiltyUrl extends Component
         $this->closeModal();$this->dispatch('miltyUrlUpdated');
     }
 
-    public function render()
+    public function render(): Factory|View|\Illuminate\View\View
     {
         return view('livewire.update-milty-url');
     }
