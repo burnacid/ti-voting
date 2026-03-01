@@ -42,7 +42,6 @@ class UpdateMiltyUrl extends Component
                 'Invalid Milty URL format. Expected format: https://milty.shenanigans.be/d/{draft_id}',
                 'error'
             ]);
-            $this->miltyError = 'Invalid Milty URL format. Expected format: https://milty.shenanigans.be/d/{draft_id}';
             return;
         }
 
@@ -53,7 +52,6 @@ class UpdateMiltyUrl extends Component
                 'Could not fetch Milty draft data. Please check the URL and try again.',
                 'error'
             ]);
-            $this->miltyError = 'Could not fetch Milty draft data. Please check the URL and try again.';
             return;
         }
 
