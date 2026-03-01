@@ -59,7 +59,7 @@ class UpdateMiltyUrl extends Component
 
         $this->game->update([
             'milty_url' => $this->miltyUrl,
-            'miltyDraftData' => $draftData,
+            'milty_draft_data' => $draftData,
             'milty_draft_id' => $draftId,
         ]);
 
