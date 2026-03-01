@@ -39,6 +39,18 @@
         </div>
 
         <div>
+            <label for="faction" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Faction (Optional)
+            </label>
+            <input type="text"
+                   id="faction"
+                   wire:model="faction"
+                   class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 dark:bg-gray-700 dark:text-white"
+                   placeholder="e.g., The Emirates of Hacan">
+            @error('faction') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
+        </div>
+
+        <div>
             <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800">
                 Create Game
             </button>
