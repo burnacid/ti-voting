@@ -31,6 +31,7 @@
                                     View Map Draft
                                 </a>
                             @endif
+                            <livewire:update-milty-url :game="$game" />
                         </div>
                     </div>
                     <div class="text-right">

@@ -3,7 +3,6 @@
 namespace App\Livewire;
 
 use App\Events\TriggerRefresh;
-use App\Events\VoteCasted;
 use App\Services\PlanetService;
 use Livewire\Attributes\On;
 use Livewire\Component;

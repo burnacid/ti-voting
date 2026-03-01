@@ -48,6 +48,14 @@ class Game extends Model
         return $this->agendas()->where('status', 'voting')->first();
     }
 
+    /**
+     * Scope to get games older than the specified number of days
+     */
+    public function scopeOlderThan($query, int $days = 7)
+    {
+        return $query->where('created_at', '<', now()->subDays($days));
+    }
+
     public function lastCompletedAgenda(): ?Agenda
     {
         return $this->agendas()->where('status', 'completed')->first();
