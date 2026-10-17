@@ -9,6 +9,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Added
 - Thunder's Edge games are detected from the Milty draft (TE tiles or TE factions enabled). In those games, the planets of The Fracture (Cocytus, Lethe, Phlegethon and Styx) can be elected on planet agendas.
 - The Fracture planets can also be added manually through the custom tile numbers 125, 126 and 127.
+- The current agenda is shown as a digital agenda card, styled like the printed cards, with its type (Law or Directive) on the ribbon. Elect agendas show what is elected in bold, e.g. "Elect Player" or "Elect Cultural Planet".
+- "Classified Document Leaks" now elects a scored secret objective instead of a For/Against vote.
 - The app version is shown at the bottom of each page.
 
 ### Fixed

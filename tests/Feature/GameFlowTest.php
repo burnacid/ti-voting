@@ -182,6 +182,47 @@ test('planets with multiple traits are electable for each trait', function () {
         ->and($game->getPlanets('industrial')->pluck('name'))->not->toContain('Olergodt');
 });
 
+test('preset agendas are shown as a card with their type', function () {
+    [$game, $speaker] = makeGame();
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->set('selectedPresetAgenda', 'Publicize Weapon Schematics')
+        ->call('createAgenda')
+        ->assertSeeHtml('<div class="agenda-card-type">')
+        ->assertSeeHtml('<strong class="agenda-card-outcome">For:</strong>')
+        ->assertSeeHtml('<span class="agenda-card-keyword">sustain damage</span>');
+
+    expect($game->currentAgenda()->type)->toBe('law');
+});
+
+test('elect agendas show what is elected on the card', function () {
+    [$game, $speaker] = makeGame();
+
+    // Preset agenda that elects a law, voted on with custom options
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->set('selectedPresetAgenda', 'Judicial Abolishment')
+        ->call('createAgenda')
+        ->assertSeeHtml('<p class="agenda-card-elect">Elect Law</p>');
+});
+
+test('custom elect agendas show what is elected and for against agendas do not', function () {
+    [$game, $speaker] = makeGame();
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->set('newAgendaTitle', 'Custom')
+        ->set('newAgendaDescription', 'Something')
+        ->set('agendaType', 'elect_player')
+        ->call('createAgenda')
+        ->assertSeeHtml('<p class="agenda-card-elect">Elect Player</p>');
+
+    $game->currentAgenda()->update(['status' => 'completed']);
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->set('selectedPresetAgenda', 'Publicize Weapon Schematics')
+        ->call('createAgenda')
+        ->assertDontSeeHtml('agenda-card-elect');
+});
+
 test('pages show the app version', function () {
     $this->get('/')->assertSee('v'.config('app.version'));
 });

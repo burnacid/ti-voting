@@ -24,6 +24,8 @@ class GameDashboard extends Component
     // Speaker-only properties for creating agendas
     public $newAgendaTitle = '';
     public $newAgendaDescription = '';
+    public $newAgendaCardType = null; // law or directive when created from a preset agenda
+    public $newAgendaElect = null; // Elect value of the preset agenda, e.g. planet or law
     public $agendaType = 'for_against';
     public $customOptions = '';
     public $customTileNumbers = '';
@@ -68,10 +70,12 @@ class GameDashboard extends Component
 
         // Populate form fields based on selected agenda
         $this->newAgendaTitle = $agenda['Name'];
+        $this->newAgendaCardType = strtolower($agenda['Type'] ?? '') ?: null;
         $this->newAgendaDescription = $agenda['Effect'];
 
         // Determine agenda type based on Elect field
         $electType = strtolower($agenda['Elect'] ?? '');
+        $this->newAgendaElect = $electType ?: null;
 
         switch ($electType) {
             case 'for_against':
@@ -134,7 +138,7 @@ class GameDashboard extends Component
     public function clearPresetSelection()
     {
         $this->selectedPresetAgenda = '';
-        $this->reset(['newAgendaTitle', 'newAgendaDescription', 'agendaType', 'customOptions', 'customTileNumbers']);
+        $this->reset(['newAgendaTitle', 'newAgendaDescription', 'newAgendaCardType', 'newAgendaElect', 'agendaType', 'customOptions', 'customTileNumbers']);
     }
 
     public function rules()
@@ -181,7 +185,7 @@ class GameDashboard extends Component
         $this->showCreateAgenda = !$this->showCreateAgenda;
 
         if (!$this->showCreateAgenda) {
-            $this->reset(['newAgendaTitle', 'newAgendaDescription', 'agendaType', 'customOptions', 'customTileNumbers']);
+            $this->reset(['newAgendaTitle', 'newAgendaDescription', 'newAgendaCardType', 'newAgendaElect', 'agendaType', 'customOptions', 'customTileNumbers']);
         }
     }
 
@@ -239,12 +243,14 @@ class GameDashboard extends Component
             'game_id' => $this->game->id,
             'title' => $this->newAgendaTitle,
             'description' => $this->newAgendaDescription,
+            'type' => $this->newAgendaCardType,
+            'elect' => $this->resolveAgendaElect(),
             'options' => $options,
             'status' => 'voting',
             'voting_started_at' => now(),
         ]);
 
-        $this->reset(['newAgendaTitle', 'newAgendaDescription', 'agendaType', 'customOptions', 'showCreateAgenda']);
+        $this->reset(['newAgendaTitle', 'newAgendaDescription', 'newAgendaCardType', 'newAgendaElect', 'agendaType', 'customOptions', 'showCreateAgenda']);
         $this->dispatch('flashMessage', [
             'New agenda created and voting has started!',
             'success'
@@ -253,6 +259,16 @@ class GameDashboard extends Component
         TriggerRefresh::dispatch($this->game);
 
         $this->refreshData();
+    }
+
+    private function resolveAgendaElect(): ?string
+    {
+        // A preset's own Elect value wins, as some (law, strategy card) use custom options
+        if (array_key_exists($this->newAgendaElect ?? '', Agenda::ELECT_LABELS)) {
+            return $this->newAgendaElect;
+        }
+
+        return Agenda::ELECT_BY_AGENDA_TYPE[$this->agendaType] ?? null;
     }
 
     private function getAgendaOptions(): array

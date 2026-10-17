@@ -293,18 +293,16 @@
     <!-- Current Agenda -->
     @if($currentAgenda)
         <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-            <div class="flex justify-between items-start mb-4">
-                <div>
-                    <h2 class="text-xl font-bold text-gray-900 dark:text-white">{{ $currentAgenda->title }}</h2>
-                    <p class="text-gray-600 dark:text-gray-300 mt-1">{!! nl2br($currentAgenda->formatted_description ) !!}</p>
-                </div>
-                <div class="text-right">
-                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                        {{ $currentAgenda->status === 'voting' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200' }}">
-                        {{ ucfirst($currentAgenda->status) }}
-                    </span>
-                </div>
+          <div class="flex flex-col md:flex-row gap-6">
+            <div class="flex flex-col items-center gap-3 md:w-80 shrink-0">
+                <x-agenda-card :agenda="$currentAgenda" />
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                    {{ $currentAgenda->status === 'voting' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200' }}">
+                    {{ ucfirst($currentAgenda->status) }}
+                </span>
             </div>
+
+            <div class="flex-1 min-w-0">
 
             @if($currentAgenda->status === 'voting' && !$hasVoted)
                 <!-- Voting Form -->
@@ -401,6 +399,8 @@
                     </div>
                 </div>
             @endif
+            </div>
+          </div>
         </div>
     @endif
 </div>
