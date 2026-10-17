@@ -20,12 +20,14 @@ class Game extends Model
         'milty_url',
         'milty_draft_id',
         'milty_draft_data',
+        'fracture_in_play',
         'status',
     ];
 
     protected $casts = [
         'status' => 'string',
-        'milty_draft_data' => 'array'
+        'milty_draft_data' => 'array',
+        'fracture_in_play' => 'boolean',
     ];
 
     public function players(): HasMany
@@ -58,7 +60,7 @@ class Game extends Model
 
     public function lastCompletedAgenda(): ?Agenda
     {
-        return $this->agendas()->where('status', 'completed')->first();
+        return $this->agendas()->where('status', 'completed')->latest('voting_ended_at')->first();
     }
 
     public function setSpeaker(Player $player): void
@@ -103,20 +105,17 @@ class Game extends Model
         $HomePlanets = $planetService->getFactionPlanets($Factions->toArray());
         $HomePlanets = collect($HomePlanets);
 
+        if ($this->isFractureInPlay()) {
+            $Tiles = $Tiles->merge(PlanetService::FRACTURE_TILES);
+        }
+
         $planetInfo = $planetService->getPlanetsByTileNumber($Tiles->toArray());
         $planetInfo = collect($planetInfo);
         $planetInfo = $planetInfo->sortBy('name');
 
-        if($type == 'industrial'){
-            return $planetInfo->where('trait', '==', 'industrial');
-        }
-
-        if($type == 'cultural'){
-            return $planetInfo->where('trait', '==', 'cultural');
-        }
-
-        if($type == 'hazardous'){
-            return $planetInfo->where('trait', '==', 'hazardous');
+        if(in_array($type, ['industrial', 'cultural', 'hazardous'])){
+            // Some Thunder's Edge planets have multiple traits stored as an array
+            return $planetInfo->filter(fn ($planet) => in_array($type, (array) $planet['trait']));
         }
 
         if($type == 'non_home'){
@@ -126,6 +125,18 @@ class Game extends Model
         $planetInfo = $planetInfo->merge($HomePlanets);
         $planetInfo = $planetInfo->sortBy('name');
         return $planetInfo;
+    }
+
+    public function isThundersEdgeGame(): bool
+    {
+        $config = $this->milty_draft_data['config'] ?? [];
+
+        return !empty($config['include_te_tiles']) || !empty($config['include_te_factions']);
+    }
+
+    public function isFractureInPlay(): bool
+    {
+        return $this->isThundersEdgeGame() && $this->fracture_in_play;
     }
 
     public function miltySelectedSlices()

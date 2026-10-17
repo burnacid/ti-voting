@@ -10,7 +10,10 @@ use App\Models\Game;
 use App\Models\Player;
 use App\Models\Agenda;
 use App\Models\Vote;
+use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\Rule;
 
 class GameDashboard extends Component
 {
@@ -22,6 +25,8 @@ class GameDashboard extends Component
     // Speaker-only properties for creating agendas
     public $newAgendaTitle = '';
     public $newAgendaDescription = '';
+    public $newAgendaCardType = null; // law or directive when created from a preset agenda
+    public $newAgendaElect = null; // Elect value of the preset agenda, e.g. planet or law
     public $agendaType = 'for_against';
     public $customOptions = '';
     public $customTileNumbers = '';
@@ -66,10 +71,12 @@ class GameDashboard extends Component
 
         // Populate form fields based on selected agenda
         $this->newAgendaTitle = $agenda['Name'];
+        $this->newAgendaCardType = strtolower($agenda['Type'] ?? '') ?: null;
         $this->newAgendaDescription = $agenda['Effect'];
 
         // Determine agenda type based on Elect field
         $electType = strtolower($agenda['Elect'] ?? '');
+        $this->newAgendaElect = $electType ?: null;
 
         switch ($electType) {
             case 'for_against':
@@ -83,6 +90,8 @@ class GameDashboard extends Component
                     $this->agendaType = 'custom';
                     break;
                 }
+                $this->agendaType = 'elect_planet_any';
+                break;
             case 'non_home_non_mecathol':
             if($this->game->milty_draft_data==null) {
                 $this->agendaType = 'custom';
@@ -130,7 +139,7 @@ class GameDashboard extends Component
     public function clearPresetSelection()
     {
         $this->selectedPresetAgenda = '';
-        $this->reset(['newAgendaTitle', 'newAgendaDescription', 'agendaType', 'customOptions', 'customTileNumbers']);
+        $this->reset(['newAgendaTitle', 'newAgendaDescription', 'newAgendaCardType', 'newAgendaElect', 'agendaType', 'customOptions', 'customTileNumbers']);
     }
 
     public function rules()
@@ -140,6 +149,7 @@ class GameDashboard extends Component
             'influenceSpent' => 'required|integer|min:0|max:99',
             'newAgendaTitle' => 'required|string|max:255',
             'newAgendaDescription' => 'required|string|max:1000',
+            'newAgendaCardType' => 'required|in:law,directive',
             'agendaType' => 'required|in:for_against,elect_player,elect_planet_any,elect_planet_industrial,elect_planet_cultural,elect_planet_hazardous,elect_planet_non_home,custom',
             'customOptions' => 'required_if:agendaType,custom|string|max:500',
             'customTileNumbers' => 'nullable|string|max:255',
@@ -177,7 +187,7 @@ class GameDashboard extends Component
         $this->showCreateAgenda = !$this->showCreateAgenda;
 
         if (!$this->showCreateAgenda) {
-            $this->reset(['newAgendaTitle', 'newAgendaDescription', 'agendaType', 'customOptions', 'customTileNumbers']);
+            $this->reset(['newAgendaTitle', 'newAgendaDescription', 'newAgendaCardType', 'newAgendaElect', 'agendaType', 'customOptions', 'customTileNumbers']);
         }
     }
 
@@ -217,6 +227,7 @@ class GameDashboard extends Component
         $this->validate([
             'newAgendaTitle' => 'required|string|max:255',
             'newAgendaDescription' => 'required|string|max:1000',
+            'newAgendaCardType' => 'required|in:law,directive',
             'agendaType' => 'required|in:for_against,elect_player,elect_planet_any,elect_planet_industrial,elect_planet_cultural,elect_planet_hazardous,elect_planet_non_home,custom'
         ]);
 
@@ -235,20 +246,33 @@ class GameDashboard extends Component
             'game_id' => $this->game->id,
             'title' => $this->newAgendaTitle,
             'description' => $this->newAgendaDescription,
+            'type' => $this->newAgendaCardType,
+            'elect' => $this->resolveAgendaElect(),
             'options' => $options,
             'status' => 'voting',
+            'reveal_step' => Agenda::STEP_WHEN_REVEALED,
             'voting_started_at' => now(),
         ]);
 
-        $this->reset(['newAgendaTitle', 'newAgendaDescription', 'agendaType', 'customOptions', 'showCreateAgenda']);
+        $this->reset(['newAgendaTitle', 'newAgendaDescription', 'newAgendaCardType', 'newAgendaElect', 'agendaType', 'customOptions', 'showCreateAgenda']);
         $this->dispatch('flashMessage', [
-            'New agenda created and voting has started!',
+            'New agenda revealed. Ask the players for "When an agenda is revealed" action cards.',
             'success'
         ]);
 
         TriggerRefresh::dispatch($this->game);
 
         $this->refreshData();
+    }
+
+    private function resolveAgendaElect(): ?string
+    {
+        // A preset's own Elect value wins, as some (law, strategy card) use custom options
+        if (array_key_exists($this->newAgendaElect ?? '', Agenda::ELECT_LABELS)) {
+            return $this->newAgendaElect;
+        }
+
+        return Agenda::ELECT_BY_AGENDA_TYPE[$this->agendaType] ?? null;
     }
 
     private function getAgendaOptions(): array
@@ -429,6 +453,14 @@ class GameDashboard extends Component
             return;
         }
 
+        if (!$currentAgenda->isVotingOpen()) {
+            $this->dispatch('flashMessage', [
+                'Voting has not started yet. The Speaker is still checking for action cards.',
+                'error'
+            ]);
+            return;
+        }
+
         if ($this->player->hasVotedOn($currentAgenda)) {
             $this->dispatch('flashMessage', [
                 'You have already voted on this agenda.',
@@ -438,7 +470,7 @@ class GameDashboard extends Component
         }
 
         $this->validate([
-            'selectedOption' => 'required|string',
+            'selectedOption' => ['required', 'string', Rule::in($currentAgenda->options)],
             'influenceSpent' => $this->selectedOption === 'Abstain' ? 'integer' : 'required|integer|min:1|max:99',
         ]);
 
@@ -447,12 +479,20 @@ class GameDashboard extends Component
             $this->influenceSpent = 0;
         }
 
-        $vote = Vote::create([
-            'agenda_id' => $currentAgenda->id,
-            'player_id' => $this->player->id,
-            'option' => $this->selectedOption,
-            'influence_spent' => $this->influenceSpent,
-        ]);
+        try {
+            Vote::create([
+                'agenda_id' => $currentAgenda->id,
+                'player_id' => $this->player->id,
+                'option' => $this->selectedOption,
+                'influence_spent' => $this->influenceSpent,
+            ]);
+        } catch (UniqueConstraintViolationException) {
+            $this->dispatch('flashMessage', [
+                'You have already voted on this agenda.',
+                'error'
+            ]);
+            return;
+        }
 
         $this->selectedOption = '';
         $this->influenceSpent = 0;
@@ -478,6 +518,14 @@ class GameDashboard extends Component
         }
 
         $currentAgenda = $this->game->currentAgenda();
+        if ($currentAgenda && !$currentAgenda->isVotingOpen()) {
+            $this->dispatch('flashMessage', [
+                'Voting has not started yet. Finish checking for action cards first.',
+                'error'
+            ]);
+            return;
+        }
+
         if ($currentAgenda) {
             $currentAgenda->update([
                 'status' => 'completed',
@@ -485,12 +533,120 @@ class GameDashboard extends Component
             ]);
 
             $this->dispatch('flashMessage', [
-                'Voting has ended. Results are now visible to all players.',
+                'Voting has ended. Please announce the results to the other players.',
                 'info'
             ]);
             $this->refreshData();
             TriggerRefresh::dispatch($this->game);
         }
+    }
+
+    public function toggleFracture()
+    {
+        if (!$this->player->is_speaker || !$this->game->isThundersEdgeGame()) {
+            return;
+        }
+
+        $this->game->update(['fracture_in_play' => !$this->game->fracture_in_play]);
+
+        $keptPlanets = $this->syncFracturePlanetsOnCurrentAgenda();
+
+        if ($this->game->fracture_in_play) {
+            $message = 'The Fracture is in play. Its planets are added to planet agendas, including the current one.';
+        } else {
+            $message = 'The Fracture is no longer in play. Its planets are removed from planet agendas, including the current one.';
+
+            if ($keptPlanets->isNotEmpty()) {
+                $message .= ' ' . $keptPlanets->implode(', ') . ' stayed on the current agenda because players already voted for them.';
+            }
+        }
+
+        $this->dispatch('flashMessage', [$message, 'info']);
+        TriggerRefresh::dispatch($this->game);
+        $this->refreshData();
+    }
+
+    /**
+     * Add or remove the Fracture planets on the open agenda to match the Fracture toggle.
+     * Returns the Fracture planets that were kept because players already voted for them.
+     */
+    private function syncFracturePlanetsOnCurrentAgenda(): Collection
+    {
+        // The Fracture planets have no trait, so only these agendas can elect them
+        $currentAgenda = $this->game->currentAgenda();
+        if (!$currentAgenda || !in_array($currentAgenda->elect, ['planet', 'non_home_non_mecathol'])) {
+            return collect();
+        }
+
+        $fracturePlanets = collect(app(PlanetService::class)->getPlanetsByTileNumber(PlanetService::FRACTURE_TILES))->pluck('name');
+        $planets = collect($currentAgenda->options)->reject(fn ($option) => $option === 'Abstain');
+        $keptPlanets = collect();
+
+        if ($this->game->fracture_in_play) {
+            $planets = $planets->merge($fracturePlanets)->unique();
+        } else {
+            // Removing an option that has votes would drop those votes from the results
+            $keptPlanets = $currentAgenda->votes()->whereIn('option', $fracturePlanets)->distinct()->pluck('option');
+            $planets = $planets->reject(fn ($planet) => $fracturePlanets->contains($planet) && !$keptPlanets->contains($planet));
+        }
+
+        $currentAgenda->update(['options' => $planets->sort()->values()->push('Abstain')->all()]);
+
+        return $keptPlanets->sort()->values();
+    }
+
+    public function completeRevealStep()
+    {
+        if (!$this->player->is_speaker) {
+            $this->dispatch('flashMessage', [
+                'Only the Speaker can continue the agenda.',
+                'error'
+            ]);
+            return;
+        }
+
+        $currentAgenda = $this->game->currentAgenda();
+        if (!$currentAgenda || $currentAgenda->reveal_step === null) {
+            return;
+        }
+
+        if ($currentAgenda->reveal_step === Agenda::STEP_WHEN_REVEALED) {
+            $currentAgenda->update(['reveal_step' => Agenda::STEP_AFTER_REVEALED]);
+            $message = 'Ask the players for "After an agenda is revealed" action cards.';
+        } else {
+            $currentAgenda->update(['reveal_step' => null, 'voting_started_at' => now()]);
+            $message = 'Voting has started!';
+        }
+
+        $this->dispatch('flashMessage', [$message, 'success']);
+        TriggerRefresh::dispatch($this->game);
+        $this->refreshData();
+    }
+
+    public function discardAgenda()
+    {
+        if (!$this->player->is_speaker) {
+            $this->dispatch('flashMessage', [
+                'Only the Speaker can discard the agenda.',
+                'error'
+            ]);
+            return;
+        }
+
+        // Only before voting opens, e.g. when the agenda is vetoed
+        $currentAgenda = $this->game->currentAgenda();
+        if (!$currentAgenda || $currentAgenda->reveal_step === null) {
+            return;
+        }
+
+        $currentAgenda->delete();
+
+        $this->dispatch('flashMessage', [
+            'Agenda discarded. Reveal the next agenda.',
+            'info'
+        ]);
+        TriggerRefresh::dispatch($this->game);
+        $this->refreshData();
     }
 
     public function refreshComponent()
@@ -501,6 +657,12 @@ class GameDashboard extends Component
     public function render()
     {
         $currentAgenda = $this->game->currentAgenda();
+
+        // Results of the last ended agenda remain visible to the Speaker only
+        if (!$currentAgenda && $this->player->is_speaker) {
+            $currentAgenda = $this->game->lastCompletedAgenda();
+        }
+
         $players = $this->game->players()->get();
         $hasVoted = $currentAgenda ? $this->player->hasVotedOn($currentAgenda) : false;
         $allVoted = $currentAgenda ? $currentAgenda->allPlayersVoted() : false;

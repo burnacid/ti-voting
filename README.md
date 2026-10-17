@@ -51,6 +51,10 @@ Open [http://localhost:8000](http://localhost:8000) in your browser.
 1. The speaker creates an agenda from the dashboard (preset or custom).
 2. All players cast their vote and enter the influence they are spending.
 3. Once everyone has voted, the speaker reveals the results.
+## Releases
+
+Changes per release are listed in [CHANGELOG.md](CHANGELOG.md). When releasing, add a new entry there and update `version` in `config/app.php` to match; it is shown at the bottom of every page.
+
 ## Running Tests
 ```bash
 composer test

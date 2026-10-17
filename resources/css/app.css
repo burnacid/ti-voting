@@ -6,3 +6,100 @@
 @theme {
     --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
 }
+
+/* Agenda card, styled after the printed TI4 agenda cards */
+.agenda-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: 20rem;
+    aspect-ratio: 5 / 7;
+    padding: 0.625rem;
+    border-radius: 0.875rem;
+    background: linear-gradient(160deg, #1b3a5c 0%, #0b1828 45%, #050b15 100%);
+    box-shadow:
+        0 0 0 1px #3a6d9c,
+        0 0 0 4px #07101c,
+        0 0 18px rgba(90, 175, 255, 0.35),
+        0 12px 28px rgba(0, 0, 0, 0.45);
+    font-family: 'Source Sans 3', ui-sans-serif, system-ui, sans-serif;
+}
+
+.agenda-card-title {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 3.75rem;
+    padding: 0.5rem 0.5rem 0.625rem;
+    color: #fff;
+    font-family: 'Saira Semi Condensed', ui-sans-serif, system-ui, sans-serif;
+    font-size: 1.5rem;
+    font-weight: 800;
+    line-height: 1.05;
+    letter-spacing: 0.02em;
+    text-align: center;
+    text-transform: uppercase;
+    text-shadow: 0 2px 3px rgba(0, 0, 0, 0.7);
+}
+
+.agenda-card-type {
+    display: flex;
+    justify-content: center;
+    margin: 0 -0.625rem;
+    padding: 0.125rem 0;
+    border-block: 2px solid #e08a24;
+    background: linear-gradient(180deg, #2a1806 0%, #120a02 100%);
+    clip-path: polygon(0.75rem 0, calc(100% - 0.75rem) 0, 100% 50%, calc(100% - 0.75rem) 100%, 0.75rem 100%, 0 50%);
+}
+
+.agenda-card-type span {
+    background: linear-gradient(180deg, #ffd27a 0%, #f39a2b 55%, #c8650f 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    font-family: 'Saira Semi Condensed', ui-sans-serif, system-ui, sans-serif;
+    min-height: 1.5em;
+    font-size: 1.125rem;
+    font-weight: 800;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+}
+
+.agenda-card-body {
+    position: relative;
+    flex: 1;
+    margin-top: 0.625rem;
+    padding: 1rem 1.125rem;
+    overflow: hidden;
+    border-radius: 0.5rem;
+    background:
+        repeating-linear-gradient(0deg, rgba(40, 110, 180, 0.07) 0 1px, transparent 1px 22px),
+        repeating-linear-gradient(90deg, rgba(40, 110, 180, 0.07) 0 1px, transparent 1px 22px),
+        radial-gradient(ellipse at 50% 40%, #ffffff 0%, #e7f3fc 45%, #b4d9f2 100%);
+    box-shadow:
+        inset 0 0 0 2px rgba(255, 255, 255, 0.85),
+        inset 0 0 28px rgba(60, 145, 220, 0.5);
+    color: #0b1a2e;
+    font-size: 1rem;
+    line-height: 1.3;
+}
+
+.agenda-card-body p + p {
+    margin-top: 0.75rem;
+}
+
+.agenda-card-elect {
+    font-weight: 700;
+}
+
+.agenda-card-outcome {
+    font-style: italic;
+    font-weight: 700;
+}
+
+.agenda-card-keyword {
+    font-variant: small-caps;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}

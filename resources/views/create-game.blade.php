@@ -30,5 +30,7 @@
             <livewire:create-game />
         </div>
     </div>
+
+    @include('partials.version')
 </body>
 </html>

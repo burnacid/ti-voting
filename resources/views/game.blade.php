@@ -4,6 +4,9 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ $game->name }} - TI4 Hidden Agenda</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Saira+Semi+Condensed:wght@800&family=Source+Sans+3:ital,wght@0,400;0,600;1,700&display=swap" rel="stylesheet">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="bg-gray-100 dark:bg-gray-900 min-h-screen">
@@ -31,7 +34,9 @@
                                     View Map Draft
                                 </a>
                             @endif
-                            <livewire:update-milty-url :game="$game" />
+                            @if($player->is_speaker)
+                                <livewire:update-milty-url :game="$game" :player="$player" />
+                            @endif
                         </div>
                     </div>
                     <div class="text-right">
@@ -56,6 +61,8 @@
             <livewire:game-dashboard :game="$game" :player="$player" />
         </div>
     </div>
+
+    @include('partials.version')
 
     <!-- Flash Messages -->
     <livewire:flash-messages />

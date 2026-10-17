@@ -77,7 +77,14 @@ class CreateGame extends Component
     {
         $this->validate();
 
-        $this->fetchMiltyData();
+        if (!empty($this->miltyUrl) && !$this->hasMiltyData) {
+            $this->fetchMiltyData();
+
+            if (!$this->hasMiltyData) {
+                $this->addError('miltyUrl', $this->miltyError);
+                return;
+            }
+        }
 
         $game = Game::create([
             'code' => Game::generateCode(),

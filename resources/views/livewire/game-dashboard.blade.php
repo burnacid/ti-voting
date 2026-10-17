@@ -5,14 +5,20 @@
             <div class="flex justify-between items-center mb-4">
                 <h2 class="text-xl font-bold text-yellow-800 dark:text-yellow-200">Speaker Controls</h2>
                 <div class="flex space-x-2">
-                    @if(!$currentAgenda)
+                    @if($currentAgenda?->status !== 'voting')
                         <button wire:click="toggleCreateAgenda"
                                 class="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-md transition-colors">
                             {{ $showCreateAgenda ? 'Cancel' : 'Create New Agenda' }}
                         </button>
-                    @elseif($currentAgenda->status === 'voting')
+                    @elseif($currentAgenda->reveal_step)
+                        <button wire:click="discardAgenda"
+                                wire:confirm="Discard this agenda, for example because it was vetoed? You can then reveal the next agenda."
+                                class="bg-gray-600 hover:bg-gray-700 text-white font-medium py-2 px-4 rounded-md transition-colors">
+                            Discard Agenda
+                        </button>
+                    @else
                         <button wire:click="endVoting"
-                                wire:confirm="Are you sure you want to end voting? This will make results visible to all players."
+                                wire:confirm="Are you sure you want to end voting? The results will only be visible to you."
                                 class="bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-md transition-colors">
                             End Voting
                         </button>
@@ -20,8 +26,48 @@
                 </div>
             </div>
 
+            <!-- Thunder's Edge: The Fracture -->
+            @if($game->isThundersEdgeGame())
+                <label class="flex items-start gap-3 mb-4 cursor-pointer">
+                    <input type="checkbox"
+                           wire:click="toggleFracture"
+                           @checked($game->fracture_in_play)
+                           class="mt-1 h-4 w-4 text-blue-600 rounded">
+                    <span>
+                        <span class="block font-medium text-yellow-800 dark:text-yellow-200">The Fracture is in play</span>
+                        <span class="block text-sm text-yellow-700 dark:text-yellow-300">
+                            Adds Cocytus, Lethe, Phlegethon and Styx to planet agendas.
+                        </span>
+                    </span>
+                </label>
+            @endif
+
+            <!-- Action card checks before voting opens -->
+            @if($currentAgenda?->status === 'voting' && $currentAgenda->reveal_step)
+                @php($isWhenStep = $currentAgenda->reveal_step === \App\Models\Agenda::STEP_WHEN_REVEALED)
+                <div class="bg-white dark:bg-gray-800 rounded-lg p-6 border">
+                    <p class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">
+                        Step {{ $isWhenStep ? 1 : 2 }} of 2 before voting
+                    </p>
+                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                        &ldquo;{{ $currentAgenda->reveal_step_label }}&rdquo; cards
+                    </h3>
+                    <p class="text-gray-700 dark:text-gray-300 mb-4">
+                        @if($isWhenStep)
+                            Ask the players if anyone wants to play a card with &ldquo;When an agenda is revealed&rdquo;, such as Veto. Resolve those cards before continuing. If the agenda is discarded, use Discard Agenda and reveal the next one.
+                        @else
+                            Ask the players if anyone wants to play a card with &ldquo;After an agenda is revealed&rdquo;, such as a Rider or Assassinate Representative. Resolve those cards before continuing.
+                        @endif
+                    </p>
+                    <button wire:click="completeRevealStep"
+                            class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition-colors">
+                        {{ $isWhenStep ? 'Done, continue to "After" cards' : 'Done, start voting' }}
+                    </button>
+                </div>
+            @endif
+
             <!-- Create Agenda Form -->
-            @if($showCreateAgenda && !$currentAgenda)
+            @if($showCreateAgenda && $currentAgenda?->status !== 'voting')
                 <div class="bg-white dark:bg-gray-800 rounded-lg p-6 border">
                     <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Create New Agenda</h3>
 
@@ -77,6 +123,29 @@
                                       placeholder="Describe what this agenda is about..."
                                       class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"></textarea>
                             @error('newAgendaDescription') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                Agenda Type
+                            </label>
+                            <div class="flex gap-6">
+                                <label class="flex items-center">
+                                    <input type="radio"
+                                           wire:model="newAgendaCardType"
+                                           value="law"
+                                           class="mr-2 text-blue-600">
+                                    <span class="text-gray-900 dark:text-white">Law</span>
+                                </label>
+                                <label class="flex items-center">
+                                    <input type="radio"
+                                           wire:model="newAgendaCardType"
+                                           value="directive"
+                                           class="mr-2 text-blue-600">
+                                    <span class="text-gray-900 dark:text-white">Directive</span>
+                                </label>
+                            </div>
+                            @error('newAgendaCardType') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
                         </div>
 
                         <div>
@@ -293,20 +362,27 @@
     <!-- Current Agenda -->
     @if($currentAgenda)
         <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-            <div class="flex justify-between items-start mb-4">
-                <div>
-                    <h2 class="text-xl font-bold text-gray-900 dark:text-white">{{ $currentAgenda->title }}</h2>
-                    <p class="text-gray-600 dark:text-gray-300 mt-1">{!! nl2br($currentAgenda->formatted_description ) !!}</p>
-                </div>
-                <div class="text-right">
-                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                        {{ $currentAgenda->status === 'voting' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200' }}">
-                        {{ ucfirst($currentAgenda->status) }}
-                    </span>
-                </div>
+          <div class="flex flex-col md:flex-row gap-6">
+            <div class="flex flex-col items-center gap-3 md:w-80 shrink-0">
+                <x-agenda-card :agenda="$currentAgenda" />
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                    @if($currentAgenda->reveal_step) bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200
+                    @elseif($currentAgenda->status === 'voting') bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200
+                    @else bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 @endif">
+                    {{ $currentAgenda->reveal_step_label ?? ucfirst($currentAgenda->status) }}
+                </span>
             </div>
 
-            @if($currentAgenda->status === 'voting' && !$hasVoted)
+            <div class="flex-1 min-w-0">
+
+            @if($currentAgenda->reveal_step)
+                <div class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+                    <p class="text-yellow-800 dark:text-yellow-200 font-medium">Voting has not started yet</p>
+                    <p class="text-sm text-yellow-800 dark:text-yellow-200 mt-1">
+                        The Speaker is asking for &ldquo;{{ $currentAgenda->reveal_step_label }}&rdquo; action cards. Voting opens when the Speaker is done.
+                    </p>
+                </div>
+            @elseif($currentAgenda->isVotingOpen() && !$hasVoted)
                 <!-- Voting Form -->
                 <form wire:submit="submitVote" class="space-y-4">
                     <div>
@@ -401,6 +477,8 @@
                     </div>
                 </div>
             @endif
+            </div>
+          </div>
         </div>
     @endif
 </div>
