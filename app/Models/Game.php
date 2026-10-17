@@ -103,6 +103,10 @@ class Game extends Model
         $HomePlanets = $planetService->getFactionPlanets($Factions->toArray());
         $HomePlanets = collect($HomePlanets);
 
+        if ($this->isThundersEdgeGame()) {
+            $Tiles = $Tiles->merge(PlanetService::FRACTURE_TILES);
+        }
+
         $planetInfo = $planetService->getPlanetsByTileNumber($Tiles->toArray());
         $planetInfo = collect($planetInfo);
         $planetInfo = $planetInfo->sortBy('name');
@@ -126,6 +130,13 @@ class Game extends Model
         $planetInfo = $planetInfo->merge($HomePlanets);
         $planetInfo = $planetInfo->sortBy('name');
         return $planetInfo;
+    }
+
+    public function isThundersEdgeGame(): bool
+    {
+        $config = $this->milty_draft_data['config'] ?? [];
+
+        return !empty($config['include_te_tiles']) || !empty($config['include_te_factions']);
     }
 
     public function miltySelectedSlices()

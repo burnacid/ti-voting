@@ -7,6 +7,9 @@ use Illuminate\Support\Facades\File;
 
 class PlanetService
 {
+    // Tiles of The Fracture (Thunder's Edge), kept outside planets.json because that file is sourced from another project
+    public const FRACTURE_TILES = [125, 126, 127];
+
     protected array $planets = [];
     protected array $flattenedPlanets = [];
 
@@ -17,18 +20,26 @@ class PlanetService
 
     protected function loadPlanets(): void
     {
-        $path = resource_path('data/planets.json');
+        foreach (['data/planets.json', 'data/fracture_planets.json'] as $file) {
+            $path = resource_path($file);
 
-        if (File::exists($path)) {
-            $this->planets = json_decode(File::get($path), true);
-            $this->flattenPlanets();
+            if (File::exists($path)) {
+                $this->planets += json_decode(File::get($path), true);
+            }
         }
+
+        $this->flattenPlanets();
     }
 
     protected function flattenPlanets(): void
     {
         foreach ($this->planets as $tileId => $tile) {
             foreach ($tile['planets'] as $planet) {
+                // Keep the first occurrence, e.g. Mecatol Rex on tile 18 rather than its Thunder's Edge variant on tile 112
+                if (isset($this->flattenedPlanets[$planet['name']])) {
+                    continue;
+                }
+
                 $this->flattenedPlanets[$planet['name']] = array_merge(
                     $planet,
                     [

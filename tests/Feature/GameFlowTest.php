@@ -157,6 +157,26 @@ test('planet preset agenda elects any planet when milty data exists', function (
         ->assertSet('agendaType', 'elect_planet_any');
 });
 
+test('thunders edge games include the fracture planets', function () {
+    $draft = ['draft' => ['players' => []], 'slices' => []];
+    [$teGame] = makeGame(['milty_draft_data' => $draft + ['config' => ['include_te_tiles' => true]]]);
+    [$baseGame] = makeGame(['milty_draft_data' => $draft + ['config' => ['include_te_tiles' => false]]]);
+
+    expect($teGame->isThundersEdgeGame())->toBeTrue()
+        ->and($teGame->getPlanets()->pluck('name'))->toContain('Styx', 'Cocytus', 'Lethe', 'Phlegethon')
+        ->and($teGame->getPlanets('non_home')->pluck('name'))->toContain('Styx')
+        ->and($teGame->getPlanets('cultural')->pluck('name'))->not->toContain('Styx')
+        ->and($baseGame->isThundersEdgeGame())->toBeFalse()
+        ->and($baseGame->getPlanets()->pluck('name'))->not->toContain('Styx');
+});
+
+test('elect planet includes mecatol rex but non-home excludes it', function () {
+    [$game] = makeGame(['milty_draft_data' => ['draft' => ['players' => []], 'slices' => []]]);
+
+    expect($game->getPlanets()->pluck('name'))->toContain('Mecatol Rex')
+        ->and($game->getPlanets('non_home')->pluck('name'))->not->toContain('Mecatol Rex');
+});
+
 test('after voting ends only the speaker still sees the results', function () {
     [$game, $speaker, $other] = makeGame();
     makeAgenda($game);
