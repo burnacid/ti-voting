@@ -111,16 +111,9 @@ class Game extends Model
         $planetInfo = collect($planetInfo);
         $planetInfo = $planetInfo->sortBy('name');
 
-        if($type == 'industrial'){
-            return $planetInfo->where('trait', '==', 'industrial');
-        }
-
-        if($type == 'cultural'){
-            return $planetInfo->where('trait', '==', 'cultural');
-        }
-
-        if($type == 'hazardous'){
-            return $planetInfo->where('trait', '==', 'hazardous');
+        if(in_array($type, ['industrial', 'cultural', 'hazardous'])){
+            // Some Thunder's Edge planets have multiple traits stored as an array
+            return $planetInfo->filter(fn ($planet) => in_array($type, (array) $planet['trait']));
         }
 
         if($type == 'non_home'){

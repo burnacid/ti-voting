@@ -170,6 +170,18 @@ test('thunders edge games include the fracture planets', function () {
         ->and($baseGame->getPlanets()->pluck('name'))->not->toContain('Styx');
 });
 
+test('planets with multiple traits are electable for each trait', function () {
+    // Tile 101 holds Olergodt, which is both cultural and hazardous
+    [$game] = makeGame(['milty_draft_data' => [
+        'draft' => ['players' => [['slice' => 0, 'faction' => null]]],
+        'slices' => [['tiles' => [101]]],
+    ]]);
+
+    expect($game->getPlanets('cultural')->pluck('name'))->toContain('Olergodt')
+        ->and($game->getPlanets('hazardous')->pluck('name'))->toContain('Olergodt')
+        ->and($game->getPlanets('industrial')->pluck('name'))->not->toContain('Olergodt');
+});
+
 test('elect planet includes mecatol rex but non-home excludes it', function () {
     [$game] = makeGame(['milty_draft_data' => ['draft' => ['players' => []], 'slices' => []]]);
 
