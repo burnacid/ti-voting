@@ -211,9 +211,11 @@ test('custom elect agendas show what is elected and for against agendas do not',
     Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
         ->set('newAgendaTitle', 'Custom')
         ->set('newAgendaDescription', 'Something')
+        ->set('newAgendaCardType', 'directive')
         ->set('agendaType', 'elect_player')
         ->call('createAgenda')
-        ->assertSeeHtml('<p class="agenda-card-elect">Elect Player</p>');
+        ->assertSeeHtml('<p class="agenda-card-elect">Elect Player</p>')
+        ->assertSeeHtml('<span>directive</span>');
 
     $game->currentAgenda()->update(['status' => 'completed']);
 
@@ -221,6 +223,36 @@ test('custom elect agendas show what is elected and for against agendas do not',
         ->set('selectedPresetAgenda', 'Publicize Weapon Schematics')
         ->call('createAgenda')
         ->assertDontSeeHtml('agenda-card-elect');
+});
+
+test('speaker can create a new agenda after ending voting', function () {
+    [$game, $speaker] = makeGame();
+    makeAgenda($game);
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->assertSee('End Voting')
+        ->call('endVoting')
+        ->assertDontSee('End Voting')
+        ->assertSee('Create New Agenda')
+        ->call('toggleCreateAgenda')
+        ->set('newAgendaTitle', 'Next Agenda')
+        ->set('newAgendaDescription', 'Something')
+        ->set('newAgendaCardType', 'law')
+        ->call('createAgenda');
+
+    expect($game->currentAgenda()->title)->toBe('Next Agenda');
+});
+
+test('custom agendas must be a law or a directive', function () {
+    [$game, $speaker] = makeGame();
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->set('newAgendaTitle', 'Custom')
+        ->set('newAgendaDescription', 'Something')
+        ->call('createAgenda')
+        ->assertHasErrors('newAgendaCardType');
+
+    expect($game->currentAgenda())->toBeNull();
 });
 
 test('pages show the app version', function () {

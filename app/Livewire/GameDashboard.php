@@ -148,6 +148,7 @@ class GameDashboard extends Component
             'influenceSpent' => 'required|integer|min:0|max:99',
             'newAgendaTitle' => 'required|string|max:255',
             'newAgendaDescription' => 'required|string|max:1000',
+            'newAgendaCardType' => 'required|in:law,directive',
             'agendaType' => 'required|in:for_against,elect_player,elect_planet_any,elect_planet_industrial,elect_planet_cultural,elect_planet_hazardous,elect_planet_non_home,custom',
             'customOptions' => 'required_if:agendaType,custom|string|max:500',
             'customTileNumbers' => 'nullable|string|max:255',
@@ -225,6 +226,7 @@ class GameDashboard extends Component
         $this->validate([
             'newAgendaTitle' => 'required|string|max:255',
             'newAgendaDescription' => 'required|string|max:1000',
+            'newAgendaCardType' => 'required|in:law,directive',
             'agendaType' => 'required|in:for_against,elect_player,elect_planet_any,elect_planet_industrial,elect_planet_cultural,elect_planet_hazardous,elect_planet_non_home,custom'
         ]);
 

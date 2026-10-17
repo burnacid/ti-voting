@@ -59,6 +59,7 @@
     background-clip: text;
     color: transparent;
     font-family: 'Saira Semi Condensed', ui-sans-serif, system-ui, sans-serif;
+    min-height: 1.5em;
     font-size: 1.125rem;
     font-weight: 800;
     letter-spacing: 0.18em;

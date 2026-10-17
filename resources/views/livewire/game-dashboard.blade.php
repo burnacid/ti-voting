@@ -5,14 +5,14 @@
             <div class="flex justify-between items-center mb-4">
                 <h2 class="text-xl font-bold text-yellow-800 dark:text-yellow-200">Speaker Controls</h2>
                 <div class="flex space-x-2">
-                    @if(!$currentAgenda)
+                    @if($currentAgenda?->status !== 'voting')
                         <button wire:click="toggleCreateAgenda"
                                 class="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-md transition-colors">
                             {{ $showCreateAgenda ? 'Cancel' : 'Create New Agenda' }}
                         </button>
-                    @elseif($currentAgenda->status === 'voting')
+                    @else
                         <button wire:click="endVoting"
-                                wire:confirm="Are you sure you want to end voting? This will make results visible to all players."
+                                wire:confirm="Are you sure you want to end voting? The results will only be visible to you."
                                 class="bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-md transition-colors">
                             End Voting
                         </button>
@@ -21,7 +21,7 @@
             </div>
 
             <!-- Create Agenda Form -->
-            @if($showCreateAgenda && !$currentAgenda)
+            @if($showCreateAgenda && $currentAgenda?->status !== 'voting')
                 <div class="bg-white dark:bg-gray-800 rounded-lg p-6 border">
                     <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Create New Agenda</h3>
 
@@ -77,6 +77,29 @@
                                       placeholder="Describe what this agenda is about..."
                                       class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"></textarea>
                             @error('newAgendaDescription') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                Agenda Type
+                            </label>
+                            <div class="flex gap-6">
+                                <label class="flex items-center">
+                                    <input type="radio"
+                                           wire:model="newAgendaCardType"
+                                           value="law"
+                                           class="mr-2 text-blue-600">
+                                    <span class="text-gray-900 dark:text-white">Law</span>
+                                </label>
+                                <label class="flex items-center">
+                                    <input type="radio"
+                                           wire:model="newAgendaCardType"
+                                           value="directive"
+                                           class="mr-2 text-blue-600">
+                                    <span class="text-gray-900 dark:text-white">Directive</span>
+                                </label>
+                            </div>
+                            @error('newAgendaCardType') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
                         </div>
 
                         <div>

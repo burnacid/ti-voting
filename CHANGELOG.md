@@ -9,7 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Added
 - Thunder's Edge games are detected from the Milty draft (TE tiles or TE factions enabled). In those games, the planets of The Fracture (Cocytus, Lethe, Phlegethon and Styx) can be elected on planet agendas.
 - The Fracture planets can also be added manually through the custom tile numbers 125, 126 and 127.
-- The current agenda is shown as a digital agenda card, styled like the printed cards, with its type (Law or Directive) on the ribbon. Elect agendas show what is elected in bold, e.g. "Elect Player" or "Elect Cultural Planet".
+- The current agenda is shown as a digital agenda card, styled like the printed cards, with its type (Law or Directive) on the ribbon. Custom agendas ask the Speaker to choose Law or Directive. Elect agendas show what is elected in bold, e.g. "Elect Player" or "Elect Cultural Planet".
 - "Classified Document Leaks" now elects a scored secret objective instead of a For/Against vote.
 - The app version is shown at the bottom of each page.
 
@@ -21,6 +21,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Votes for an option that is not on the agenda are rejected.
 - Voting twice on the same agenda shows an error instead of crashing.
 - After voting ends, the results stay visible to the Speaker only, and the Speaker is asked to announce them.
+- After ending voting, the Speaker can create a new agenda again; the Speaker controls no longer disappear.
 - Only the Speaker can see and use the "Change Milty URL" button.
 - Creating a game with a Milty URL that cannot be loaded shows an error instead of creating the game without draft data.
 - Requests to the Milty API time out after 10 seconds.
