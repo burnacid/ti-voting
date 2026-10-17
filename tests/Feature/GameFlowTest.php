@@ -157,10 +157,10 @@ test('planet preset agenda elects any planet when milty data exists', function (
         ->assertSet('agendaType', 'elect_planet_any');
 });
 
-test('thunders edge games include the fracture planets', function () {
+test('thunders edge games include the fracture planets once it is in play', function () {
     $draft = ['draft' => ['players' => []], 'slices' => []];
-    [$teGame] = makeGame(['milty_draft_data' => $draft + ['config' => ['include_te_tiles' => true]]]);
-    [$baseGame] = makeGame(['milty_draft_data' => $draft + ['config' => ['include_te_tiles' => false]]]);
+    [$teGame] = makeGame(['milty_draft_data' => $draft + ['config' => ['include_te_tiles' => true]], 'fracture_in_play' => true]);
+    [$baseGame] = makeGame(['milty_draft_data' => $draft + ['config' => ['include_te_tiles' => false]], 'fracture_in_play' => true]);
 
     expect($teGame->isThundersEdgeGame())->toBeTrue()
         ->and($teGame->getPlanets()->pluck('name'))->toContain('Styx', 'Cocytus', 'Lethe', 'Phlegethon')
@@ -168,6 +168,78 @@ test('thunders edge games include the fracture planets', function () {
         ->and($teGame->getPlanets('cultural')->pluck('name'))->not->toContain('Styx')
         ->and($baseGame->isThundersEdgeGame())->toBeFalse()
         ->and($baseGame->getPlanets()->pluck('name'))->not->toContain('Styx');
+});
+
+test('speaker controls whether the fracture is in play', function () {
+    $draft = ['draft' => ['players' => []], 'slices' => [], 'config' => ['include_te_factions' => true]];
+    [$game, $speaker, $other] = makeGame(['milty_draft_data' => $draft]);
+
+    // The Fracture starts out of play
+    expect($game->getPlanets()->pluck('name'))->not->toContain('Styx');
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $other])
+        ->assertDontSee('The Fracture is in play')
+        ->call('toggleFracture');
+    expect($game->fresh()->fracture_in_play)->toBeFalse();
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->assertSee('The Fracture is in play')
+        ->call('toggleFracture');
+    expect($game->fresh()->getPlanets()->pluck('name'))->toContain('Styx');
+});
+
+test('enabling the fracture adds its planets to the open planet agenda', function () {
+    $draft = ['draft' => ['players' => []], 'slices' => [], 'config' => ['include_te_tiles' => true]];
+    [$game, $speaker] = makeGame(['milty_draft_data' => $draft]);
+    $planetAgenda = makeAgenda($game);
+    $planetAgenda->update(['elect' => 'planet', 'options' => ['Mecatol Rex', 'Abstain']]);
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->call('toggleFracture')
+        ->assertSee('Styx');
+
+    expect($planetAgenda->fresh()->options)
+        ->toBe(['Cocytus', 'Lethe', 'Mecatol Rex', 'Phlegethon', 'Styx', 'Abstain']);
+});
+
+test('disabling the fracture removes its planets from the open agenda unless voted for', function () {
+    $draft = ['draft' => ['players' => []], 'slices' => [], 'config' => ['include_te_tiles' => true]];
+    [$game, $speaker, $other] = makeGame(['milty_draft_data' => $draft, 'fracture_in_play' => true]);
+    $planetAgenda = makeAgenda($game);
+    $planetAgenda->update([
+        'elect' => 'planet',
+        'options' => ['Cocytus', 'Lethe', 'Mecatol Rex', 'Phlegethon', 'Styx', 'Abstain'],
+    ]);
+    Vote::create(['agenda_id' => $planetAgenda->id, 'player_id' => $other->id, 'option' => 'Styx', 'influence_spent' => 2]);
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->call('toggleFracture')
+        ->assertDispatched('flashMessage', fn ($event, $params) => str_contains($params[0][0], 'Styx stayed on the current agenda'));
+
+    expect($game->fresh()->fracture_in_play)->toBeFalse()
+        ->and($planetAgenda->fresh()->options)->toBe(['Mecatol Rex', 'Styx', 'Abstain']);
+});
+
+test('enabling the fracture leaves trait and for against agendas alone', function () {
+    $draft = ['draft' => ['players' => []], 'slices' => [], 'config' => ['include_te_tiles' => true]];
+    [$game, $speaker] = makeGame(['milty_draft_data' => $draft]);
+    $agenda = makeAgenda($game);
+    $agenda->update(['elect' => 'cultural_planet', 'options' => ['Olergodt', 'Abstain']]);
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->call('toggleFracture');
+
+    expect($agenda->fresh()->options)->toBe(['Olergodt', 'Abstain']);
+});
+
+test('the fracture toggle is hidden in games without thunders edge', function () {
+    [$game, $speaker] = makeGame(['milty_draft_data' => ['draft' => ['players' => []], 'slices' => []]]);
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->assertDontSee('The Fracture is in play')
+        ->call('toggleFracture');
+
+    expect($game->fresh()->fracture_in_play)->toBeFalse();
 });
 
 test('planets with multiple traits are electable for each trait', function () {
@@ -253,6 +325,67 @@ test('custom agendas must be a law or a directive', function () {
         ->assertHasErrors('newAgendaCardType');
 
     expect($game->currentAgenda())->toBeNull();
+});
+
+test('voting opens only after the speaker checked when and after revealed cards', function () {
+    [$game, $speaker, $other] = makeGame();
+
+    $speakerView = Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->set('selectedPresetAgenda', 'Publicize Weapon Schematics')
+        ->call('createAgenda')
+        ->assertSee('Done, continue to "After" cards')
+        ->assertDontSee('End Voting');
+
+    expect($game->currentAgenda()->reveal_step)->toBe(Agenda::STEP_WHEN_REVEALED);
+
+    // Players cannot vote yet
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $other])
+        ->assertSee('Voting has not started yet')
+        ->assertDontSee('Submit Vote')
+        ->set('selectedOption', 'For')
+        ->set('influenceSpent', 3)
+        ->call('submitVote');
+    expect(Vote::count())->toBe(0);
+
+    $speakerView->call('completeRevealStep')->assertSee('Done, start voting');
+    expect($game->currentAgenda()->reveal_step)->toBe(Agenda::STEP_AFTER_REVEALED);
+
+    $speakerView->call('completeRevealStep')->assertSee('End Voting');
+    expect($game->currentAgenda()->isVotingOpen())->toBeTrue();
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $other])
+        ->set('selectedOption', 'For')
+        ->set('influenceSpent', 3)
+        ->call('submitVote');
+    expect(Vote::count())->toBe(1);
+});
+
+test('only the speaker can continue or discard an agenda before voting', function () {
+    [$game, , $other] = makeGame();
+    $agenda = makeAgenda($game);
+    $agenda->update(['reveal_step' => Agenda::STEP_WHEN_REVEALED]);
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $other])
+        ->call('completeRevealStep')
+        ->call('discardAgenda')
+        ->call('endVoting');
+
+    expect($agenda->fresh())
+        ->reveal_step->toBe(Agenda::STEP_WHEN_REVEALED)
+        ->status->toBe('voting');
+});
+
+test('speaker can discard a vetoed agenda and reveal another', function () {
+    [$game, $speaker] = makeGame();
+    $agenda = makeAgenda($game);
+    $agenda->update(['reveal_step' => Agenda::STEP_WHEN_REVEALED]);
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->call('endVoting')
+        ->call('discardAgenda')
+        ->assertSee('Create New Agenda');
+
+    expect(Agenda::find($agenda->id))->toBeNull();
 });
 
 test('pages show the app version', function () {

@@ -12,6 +12,15 @@ class Agenda extends Model
 {
     use HasFactory, HasUuids;
 
+    // Before voting opens, the Speaker checks for these action card timings, in this order
+    public const STEP_WHEN_REVEALED = 'when_revealed';
+    public const STEP_AFTER_REVEALED = 'after_revealed';
+
+    public const REVEAL_STEP_LABELS = [
+        self::STEP_WHEN_REVEALED => 'When an agenda is revealed',
+        self::STEP_AFTER_REVEALED => 'After an agenda is revealed',
+    ];
+
     // Elect line as printed on the agenda cards, keyed by the "Elect" value in agendas.json
     public const ELECT_LABELS = [
         'player' => 'Elect Player',
@@ -43,6 +52,7 @@ class Agenda extends Model
         'elect',
         'options',
         'status',
+        'reveal_step',
         'voting_started_at',
         'voting_ended_at',
     ];
@@ -83,6 +93,16 @@ class Agenda extends Model
     public function allPlayersVoted(): bool
     {
         return $this->votes()->count() >= $this->game->players()->count();
+    }
+
+    public function isVotingOpen(): bool
+    {
+        return $this->status === 'voting' && $this->reveal_step === null;
+    }
+
+    public function getRevealStepLabelAttribute(): ?string
+    {
+        return self::REVEAL_STEP_LABELS[$this->reveal_step] ?? null;
     }
 
     public function getElectLabelAttribute(): ?string

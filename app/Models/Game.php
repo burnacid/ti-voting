@@ -20,12 +20,14 @@ class Game extends Model
         'milty_url',
         'milty_draft_id',
         'milty_draft_data',
+        'fracture_in_play',
         'status',
     ];
 
     protected $casts = [
         'status' => 'string',
-        'milty_draft_data' => 'array'
+        'milty_draft_data' => 'array',
+        'fracture_in_play' => 'boolean',
     ];
 
     public function players(): HasMany
@@ -103,7 +105,7 @@ class Game extends Model
         $HomePlanets = $planetService->getFactionPlanets($Factions->toArray());
         $HomePlanets = collect($HomePlanets);
 
-        if ($this->isThundersEdgeGame()) {
+        if ($this->isFractureInPlay()) {
             $Tiles = $Tiles->merge(PlanetService::FRACTURE_TILES);
         }
 
@@ -130,6 +132,11 @@ class Game extends Model
         $config = $this->milty_draft_data['config'] ?? [];
 
         return !empty($config['include_te_tiles']) || !empty($config['include_te_factions']);
+    }
+
+    public function isFractureInPlay(): bool
+    {
+        return $this->isThundersEdgeGame() && $this->fracture_in_play;
     }
 
     public function miltySelectedSlices()
