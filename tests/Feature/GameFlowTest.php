@@ -182,6 +182,10 @@ test('planets with multiple traits are electable for each trait', function () {
         ->and($game->getPlanets('industrial')->pluck('name'))->not->toContain('Olergodt');
 });
 
+test('pages show the app version', function () {
+    $this->get('/')->assertSee('v'.config('app.version'));
+});
+
 test('elect planet includes mecatol rex but non-home excludes it', function () {
     [$game] = makeGame(['milty_draft_data' => ['draft' => ['players' => []], 'slices' => []]]);
 

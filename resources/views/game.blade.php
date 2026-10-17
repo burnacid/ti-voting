@@ -59,6 +59,8 @@
         </div>
     </div>
 
+    @include('partials.version')
+
     <!-- Flash Messages -->
     <livewire:flash-messages />
 </body>

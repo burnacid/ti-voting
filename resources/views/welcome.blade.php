@@ -160,5 +160,7 @@
             </div>
         </div>
     </div>
+
+    @include('partials.version')
 </body>
 </html>
