@@ -11,12 +11,14 @@ use Livewire\Component;
 class UpdateMiltyUrl extends Component
 {
     public $game;
+    public $player;
     public $miltyUrl = '';
     public $showModal = false;
 
-    public function mount($game): void
+    public function mount($game, $player): void
     {
         $this->game = $game;
+        $this->player = $player;
         $this->miltyUrl = $game->milty_url ?? '';
     }
 
@@ -32,6 +34,14 @@ class UpdateMiltyUrl extends Component
 
     public function updateMiltyUrl(): void
     {
+        if (!$this->player->is_speaker) {
+            $this->dispatch('flashMessage', [
+                'Only the Speaker can change the Milty URL.',
+                'error'
+            ]);
+            return;
+        }
+
         $this->validate([
             'miltyUrl' => 'required|url',
         ]);

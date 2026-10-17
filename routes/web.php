@@ -42,8 +42,3 @@ Route::get('/game/{code}', function (string $code) {
 
     return view('game', ['game' => $game, 'player' => $player]);
 })->name('game.show');
-
-// Alternative route for backward compatibility
-Route::get('/group/{group}', function (App\Models\Group $group) {
-    return view('group', ['group' => $group]);
-})->name('group.show');

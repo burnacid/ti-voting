@@ -31,7 +31,9 @@
                                     View Map Draft
                                 </a>
                             @endif
-                            <livewire:update-milty-url :game="$game" />
+                            @if($player->is_speaker)
+                                <livewire:update-milty-url :game="$game" :player="$player" />
+                            @endif
                         </div>
                     </div>
                     <div class="text-right">

@@ -34,7 +34,7 @@ class MiltyService
     {
         try {
             // Skip SSL verification in local environment
-            $http = Http::withOptions([
+            $http = Http::timeout(10)->withOptions([
                 'verify' => !App::environment('local'),
             ]);
 

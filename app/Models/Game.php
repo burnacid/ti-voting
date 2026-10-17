@@ -58,7 +58,7 @@ class Game extends Model
 
     public function lastCompletedAgenda(): ?Agenda
     {
-        return $this->agendas()->where('status', 'completed')->first();
+        return $this->agendas()->where('status', 'completed')->latest('voting_ended_at')->first();
     }
 
     public function setSpeaker(Player $player): void

@@ -10,7 +10,9 @@ use App\Models\Game;
 use App\Models\Player;
 use App\Models\Agenda;
 use App\Models\Vote;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\Rule;
 
 class GameDashboard extends Component
 {
@@ -83,6 +85,8 @@ class GameDashboard extends Component
                     $this->agendaType = 'custom';
                     break;
                 }
+                $this->agendaType = 'elect_planet_any';
+                break;
             case 'non_home_non_mecathol':
             if($this->game->milty_draft_data==null) {
                 $this->agendaType = 'custom';
@@ -438,7 +442,7 @@ class GameDashboard extends Component
         }
 
         $this->validate([
-            'selectedOption' => 'required|string',
+            'selectedOption' => ['required', 'string', Rule::in($currentAgenda->options)],
             'influenceSpent' => $this->selectedOption === 'Abstain' ? 'integer' : 'required|integer|min:1|max:99',
         ]);
 
@@ -447,12 +451,20 @@ class GameDashboard extends Component
             $this->influenceSpent = 0;
         }
 
-        $vote = Vote::create([
-            'agenda_id' => $currentAgenda->id,
-            'player_id' => $this->player->id,
-            'option' => $this->selectedOption,
-            'influence_spent' => $this->influenceSpent,
-        ]);
+        try {
+            Vote::create([
+                'agenda_id' => $currentAgenda->id,
+                'player_id' => $this->player->id,
+                'option' => $this->selectedOption,
+                'influence_spent' => $this->influenceSpent,
+            ]);
+        } catch (UniqueConstraintViolationException) {
+            $this->dispatch('flashMessage', [
+                'You have already voted on this agenda.',
+                'error'
+            ]);
+            return;
+        }
 
         $this->selectedOption = '';
         $this->influenceSpent = 0;
@@ -485,7 +497,7 @@ class GameDashboard extends Component
             ]);
 
             $this->dispatch('flashMessage', [
-                'Voting has ended. Results are now visible to all players.',
+                'Voting has ended. Please announce the results to the other players.',
                 'info'
             ]);
             $this->refreshData();
@@ -501,6 +513,12 @@ class GameDashboard extends Component
     public function render()
     {
         $currentAgenda = $this->game->currentAgenda();
+
+        // Results of the last ended agenda remain visible to the Speaker only
+        if (!$currentAgenda && $this->player->is_speaker) {
+            $currentAgenda = $this->game->lastCompletedAgenda();
+        }
+
         $players = $this->game->players()->get();
         $hasVoted = $currentAgenda ? $this->player->hasVotedOn($currentAgenda) : false;
         $allVoted = $currentAgenda ? $currentAgenda->allPlayersVoted() : false;
