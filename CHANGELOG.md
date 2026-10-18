@@ -4,7 +4,7 @@ All notable changes to TI Voting are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.4.2] - 2026-10-18
 
 ### Added
 - Rejoining: a player who lost access (cleared browser, other phone), including the Speaker, can ask to rejoin under their name through the game's rejoin link or by joining with their taken name. Another player in the game confirms it is them, and they are let back in. Every player can copy the rejoin link from the game screen.
@@ -100,7 +100,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Milty draft integration to load factions and planets.
 - Planet agendas (any, industrial, cultural, hazardous, non-home), with extra tiles that can be added by tile number.
 
-[Unreleased]: https://github.com/burnacid/ti-voting/compare/v1.4.1...HEAD
+[1.4.2]: https://github.com/burnacid/ti-voting/compare/v1.4.1...v1.4.2
 [1.4.1]: https://github.com/burnacid/ti-voting/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/burnacid/ti-voting/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/burnacid/ti-voting/compare/v1.2.0...v1.3.0
