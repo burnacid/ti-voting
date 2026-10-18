@@ -95,7 +95,8 @@
                 </div>
 
                 @if($factions->isNotEmpty())
-                    <div>
+                    {{-- Polled, so factions other players choose in the meantime drop out of the list --}}
+                    <div wire:poll.5s="checkFaction">
                         <label for="faction" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                             Your Faction
                         </label>
@@ -104,6 +105,13 @@
                             @foreach($factions as $factionName => $drafter)
                                 <option value="{{ $factionName }}">{{ $factionName }}{{ $drafter ? " ({$drafter})" : '' }}</option>
                             @endforeach
+                            @if($takenFactions->isNotEmpty())
+                                <optgroup label="Already chosen">
+                                    @foreach($takenFactions as $factionName => $takenBy)
+                                        <option disabled>{{ $factionName }} (taken by {{ $takenBy }})</option>
+                                    @endforeach
+                                </optgroup>
+                            @endif
                         </select>
                         @error('faction') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
                     </div>

@@ -3,6 +3,10 @@
 namespace App\Models;
 
 use App\Services\PlanetService;
+use BaconQrCode\Renderer\Image\SvgImageBackEnd;
+use BaconQrCode\Renderer\ImageRenderer;
+use BaconQrCode\Renderer\RendererStyle\RendererStyle;
+use BaconQrCode\Writer;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -57,6 +61,22 @@ class Game extends Model
 
     // Law that, when voted "For", lets each player cast only 1 vote on each agenda
     public const REPRESENTATIVE_GOVERNMENT = 'Representative Government';
+
+    // Page where new players join this game, shared as a link or QR code
+    public function joinUrl(): string
+    {
+        return route('join-group', $this->code);
+    }
+
+    /**
+     * QR code of the join link as inline SVG, made here so the link is not sent to a QR service.
+     */
+    public function joinQrSvg(int $size = 240): string
+    {
+        $svg = (new Writer(new ImageRenderer(new RendererStyle($size, 1), new SvgImageBackEnd())))->writeString($this->joinUrl());
+
+        return preg_replace('/^<\?xml[^>]*>\s*/', '', $svg);
+    }
 
     // Page where players who lost their session ask to rejoin, another player has to confirm it
     public function rejoinUrl(): string

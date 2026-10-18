@@ -35,6 +35,16 @@ class Player extends Model
         'rejoin_approved_at' => 'datetime',
     ];
 
+    // Up to two letters for the avatar in the player list, e.g. "Jan de Vries" becomes "JD"
+    public function getInitialsAttribute(): string
+    {
+        return collect(preg_split('/\s+/', trim($this->name)))
+            ->filter()
+            ->take(2)
+            ->map(fn ($word) => mb_strtoupper(mb_substr($word, 0, 1)))
+            ->implode('');
+    }
+
     // How long a request to rejoin as this player waits for another player to confirm it
     public const REJOIN_REQUEST_MINUTES = 10;
 

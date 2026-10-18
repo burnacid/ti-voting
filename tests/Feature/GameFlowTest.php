@@ -89,6 +89,20 @@ test('speaker can update the milty url', function () {
         ->milty_draft_id->toBe('abc123');
 });
 
+test('every player can invite others with a qr code of the join link', function () {
+    [$game, $speaker, $other] = makeGame();
+
+    $this->withSession(['player_token' => $other->session_token])
+        ->get(route('game.show', $game->code))
+        ->assertOk()
+        ->assertSee('Invite players')
+        ->assertSee('Copy join link')
+        ->assertSee('<svg xmlns="http://www.w3.org/2000/svg"', false)
+        ->assertDontSee('<?xml', false);
+
+    expect($game->joinUrl())->toEndWith('/join/' . $game->code);
+});
+
 test('game page only shows the milty button to the speaker', function () {
     [$game, $speaker, $other] = makeGame();
 
@@ -829,6 +843,87 @@ test('representative government voted against or tied is not put in effect', fun
     expect($game->fresh()->representative_government)->toBeFalse();
 })->with([[2, 6], [4, 4]]);
 
+function makeMutiny(Game $game): Agenda
+{
+    $agenda = makeAgenda($game);
+    $agenda->update([
+        'title' => 'Mutiny',
+        'description' => "FOR : Each player who voted \"For\" gains 1 victory point.\nAGAINST : Each player who voted \"For\" loses 1 victory point.",
+    ]);
+
+    return $agenda;
+}
+
+test('after an agenda that affects voters the speaker can show who is affected', function () {
+    [$game, $speaker, $other] = makeGame();
+    $agenda = makeMutiny($game);
+    Vote::create(['agenda_id' => $agenda->id, 'player_id' => $speaker->id, 'option' => 'For', 'influence_spent' => 2]);
+    Vote::create(['agenda_id' => $agenda->id, 'player_id' => $other->id, 'option' => 'Against', 'influence_spent' => 5]);
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->call('endVoting')
+        ->assertSee('Against wins')
+        ->assertDontSee('Players who voted')
+        ->call('toggleAffectedPlayers')
+        ->assertSee('Each player who voted &quot;For&quot; loses 1 victory point.', false)
+        ->assertSeeInOrder(['Players who voted', 'For', 'Speaker']);
+
+    expect($agenda->fresh()->playersAffectedBy('Against'))->toBe(['For' => ['Speaker']])
+        ->and($agenda->fresh()->playersAffectedBy('For'))->toBe(['For' => ['Speaker']]);
+});
+
+test('agendas that do not depend on how players voted have no affected players', function () {
+    [$game, $speaker] = makeGame();
+    $agenda = makeAgenda($game);
+    $agenda->update(['description' => "FOR : Players cannot use BOMBARDMENT against units that are on cultural planets.\nAGAINST : Each player that voted \"Against\" discards all of their action cards."]);
+
+    expect(makeAgenda($game)->affectsVoters())->toBeFalse()
+        ->and($agenda->fresh()->affectsVoters())->toBeTrue()
+        ->and($agenda->fresh()->playersAffectedBy('For'))->toBe([])
+        ->and($agenda->fresh()->playersAffectedBy('Against'))->toBe(['Against' => []]);
+});
+
+test('on a tie the speaker breaks it before seeing who is affected', function () {
+    [$game, $speaker, $other] = makeGame();
+    $agenda = makeMutiny($game);
+    Vote::create(['agenda_id' => $agenda->id, 'player_id' => $speaker->id, 'option' => 'For', 'influence_spent' => 4]);
+    Vote::create(['agenda_id' => $agenda->id, 'player_id' => $other->id, 'option' => 'Against', 'influence_spent' => 4]);
+
+    $view = Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->call('endVoting')
+        ->assertSee('The vote is tied')
+        ->assertDontSee('Show who is affected');
+
+    // Only the tied options can win, and only the Speaker decides
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $other])->call('breakTie', 'For');
+    $view->call('breakTie', 'Abstain');
+    expect($agenda->fresh()->tiebreak_option)->toBeNull();
+
+    $view->call('breakTie', 'For')
+        ->assertSee('For wins (tie broken by the Speaker)')
+        ->call('toggleAffectedPlayers')
+        ->assertSee('gains 1 victory point');
+
+    expect($agenda->fresh()->outcome())->toBe('For');
+});
+
+test('representative government is put in effect when the speaker breaks a tie for it', function () {
+    [$game, $speaker, $other] = makeGame();
+    $agenda = makeAgenda($game);
+    $agenda->update([
+        'title' => 'Representative Government',
+        'description' => "FOR : Each player may cast 1 vote on each agenda instead.\nAGAINST : Each player that voted \"Against\" exhausts all of their cultural planets.",
+    ]);
+    Vote::create(['agenda_id' => $agenda->id, 'player_id' => $speaker->id, 'option' => 'For', 'influence_spent' => 3]);
+    Vote::create(['agenda_id' => $agenda->id, 'player_id' => $other->id, 'option' => 'Against', 'influence_spent' => 3]);
+
+    $view = Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])->call('endVoting');
+    expect($game->fresh()->representative_government)->toBeFalse();
+
+    $view->call('breakTie', 'For');
+    expect($game->fresh()->representative_government)->toBeTrue();
+});
+
 test('only the speaker can turn representative government on or off', function () {
     [$game, $speaker, $other] = makeGame();
 
@@ -1036,6 +1131,33 @@ test('joining a milty game offers the drafted factions nobody chose yet', functi
     expect($game->players()->where('name', 'Bob')->first()->faction)->toBe('The Federation of Sol');
 });
 
+test('factions other players chose are shown as taken and cannot be picked', function () {
+    Event::fake([TriggerRefresh::class]);
+    [$game, $speaker] = makeGame(['milty_draft_data' => draftWithFactions()]);
+    $speaker->update(['faction' => 'The Argent Flight']);
+
+    Livewire::test(JoinGameForm::class, ['gameCode' => $game->code])
+        ->assertSeeHtml('<option disabled>The Argent Flight (taken by Speaker)</option>')
+        ->assertSee('The Federation of Sol (Bob)');
+});
+
+test('a faction taken while choosing is cleared from the join form', function () {
+    Event::fake([TriggerRefresh::class]);
+    [$game, $speaker] = makeGame(['milty_draft_data' => draftWithFactions()]);
+
+    $form = Livewire::test(JoinGameForm::class, ['gameCode' => $game->code])
+        ->set('playerName', 'Bob')
+        ->set('faction', 'The Federation of Sol');
+
+    // Someone else joins with that faction before this form is sent
+    $speaker->update(['faction' => 'The Federation of Sol']);
+
+    $form->call('checkFaction')
+        ->assertSet('faction', '')
+        ->assertHasErrors('faction')
+        ->assertSeeHtml('<option disabled>The Federation of Sol (taken by Speaker)</option>');
+});
+
 test('joining a game without milty has no faction', function () {
     Event::fake([TriggerRefresh::class]);
     [$game] = makeGame();
@@ -1157,6 +1279,73 @@ test('any player can draw a star chart tile and everyone sees it', function () {
 
     // A drawn system is on the map, so its planets can be elected
     expect($game->fresh()->getPlanets()->pluck('name'))->toContain($planet);
+});
+
+test('players, speaker controls and star chart are tabs below the agenda', function () {
+    [$game, $speaker, $other] = makeGame(['milty_draft_data' => starChartDraft()]);
+    makeAgenda($game);
+
+    // The Speaker starts on the Speaker tab, the agenda stays visible above the tabs
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->assertSeeHtml('id="tab-players"')
+        ->assertSeeHtml('id="tab-speaker"')
+        ->assertSeeHtml('id="tab-star-chart"')
+        ->assertSeeHtml("tab: 'speaker'")
+        ->assertSeeInOrder(['Test Agenda', 'id="tab-speaker"', 'id="tab-players"', 'id="tab-star-chart"', 'Speaker Settings', 'Draw a system tile'], false);
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $other])
+        ->assertSeeHtml('id="tab-players"')
+        ->assertDontSeeHtml('id="tab-speaker"')
+        ->assertSeeHtml("tab: 'players'");
+});
+
+test('create new agenda is above the tabs', function () {
+    [$game, $speaker] = makeGame(['milty_draft_data' => starChartDraft()]);
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->assertSeeInOrder(['Create New Agenda', 'Game sections'])
+        ->call('toggleCreateAgenda')
+        ->assertSeeInOrder(['Preset agenda', 'Game sections']);
+});
+
+test('voting ends by itself once every player who may vote has voted', function () {
+    [$game, $speaker, $other] = makeGame();
+    $agenda = makeAgenda($game);
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $other])
+        ->set('selectedOption', 'For')
+        ->set('influenceSpent', 3)
+        ->call('submitVote');
+    expect($agenda->fresh()->status)->toBe('voting');
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->set('selectedOption', 'Against')
+        ->set('influenceSpent', 2)
+        ->call('submitVote')
+        ->assertSee('Voting Results')
+        ->assertDontSee('End Voting');
+    expect($agenda->fresh()->status)->toBe('completed');
+});
+
+test('a blocked player does not keep voting open', function () {
+    [$game, $speaker, $other] = makeGame();
+    $agenda = makeAgenda($game);
+    $agenda->update(['blocked_player_ids' => [$other->id]]);
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->set('selectedOption', 'For')
+        ->set('influenceSpent', 1)
+        ->call('submitVote');
+
+    expect($agenda->fresh()->status)->toBe('completed');
+});
+
+test('without speaker controls or star chart there are no tabs', function () {
+    [$game, $speaker, $other] = makeGame();
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $other])
+        ->assertDontSeeHtml('role="tablist"')
+        ->assertSee('Players');
 });
 
 test('star chart stops when no tiles are left', function () {
