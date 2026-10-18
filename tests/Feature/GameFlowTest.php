@@ -1240,6 +1240,73 @@ test('any player can draw a star chart tile and everyone sees it', function () {
     expect($game->fresh()->getPlanets()->pluck('name'))->toContain($planet);
 });
 
+test('players, speaker controls and star chart are tabs below the agenda', function () {
+    [$game, $speaker, $other] = makeGame(['milty_draft_data' => starChartDraft()]);
+    makeAgenda($game);
+
+    // The Speaker starts on the Speaker tab, the agenda stays visible above the tabs
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->assertSeeHtml('id="tab-players"')
+        ->assertSeeHtml('id="tab-speaker"')
+        ->assertSeeHtml('id="tab-star-chart"')
+        ->assertSeeHtml("tab: 'speaker'")
+        ->assertSeeInOrder(['Test Agenda', 'id="tab-speaker"', 'id="tab-players"', 'id="tab-star-chart"', 'Speaker Controls', 'Draw a system tile'], false);
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $other])
+        ->assertSeeHtml('id="tab-players"')
+        ->assertDontSeeHtml('id="tab-speaker"')
+        ->assertSeeHtml("tab: 'players'");
+});
+
+test('create new agenda is above the tabs', function () {
+    [$game, $speaker] = makeGame(['milty_draft_data' => starChartDraft()]);
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->assertSeeInOrder(['Create New Agenda', 'Game sections'])
+        ->call('toggleCreateAgenda')
+        ->assertSeeInOrder(['Preset agenda', 'Game sections']);
+});
+
+test('voting ends by itself once every player who may vote has voted', function () {
+    [$game, $speaker, $other] = makeGame();
+    $agenda = makeAgenda($game);
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $other])
+        ->set('selectedOption', 'For')
+        ->set('influenceSpent', 3)
+        ->call('submitVote');
+    expect($agenda->fresh()->status)->toBe('voting');
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->set('selectedOption', 'Against')
+        ->set('influenceSpent', 2)
+        ->call('submitVote')
+        ->assertSee('Voting Results')
+        ->assertDontSee('End Voting');
+    expect($agenda->fresh()->status)->toBe('completed');
+});
+
+test('a blocked player does not keep voting open', function () {
+    [$game, $speaker, $other] = makeGame();
+    $agenda = makeAgenda($game);
+    $agenda->update(['blocked_player_ids' => [$other->id]]);
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->set('selectedOption', 'For')
+        ->set('influenceSpent', 1)
+        ->call('submitVote');
+
+    expect($agenda->fresh()->status)->toBe('completed');
+});
+
+test('without speaker controls or star chart there are no tabs', function () {
+    [$game, $speaker, $other] = makeGame();
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $other])
+        ->assertDontSeeHtml('role="tablist"')
+        ->assertSee('Players');
+});
+
 test('star chart stops when no tiles are left', function () {
     Event::fake([TriggerRefresh::class]);
     [$game, $speaker] = makeGame(['milty_draft_data' => starChartDraft()]);

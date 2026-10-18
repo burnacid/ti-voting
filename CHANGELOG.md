@@ -10,6 +10,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Agendas that affect players by how they voted, such as Mutiny, Unconventional Measures or Conventions of War (an effect with "each player who voted For" or "Against"): after voting ends, the Speaker sees which outcome won and can show who is affected, i.e. the winning outcome's effect and the players who voted the way it names. On a tie, also when no votes were cast, the Speaker first picks the winning outcome.
 
 ### Changed
+- Voting ends by itself once every player who may vote has voted, so the Speaker no longer has to press End Voting. End Voting is still there to end voting early.
+- The game screen is less cluttered: the Speaker Controls, the players and the Star Chart are tabs below the current agenda, which stays visible. Create New Agenda and its form stay above the tabs. The Speaker starts on the Speaker tab, other players on Players, and the chosen tab is remembered on that device for each game. Players who only have the players list see no tabs.
 - The Speaker's "When" and "After" action card steps (and The Argent Flight step) are shown next to the agenda card instead of in the Speaker Controls, with Discard Agenda right beside the Done button.
 - When Representative Government ties, the Speaker breaks the tie in the results; if For wins, the law is put in effect automatically.
 

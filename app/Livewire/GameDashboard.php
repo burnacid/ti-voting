@@ -577,6 +577,11 @@ class GameDashboard extends Component
             'success'
         ]);
 
+        // The last vote ends voting, so the Speaker does not have to
+        if ($currentAgenda->allPlayersVoted()) {
+            $this->completeAgenda($currentAgenda);
+        }
+
         TriggerRefresh::dispatch($this->game);
 
         $this->refreshData();
@@ -602,20 +607,26 @@ class GameDashboard extends Component
         }
 
         if ($currentAgenda) {
-            $currentAgenda->update([
-                'status' => 'completed',
-                'voting_ended_at' => now(),
-            ]);
-            Log::info('Voting ended', ['agenda' => $currentAgenda->title, 'votes' => $currentAgenda->votes()->count()]);
-
+            $this->completeAgenda($currentAgenda);
             $this->dispatch('flashMessage', [
                 'Voting has ended. Please announce the results to the other players.',
                 'info'
             ]);
-            $this->applyRepresentativeGovernment($currentAgenda);
             $this->refreshData();
             TriggerRefresh::dispatch($this->game);
         }
+    }
+
+    // Ends voting, by the Speaker or by itself once every player who may vote has voted
+    private function completeAgenda(Agenda $agenda): void
+    {
+        $agenda->update([
+            'status' => 'completed',
+            'voting_ended_at' => now(),
+        ]);
+        Log::info('Voting ended', ['agenda' => $agenda->title, 'votes' => $agenda->votes()->count()]);
+
+        $this->applyRepresentativeGovernment($agenda);
     }
 
     /**
@@ -636,7 +647,7 @@ class GameDashboard extends Component
                 'Representative Government passed: from now on each player casts 1 vote on each agenda.',
                 'success'
             ]);
-        } elseif ($outcome === null) {
+        } elseif ($outcome === null && $this->player->is_speaker) {
             $this->dispatch('flashMessage', [
                 'Representative Government is tied. As Speaker you decide: break the tie in the results.',
                 'info'
