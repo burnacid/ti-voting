@@ -11,6 +11,7 @@ use App\Models\Game;
 use App\Models\LogEntry;
 use App\Models\Player;
 use App\Models\User;
+use App\Models\Vote;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Log;
 use Livewire\Livewire;
@@ -19,16 +20,19 @@ function makeAdminGame(string $name = 'Admin Test Game', ?string $createdAt = nu
 {
     $game = Game::create(['code' => Game::generateCode(), 'name' => $name, 'status' => 'waiting']);
 
-    if ($createdAt) {
-        $game->forceFill(['created_at' => $createdAt])->save();
-    }
-
     Player::create([
         'game_id' => $game->id,
         'name' => 'Alice',
         'session_token' => Player::generateSessionToken(),
         'is_speaker' => true,
     ]);
+
+    // Backdate the whole game, so it has had no activity since then
+    if ($createdAt) {
+        Game::whereKey($game->id)->update(['created_at' => $createdAt, 'updated_at' => $createdAt]);
+        Player::where('game_id', $game->id)->update(['created_at' => $createdAt, 'updated_at' => $createdAt]);
+        $game->refresh();
+    }
 
     return $game;
 }
@@ -129,6 +133,60 @@ test('an admin can clean up old games', function () {
 
     expect(Game::find($old->id))->toBeNull()
         ->and(Game::find($recent->id))->not->toBeNull();
+});
+
+test('cleanup keeps old games that are still being played', function () {
+    $active = makeAdminGame('Long Game', now()->subDays(8)->toDateTimeString());
+    $agenda = Agenda::create([
+        'game_id' => $active->id,
+        'title' => 'Mutiny',
+        'description' => 'Test',
+        'options' => ['For', 'Against', 'Abstain'],
+        'status' => 'voting',
+    ]);
+    Agenda::whereKey($agenda->id)->update(['created_at' => now()->subDays(8), 'updated_at' => now()->subDays(8)]);
+    Vote::create(['agenda_id' => $agenda->id, 'player_id' => $active->players()->first()->id, 'option' => 'For', 'influence_spent' => 1]);
+    $inactive = makeAdminGame('Abandoned Game', now()->subDays(8)->toDateTimeString());
+
+    $this->artisan('games:cleanup', ['--days' => 7])->assertSuccessful();
+
+    expect(Game::find($active->id))->not->toBeNull()
+        ->and(Game::find($inactive->id))->toBeNull();
+});
+
+test('the game retention period is read from the environment', function () {
+    config(['app.game_retention_days' => 3]);
+    $stale = makeAdminGame('Stale Game', now()->subDays(4)->toDateTimeString());
+    $fresh = makeAdminGame('Fresh Game', now()->subDays(2)->toDateTimeString());
+
+    $this->artisan('games:cleanup')->assertSuccessful();
+
+    expect(Game::find($stale->id))->toBeNull()
+        ->and(Game::find($fresh->id))->not->toBeNull();
+
+    $this->actingAs(User::factory()->create());
+    Livewire::test(Games::class)->assertSet('cleanupDays', 3);
+});
+
+test('an admin can make a player the speaker and remove players', function () {
+    Event::fake([TriggerRefresh::class]);
+    $this->actingAs(User::factory()->create());
+    $game = makeAdminGame();
+    $speaker = $game->players()->first();
+    $bob = Player::create(['game_id' => $game->id, 'name' => 'Bob', 'session_token' => Player::generateSessionToken()]);
+
+    $view = Livewire::test(GameDetail::class, ['game' => $game])
+        ->assertSee($bob->rejoinUrl())
+        ->call('makeSpeaker', $bob->id);
+
+    expect($bob->fresh()->is_speaker)->toBeTrue()
+        ->and($speaker->fresh()->is_speaker)->toBeFalse()
+        ->and($game->fresh()->speaker_id)->toBe($bob->id);
+
+    // Removing the Speaker passes the token on
+    $view->call('removePlayer', $bob->id);
+    expect(Player::find($bob->id))->toBeNull()
+        ->and($speaker->fresh()->is_speaker)->toBeTrue();
 });
 
 test('the game detail page shows players and can delete the game', function () {

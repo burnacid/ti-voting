@@ -6,6 +6,7 @@ use App\Events\TriggerRefresh;
 use App\Models\Game;
 use App\Models\Player;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\RateLimiter;
 use Livewire\Component;
 
 class JoinGameForm extends Component
@@ -30,6 +31,13 @@ class JoinGameForm extends Component
 
     public function joinGame()
     {
+        $throttleKey = 'join-game|' . request()->ip();
+        if (RateLimiter::tooManyAttempts($throttleKey, 30)) {
+            $this->addError('gameCode', 'Too many attempts. Try again in ' . RateLimiter::availableIn($throttleKey) . ' seconds.');
+            return;
+        }
+        RateLimiter::hit($throttleKey, 600);
+
         $this->validate();
 
         $game = Game::where('code', strtoupper($this->gameCode))->first();
@@ -46,7 +54,7 @@ class JoinGameForm extends Component
 
         // Check if player name is already taken in this game
         if ($game->players()->where('name', $this->playerName)->exists()) {
-            $this->addError('playerName', 'This name is already taken in this game.');
+            $this->addError('playerName', 'This name is already taken in this game. If this is you, ask the Speaker for your rejoin link.');
             return;
         }
 

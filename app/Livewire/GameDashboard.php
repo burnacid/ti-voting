@@ -21,6 +21,15 @@ class GameDashboard extends Component
 {
     use SharesGameLogContext;
 
+    // Planet agenda types and the planet type passed to Game::getPlanets()
+    private const PLANET_AGENDA_TYPES = [
+        'elect_planet_any' => null,
+        'elect_planet_industrial' => 'industrial',
+        'elect_planet_cultural' => 'cultural',
+        'elect_planet_hazardous' => 'hazardous',
+        'elect_planet_non_home' => 'non_home',
+    ];
+
     public Game $game;
 
     // Kept as an id and loaded on every request, as the Speaker can remove the player mid-game
@@ -109,56 +118,17 @@ class GameDashboard extends Component
         $electType = strtolower($agenda['Elect'] ?? '');
         $this->newAgendaElect = $electType ?: null;
 
-        switch ($electType) {
-            case 'for_against':
-                $this->agendaType = 'for_against';
-                break;
-            case 'player':
-                $this->agendaType = 'elect_player';
-                break;
-            case 'planet':
-                if($this->game->milty_draft_data==null) {
-                    $this->agendaType = 'custom';
-                    break;
-                }
-                $this->agendaType = 'elect_planet_any';
-                break;
-            case 'non_home_non_mecathol':
-            if($this->game->milty_draft_data==null) {
-                $this->agendaType = 'custom';
-                break;
-            }
-                $this->agendaType = 'elect_planet_non_home';
-                break;
-            case 'industrial_planet':
-                if($this->game->milty_draft_data==null) {
-                    $this->agendaType = 'custom';
-                    break;
-                }
-                $this->agendaType = 'elect_planet_industrial';
-                break;
-            case 'cultural_planet':
-                if($this->game->milty_draft_data==null) {
-                    $this->agendaType = 'custom';
-                    break;
-                }
-                $this->agendaType = 'elect_planet_cultural';
-                break;
-            case 'hazardous_planet':
-                if($this->game->milty_draft_data==null) {
-                    $this->agendaType = 'custom';
-                    break;
-                }
-                $this->agendaType = 'elect_planet_hazardous';
-                break;
-            case 'law':
-            case 'secret_objective':
-                // These are special cases that might need custom handling
-                $this->agendaType = 'custom';
-                $this->customOptions = $electType === 'law' ? 'Law 1, Law 2, Law 3' : 'Secret Objective 1, Secret Objective 2';
-                break;
-            default:
-                $this->agendaType = 'for_against';
+        $agendaType = array_search($electType, Agenda::ELECT_BY_AGENDA_TYPE, true) ?: 'for_against';
+
+        if (in_array($electType, ['law', 'secret_objective'])) {
+            // These are special cases that might need custom handling
+            $this->agendaType = 'custom';
+            $this->customOptions = $electType === 'law' ? 'Law 1, Law 2, Law 3' : 'Secret Objective 1, Secret Objective 2';
+        } elseif (array_key_exists($agendaType, self::PLANET_AGENDA_TYPES) && $this->game->milty_draft_data == null) {
+            // Planets come from the Milty draft
+            $this->agendaType = 'custom';
+        } else {
+            $this->agendaType = $agendaType;
         }
 
         $this->dispatch('flashMessage', [
@@ -326,6 +296,19 @@ class GameDashboard extends Component
             $customTileNumbers = array_map('intval', $customTileNumbers);
         }
 
+        if (array_key_exists($this->agendaType, self::PLANET_AGENDA_TYPES)) {
+            $planets = $this->game->getPlanets(self::PLANET_AGENDA_TYPES[$this->agendaType]);
+
+            // Add planets from custom tile numbers
+            if (!empty($customTileNumbers)) {
+                foreach ($planetService->getPlanetsByTileNumber($customTileNumbers) as $name => $planet) {
+                    $planets[$name] = $planet;
+                }
+            }
+
+            return [...$planets->pluck('name')->sort()->values(), 'Abstain'];
+        }
+
         switch ($this->agendaType) {
             case 'for_against':
                 $options = ['For', 'Against'];
@@ -334,81 +317,6 @@ class GameDashboard extends Component
             case 'elect_player':
                 // Get all players in the game as options
                 $options = $this->game->players()->pluck('name')->toArray();
-                break;
-
-            case 'elect_planet_any':
-                // Get all planets in the game
-                $planets = $this->game->getPlanets();
-
-                // Add planets from custom tile numbers
-                if (!empty($customTileNumbers)) {
-                    $customPlanets = $planetService->getPlanetsByTileNumber($customTileNumbers);
-                    foreach ($customPlanets as $name => $planet) {
-                        $planets[$name] = $planet;
-                    }
-                }
-
-                $options = $planets->pluck('name')->sort()->toArray();
-                break;
-
-            case 'elect_planet_industrial':
-                // Get industrial planets
-                $planets = $this->game->getPlanets('industrial');
-
-                // Add planets from custom tile numbers
-                if (!empty($customTileNumbers)) {
-                    $customPlanets = $planetService->getPlanetsByTileNumber($customTileNumbers);
-                    foreach ($customPlanets as $name => $planet) {
-                        $planets[$name] = $planet;
-                    }
-                }
-
-                $options = $planets->pluck('name')->sort()->toArray();
-                break;
-
-            case 'elect_planet_cultural':
-                // Get cultural planets
-                $planets = $this->game->getPlanets('cultural');
-
-                // Add planets from custom tile numbers
-                if (!empty($customTileNumbers)) {
-                    $customPlanets = $planetService->getPlanetsByTileNumber($customTileNumbers);
-                    foreach ($customPlanets as $name => $planet) {
-                        $planets[$name] = $planet;
-                    }
-                }
-
-                $options = $planets->pluck('name')->sort()->toArray();
-                break;
-
-            case 'elect_planet_hazardous':
-                // Get hazardous planets
-                $planets = $this->game->getPlanets('hazardous');
-
-                // Add planets from custom tile numbers
-                if (!empty($customTileNumbers)) {
-                    $customPlanets = $planetService->getPlanetsByTileNumber($customTileNumbers);
-                    foreach ($customPlanets as $name => $planet) {
-                        $planets[$name] = $planet;
-                    }
-                }
-
-                $options = $planets->pluck('name')->sort()->toArray();
-                break;
-
-            case 'elect_planet_non_home':
-                // Get non-home planets
-                $planets = $this->game->getPlanets('non_home');
-
-                // Add planets from custom tile numbers
-                if (!empty($customTileNumbers)) {
-                    $customPlanets = $planetService->getPlanetsByTileNumber($customTileNumbers);
-                    foreach ($customPlanets as $name => $planet) {
-                        $planets[$name] = $planet;
-                    }
-                }
-
-                $options = $planets->pluck('name')->sort()->toArray();
                 break;
 
             case 'custom':
@@ -494,8 +402,7 @@ class GameDashboard extends Component
             return;
         }
 
-        // Their votes are deleted with them
-        $removedPlayer->delete();
+        $this->game->removePlayer($removedPlayer);
         Log::info('Player removed', ['removed' => $removedPlayer->name]);
 
         $this->dispatch('flashMessage', [
@@ -727,10 +634,14 @@ class GameDashboard extends Component
             return;
         }
 
-        if ($currentAgenda->reveal_step === Agenda::STEP_WHEN_REVEALED) {
-            $currentAgenda->update(['reveal_step' => Agenda::STEP_AFTER_REVEALED]);
-            $message = 'Ask the players for "After an agenda is revealed" action cards.';
-            Log::info('"When" action cards checked', ['agenda' => $currentAgenda->title]);
+        Log::info('Reveal step done', ['agenda' => $currentAgenda->title, 'step' => $currentAgenda->reveal_step_label]);
+        $nextStep = $currentAgenda->nextRevealStep();
+
+        if ($nextStep) {
+            $currentAgenda->update(['reveal_step' => $nextStep]);
+            $message = $nextStep === Agenda::STEP_ARGENT_VOTES
+                ? 'The Argent Flight votes first. Ask them to announce their votes to everyone.'
+                : 'Ask the players for "After an agenda is revealed" action cards.';
         } else {
             $currentAgenda->update(['reveal_step' => null, 'voting_started_at' => now()]);
             $message = 'Voting has started!';

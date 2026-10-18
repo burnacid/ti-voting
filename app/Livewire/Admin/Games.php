@@ -17,8 +17,13 @@ class Games extends Component
     #[Url(except: '')]
     public $search = '';
 
-    public $cleanupDays = 7;
+    public $cleanupDays;
     public $cleanupOutput = null;
+
+    public function mount()
+    {
+        $this->cleanupDays = Game::retentionDays();
+    }
 
     public function updatedSearch()
     {
@@ -60,7 +65,7 @@ class Games extends Component
             ->paginate(20);
 
         $cleanupCount = is_numeric($this->cleanupDays) && $this->cleanupDays >= 1
-            ? Game::olderThan((int) $this->cleanupDays)->count()
+            ? Game::inactiveFor((int) $this->cleanupDays)->count()
             : 0;
 
         return view('livewire.admin.games', [

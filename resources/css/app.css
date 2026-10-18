@@ -7,6 +7,11 @@
     --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
 }
 
+/* Hides Alpine elements until Alpine has started */
+[x-cloak] {
+    display: none !important;
+}
+
 /* Agenda card, styled after the printed TI4 agenda cards */
 .agenda-card {
     position: relative;

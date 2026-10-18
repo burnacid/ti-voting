@@ -50,6 +50,23 @@ Route::get('/game/{code}', function (string $code) {
     return view('game', ['game' => $game, 'player' => $player]);
 })->name('game.show');
 
+// Signs this browser in as a player who lost their session, the Speaker or an admin shares the link
+Route::get('/game/{code}/rejoin/{token}', function (string $code, string $token) {
+    $game = Game::where('code', strtoupper($code))->first();
+    $player = $game?->players()->where('session_token', $token)->first();
+
+    if (!$player) {
+        return redirect()->route($game ? 'join-group' : 'home', $game?->code)->with('error', 'This rejoin link is not valid.');
+    }
+
+    Log::shareContext(['game' => $game->code, 'player' => $player->name]);
+    Log::info('Player rejoined');
+
+    session(['player_token' => $player->session_token]);
+
+    return redirect()->route('game.show', $game->code);
+})->middleware('throttle:10,1')->name('game.rejoin');
+
 // Admin
 Route::prefix(config('app.admin_path'))->name('admin.')->group(function () {
     Route::view('/login', 'admin.login')->middleware('guest')->name('login');

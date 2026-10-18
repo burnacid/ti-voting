@@ -4,10 +4,12 @@ namespace App\Livewire;
 
 use App\Events\TriggerRefresh;
 use App\Livewire\Concerns\SharesGameLogContext;
+use App\Models\Player;
 use App\Services\MiltyService;
 use Illuminate\Contracts\View\Factory;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Log;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class UpdateMiltyUrl extends Component
@@ -15,15 +17,25 @@ class UpdateMiltyUrl extends Component
     use SharesGameLogContext;
 
     public $game;
-    public $player;
+
+    // Kept as an id and loaded on every request, as the Speaker can remove the player mid-game
+    #[Locked]
+    public string $playerId;
+    protected ?Player $player = null;
     public $miltyUrl = '';
     public $showModal = false;
 
     public function mount($game, $player): void
     {
         $this->game = $game;
+        $this->playerId = $player->id;
         $this->player = $player;
         $this->miltyUrl = $game->milty_url ?? '';
+    }
+
+    public function hydrate(): void
+    {
+        $this->player = Player::find($this->playerId);
     }
 
     public function openModal(): void
@@ -38,7 +50,7 @@ class UpdateMiltyUrl extends Component
 
     public function updateMiltyUrl(): void
     {
-        if (!$this->player->is_speaker) {
+        if (!$this->player?->is_speaker) {
             $this->dispatch('flashMessage', [
                 'Only the Speaker can change the Milty URL.',
                 'error'

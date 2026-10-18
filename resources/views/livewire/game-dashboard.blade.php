@@ -71,30 +71,46 @@
 
             <!-- Action card checks before voting opens -->
             @if($currentAgenda?->status === 'voting' && $currentAgenda->reveal_step)
-                @php($isWhenStep = $currentAgenda->reveal_step === \App\Models\Agenda::STEP_WHEN_REVEALED)
+                @php($steps = $currentAgenda->revealSteps())
+                @php($stepIndex = (int) array_search($currentAgenda->reveal_step, $steps))
+                @php($nextStep = $currentAgenda->nextRevealStep())
+                @php($isArgentStep = $currentAgenda->reveal_step === \App\Models\Agenda::STEP_ARGENT_VOTES)
                 <div class="bg-white dark:bg-gray-800 rounded-lg p-4 sm:p-6 border border-gray-200 dark:border-gray-700">
                     <div class="flex items-center gap-3 mb-3">
                         <div class="flex flex-1 gap-1.5" aria-hidden="true">
-                            <span class="h-1.5 flex-1 rounded-full bg-blue-600"></span>
-                            <span class="h-1.5 flex-1 rounded-full {{ $isWhenStep ? 'bg-gray-200 dark:bg-gray-700' : 'bg-blue-600' }}"></span>
+                            @foreach($steps as $index => $step)
+                                <span class="h-1.5 flex-1 rounded-full {{ $index <= $stepIndex ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-700' }}"></span>
+                            @endforeach
                         </div>
                         <p class="text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">
-                            Step {{ $isWhenStep ? 1 : 2 }} of 2
+                            Step {{ $stepIndex + 1 }} of {{ count($steps) }}
                         </p>
                     </div>
                     <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                        &ldquo;{{ $currentAgenda->reveal_step_label }}&rdquo; cards
+                        @if($isArgentStep)
+                            The Argent Flight votes first
+                        @else
+                            &ldquo;{{ $currentAgenda->reveal_step_label }}&rdquo; cards
+                        @endif
                     </h3>
                     <p class="text-sm text-gray-700 dark:text-gray-300 mb-4">
-                        @if($isWhenStep)
+                        @if($currentAgenda->reveal_step === \App\Models\Agenda::STEP_WHEN_REVEALED)
                             Ask the players if anyone wants to play a card with &ldquo;When an agenda is revealed&rdquo;, such as Veto. Resolve those cards before continuing. If the agenda is discarded, use Discard Agenda and reveal the next one.
+                        @elseif($isArgentStep)
+                            {{ $game->argentFlightPlayerName() ?? 'The Argent Flight player' }} votes before everyone else and announces their votes publicly. Ask them to say which outcome they vote for and how many votes they cast. They still enter their vote in the app once voting opens.
                         @else
                             Ask the players if anyone wants to play a card with &ldquo;After an agenda is revealed&rdquo;, such as a Rider or Assassinate Representative. Resolve those cards before continuing.
                         @endif
                     </p>
                     <button wire:click="completeRevealStep"
                             class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold py-3 sm:py-2 px-4 rounded-lg transition-colors">
-                        {{ $isWhenStep ? 'Done, continue to "After" cards' : 'Done, start voting' }}
+                        @if($nextStep === \App\Models\Agenda::STEP_AFTER_REVEALED)
+                            {{ 'Done, continue to "After" cards' }}
+                        @elseif($nextStep === \App\Models\Agenda::STEP_ARGENT_VOTES)
+                            Done, continue to The Argent Flight
+                        @else
+                            Done, start voting
+                        @endif
                     </button>
                 </div>
             @endif
@@ -318,6 +334,7 @@
                                 </button>
                             @endif
                         </div>
+                        <x-rejoin-link :player="$gamePlayer" />
                     @endif
                 </div>
             @endforeach
@@ -344,7 +361,15 @@
                 <div class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
                     <p class="text-yellow-800 dark:text-yellow-200 font-medium">Voting has not started yet</p>
                     <p class="text-sm text-yellow-800 dark:text-yellow-200 mt-1">
-                        The Speaker is asking for &ldquo;{{ $currentAgenda->reveal_step_label }}&rdquo; action cards. Voting opens when the Speaker is done.
+                        @if($currentAgenda->reveal_step === \App\Models\Agenda::STEP_ARGENT_VOTES)
+                            @if(\App\Models\Game::isArgentFlight($player->faction))
+                                You play The Argent Flight, so you vote first: announce your votes to everyone. Voting opens when the Speaker is done.
+                            @else
+                                The Argent Flight votes first and announces their votes. Voting opens when the Speaker is done.
+                            @endif
+                        @else
+                            The Speaker is asking for &ldquo;{{ $currentAgenda->reveal_step_label }}&rdquo; action cards. Voting opens when the Speaker is done.
+                        @endif
                     </p>
                 </div>
             @elseif($currentAgenda->status === 'voting' && $currentAgenda->isPlayerBlocked($player))
@@ -453,19 +478,3 @@
         </div>
     @endif
 </div>
-
-<script>
-    document.addEventListener('livewire:initialized', () => {
-        Livewire.on('option-selected', (event) => {
-            const isAbstain = event.detail.option === 'Abstain';
-            const influenceInput = document.getElementById('influenceSpent');
-
-            if (isAbstain) {
-                influenceInput.value = '0';
-                influenceInput.disabled = true;
-            } else {
-                influenceInput.disabled = false;
-            }
-        });
-    });
-</script>

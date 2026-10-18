@@ -108,7 +108,7 @@
             @endforelse
 
             <div class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 text-sm text-gray-600 dark:text-gray-400">
-                {{ $cleanupCount }} {{ Str::plural('game', $cleanupCount) }} older than 7 days will be removed by the nightly cleanup.
+                {{ $cleanupCount }} {{ Str::plural('game', $cleanupCount) }} without activity for {{ $retentionDays }} days will be removed by the nightly cleanup.
                 <a href="{{ route('admin.games') }}" class="text-blue-600 dark:text-blue-400 hover:underline">Manage games</a>
             </div>
         </section>

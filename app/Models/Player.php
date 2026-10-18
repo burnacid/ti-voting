@@ -44,6 +44,12 @@ class Player extends Model
         return $token;
     }
 
+    // Signs a browser in as this player, for players who lost their session
+    public function rejoinUrl(): string
+    {
+        return route('game.rejoin', [$this->game->code, $this->session_token]);
+    }
+
     public function hasVotedOn(Agenda $agenda): bool
     {
         return $this->votes()->where('agenda_id', $agenda->id)->exists();

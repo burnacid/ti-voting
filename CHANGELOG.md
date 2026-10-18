@@ -4,6 +4,23 @@ All notable changes to TI Voting are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Rejoin links: a player who lost their session (cleared browser, other device) can get back into the game with a link the Speaker shares from the player list. Joining with a taken name now points to this.
+- On a game's admin page, an admin can make any player the Speaker, remove players and copy their rejoin links, for example when the Speaker lost their session.
+- When The Argent Flight is in play (in the Milty draft or entered as a player's faction), the Speaker gets an extra step before voting opens: The Argent Flight votes first and announces their votes publicly.
+- `GAME_RETENTION_DAYS` (default 7) and `LOG_DATABASE_DAYS` (default 30) in `.env` set how long games and log entries are kept.
+- Creating games is limited to 10 per hour and joining to 30 attempts per 10 minutes per IP address.
+
+### Changed
+- The nightly cleanup deletes games that have had no activity for the retention period, instead of games created before it, so long games are no longer deleted while being played.
+- The Twilight Imperium Features block is removed from the homepage.
+
+### Fixed
+- A removed player is taken off an open "Elect Player" agenda, unless someone already voted for them. Removing the Speaker passes the Speaker token on.
+- The "Change Milty URL" control no longer errors for a player who was removed from the game.
+
 ## [1.4.1] - 2026-10-18
 
 ### Added
@@ -81,6 +98,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Milty draft integration to load factions and planets.
 - Planet agendas (any, industrial, cultural, hazardous, non-home), with extra tiles that can be added by tile number.
 
+[Unreleased]: https://github.com/burnacid/ti-voting/compare/v1.4.1...HEAD
 [1.4.1]: https://github.com/burnacid/ti-voting/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/burnacid/ti-voting/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/burnacid/ti-voting/compare/v1.2.0...v1.3.0
