@@ -5,10 +5,11 @@ namespace App\Livewire;
 use App\Events\TriggerRefresh;
 use App\Livewire\Concerns\SharesGameLogContext;
 use App\Models\Player;
-use App\Services\MiltyService;
+use App\Services\DraftImporter;
 use Illuminate\Contracts\View\Factory;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Log;
+use InvalidArgumentException;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 
@@ -22,6 +23,7 @@ class UpdateMiltyUrl extends Component
     #[Locked]
     public string $playerId;
     protected ?Player $player = null;
+    // A Milty or TI4 Lab draft URL, or a map string
     public $miltyUrl = '';
     public $showModal = false;
 
@@ -30,7 +32,7 @@ class UpdateMiltyUrl extends Component
         $this->game = $game;
         $this->playerId = $player->id;
         $this->player = $player;
-        $this->miltyUrl = $game->milty_url ?? '';
+        $this->miltyUrl = DraftImporter::inputOf($game);
     }
 
     public function hydrate(): void
@@ -52,53 +54,36 @@ class UpdateMiltyUrl extends Component
     {
         if (!$this->player?->is_speaker) {
             $this->dispatch('flashMessage', [
-                'Only the Speaker can change the Milty URL.',
+                'Only the Speaker can change the map.',
                 'error'
             ]);
             return;
         }
 
         $this->validate([
-            'miltyUrl' => 'required|url',
+            'miltyUrl' => 'required|string|max:2000',
         ]);
 
-        $miltyService = new MiltyService();
-        $draftId = $miltyService->extractDraftId($this->miltyUrl);
-
-        if (!$draftId) {
-            $this->dispatch('flashMessage', [
-                'Invalid Milty URL format. Expected format: https://milty.shenanigans.be/d/{draft_id}',
-                'error'
-            ]);
+        try {
+            $draft = (new DraftImporter())->import($this->miltyUrl);
+        } catch (InvalidArgumentException $e) {
+            $this->addError('miltyUrl', $e->getMessage());
             return;
         }
 
-        $draftData = $miltyService->fetchDraftData($draftId);
+        $this->game->update($draft);
 
-        if (!$draftData) {
-            $this->dispatch('flashMessage', [
-                'Could not fetch Milty draft data. Please check the URL and try again.',
-                'error'
-            ]);
-            return;
-        }
-
-        $this->game->update([
-            'milty_url' => $this->miltyUrl,
-            'milty_draft_data' => $draftData,
-            'milty_draft_id' => $draftId,
-        ]);
-
-        Log::info('Milty URL updated', ['draft' => $draftId]);
+        Log::info('Map updated', ['source' => $draft['milty_draft_data']['source'] ?? 'milty', 'draft' => $draft['milty_draft_id']]);
 
         $this->dispatch('flashMessage', [
-            "Updated Milty URL successfully.",
+            "Updated the map successfully.",
             'success'
         ]);
 
         TriggerRefresh::dispatch($this->game);
 
-        $this->closeModal();$this->dispatch('miltyUrlUpdated');
+        $this->closeModal();
+        $this->dispatch('miltyUrlUpdated');
     }
 
     public function render(): Factory|View|\Illuminate\View\View

@@ -95,12 +95,12 @@ test('game page only shows the milty button to the speaker', function () {
     $this->withSession(['player_token' => $other->session_token])
         ->get(route('game.show', $game->code))
         ->assertOk()
-        ->assertDontSee('Change Milty URL');
+        ->assertDontSee('Change Map');
 
     $this->withSession(['player_token' => $speaker->session_token])
         ->get(route('game.show', $game->code))
         ->assertOk()
-        ->assertSee('Change Milty URL');
+        ->assertSee('Change Map');
 });
 
 test('vote for an option not on the agenda is rejected', function () {

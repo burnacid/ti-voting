@@ -18,24 +18,24 @@
 
         <div>
             <label for="miltyUrl" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Milty Draft URL <span class="font-normal text-gray-500 dark:text-gray-400">(optional)</span>
+                Draft URL or Map String <span class="font-normal text-gray-500 dark:text-gray-400">(optional)</span>
             </label>
-            <input type="url"
+            <input type="text"
                    id="miltyUrl"
                    wire:model.blur="miltyUrl"
                    class="{{ $inputClass }}"
-                   placeholder="https://milty.shenanigans.be/d/...">
-            <p wire:loading wire:target="miltyUrl" class="mt-1 text-sm text-gray-500 dark:text-gray-400">Loading the draft&hellip;</p>
+                   placeholder="Milty or TI4 Lab URL, or tile numbers">
+            <p wire:loading wire:target="miltyUrl" class="mt-1 text-sm text-gray-500 dark:text-gray-400">Loading the map&hellip;</p>
             @error('miltyUrl') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
             @if($miltyError && !$errors->has('miltyUrl'))
                 <span wire:loading.remove wire:target="miltyUrl" class="block text-red-500 text-sm">{{ $miltyError }}</span>
             @elseif($hasMiltyData)
                 <span wire:loading.remove wire:target="miltyUrl" class="block mt-1 text-sm text-green-700 dark:text-green-400">
-                    Draft loaded with {{ $factions->count() }} {{ Str::plural('faction', $factions->count()) }}.
+                    {{ ($miltyDraftData['source'] ?? null) === 'map_string' ? 'Map' : 'Draft' }} loaded with {{ $factions->count() }} {{ Str::plural('faction', $factions->count()) }}.
                 </span>
             @else
                 <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    With a Milty draft, planet agendas list the planets in your game and players pick their drafted faction.
+                    A draft from <a href="https://milty.shenanigans.be" target="_blank" rel="noopener noreferrer" class="underline">Milty</a> or <a href="https://tidraft.com" target="_blank" rel="noopener noreferrer" class="underline">TI4 Lab</a>, or a map string like <span class="font-mono">41 50 73 31 &hellip;</span>, lets planet agendas list the planets in your game and players pick their faction.
                 </p>
             @endif
         </div>

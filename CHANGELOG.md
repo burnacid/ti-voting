@@ -4,6 +4,11 @@ All notable changes to TI Voting are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Besides a Milty draft URL, a game can get its map from a TI4 Lab draft URL (tidraft.com), with its players, factions and slices, or from a map string as other draft tools export it: tile numbers separated by spaces or commas. Factions come from the home systems on the map. Planet agendas, faction choice and Star Chart work with all three. Use the same field when creating a game, or Change Map on the game page.
+
 ## [1.6.0] - 2026-10-18
 
 ### Added

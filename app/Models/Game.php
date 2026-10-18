@@ -150,7 +150,7 @@ class Game extends Model
         $planetService = new PlanetService();
 
         $Slices = $this->miltySelectedSlices();
-        $Tiles = $this->miltyTilesFromSlices($Slices);
+        $Tiles = $this->miltyTilesFromSlices($Slices)->merge($this->milty_draft_data['map_tiles'] ?? []);
         $Factions = $this->miltyFactionNames();
         $HomePlanets = $planetService->getFactionPlanets($Factions->toArray());
         $HomePlanets = collect($HomePlanets);
@@ -295,7 +295,7 @@ class Game extends Model
 
     /**
      * The blue system tiles Star Chart can draw from: tiles of the expansions in the Milty draft
-     * that are not on the map yet, i.e. not in a drafted slice and not drawn before.
+     * that are not on the map yet, i.e. not in a drafted slice or the map string and not drawn before.
      */
     public function starChartPool(): Collection
     {
@@ -306,6 +306,7 @@ class Game extends Model
             ->pluck('slice')
             ->filter(fn ($slice) => $slice !== null && isset($slices[$slice]))
             ->flatMap(fn ($slice) => $slices[$slice]['tiles'] ?? [])
+            ->merge($this->milty_draft_data['map_tiles'] ?? [])
             ->map(fn ($tile) => (string) $tile)
             ->merge($this->starChartTileNumbers());
 
