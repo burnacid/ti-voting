@@ -51,7 +51,7 @@ Route::get('/game/{code}', function (string $code) {
 })->name('game.show');
 
 // Admin
-Route::prefix('admin')->name('admin.')->group(function () {
+Route::prefix(config('app.admin_path'))->name('admin.')->group(function () {
     Route::view('/login', 'admin.login')->middleware('guest')->name('login');
 
     Route::middleware('auth')->group(function () {
