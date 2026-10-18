@@ -10,6 +10,8 @@ A secret voting system for **Twilight Imperium 4th Edition (TI4)** agenda phase 
 - **Speaker controls** — only the speaker can create agendas and reveal results
 - **Milty integration** — paste a Milty draft URL to auto-load faction and planet data for all players
 - **Preset agendas** — choose from a library of TI4 agenda cards
+- **Who is affected** — for agendas like Mutiny, the Speaker sees which players voted the way the outcome names
+- **Invite with a QR code** — other players scan it with their phone camera to join
 - **Star Chart** — draw a random unused system tile, from the expansions in your Milty draft
 - **Real-time updates** — votes and state changes sync instantly via WebSockets (Laravel Reverb)
 - **No accounts required** — players join using a game code and a display name
@@ -36,6 +38,29 @@ A secret voting system for **Twilight Imperium 4th Edition (TI4)** agenda phase 
         <img src="docs/screenshots/10-speaker-results-light.png" width="240" alt="Voting results with the influence per outcome">
       </picture>
       <br><sub>The Speaker sees the results</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="33%">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/11-who-is-affected-dark.png">
+        <img src="docs/screenshots/11-who-is-affected-light.png" width="240" alt="The players who voted For, for an agenda that rewards them">
+      </picture>
+      <br><sub>See who an outcome affects</sub>
+    </td>
+    <td align="center" width="33%">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/15-players-dark.png">
+        <img src="docs/screenshots/15-players-light.png" width="240" alt="The player list with who has voted and who is still voting">
+      </picture>
+      <br><sub>Who has voted, at a glance</sub>
+    </td>
+    <td align="center" width="33%">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/14-invite-qr-dark.png">
+        <img src="docs/screenshots/14-invite-qr-light.png" width="240" alt="A QR code that other players scan to join the game">
+      </picture>
+      <br><sub>Invite players with a QR code</sub>
     </td>
   </tr>
   <tr>
