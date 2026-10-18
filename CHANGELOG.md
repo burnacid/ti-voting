@@ -4,7 +4,7 @@ All notable changes to TI Voting are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.6.0] - 2026-10-18
 
 ### Added
 - A phone can play in several games: the homepage lists every game it is in, most recent first, with whether an agenda is open. A game can be removed from that list; the player stays in the game.
@@ -127,7 +127,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Milty draft integration to load factions and planets.
 - Planet agendas (any, industrial, cultural, hazardous, non-home), with extra tiles that can be added by tile number.
 
-[Unreleased]: https://github.com/burnacid/ti-voting/compare/v1.5.0...HEAD
+[1.6.0]: https://github.com/burnacid/ti-voting/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/burnacid/ti-voting/compare/v1.4.2...v1.5.0
 [1.4.2]: https://github.com/burnacid/ti-voting/compare/v1.4.1...v1.4.2
 [1.4.1]: https://github.com/burnacid/ti-voting/compare/v1.4.0...v1.4.1
