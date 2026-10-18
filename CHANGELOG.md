@@ -4,6 +4,20 @@ All notable changes to TI Voting are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-10-18
+
+### Added
+- The Speaker can remove a player from the game. Their votes are removed too, and the removed player is sent back to the join page.
+- While checking "When" and "After" action cards, the Speaker can block a player from voting on the current agenda, for example after Assassinate Representative. Blocked players cannot vote and are not counted in the voting progress.
+- Admin dashboard at `/admin`, behind a login. Accounts are created with `php artisan admin:create`. It shows stats (games, players, agendas, votes, games per day, most played agendas, recent errors), lets admins search, inspect and delete games, run the cleanup of old games, and review logs.
+- Logs are stored in the database and shown in the admin dashboard, with filters for level, game and text. Entries older than 30 days are deleted every night.
+- Game actions are logged with the game code and player, such as games created, players joining, agendas revealed, votes cast and voting ended.
+- The footer links to the GitHub repository and shows the copyright.
+
+### Changed
+- The Speaker controls are redesigned for phones, with full-width buttons, larger tap targets and voting types as selectable cards.
+- Logs are written to the database and to daily log files kept for 14 days, instead of one `laravel.log` file. Set `LOG_STACK=database,daily` in `.env` and run the migrations.
+
 ## [1.3.0] - 2026-10-18
 
 ### Added
@@ -62,6 +76,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Milty draft integration to load factions and planets.
 - Planet agendas (any, industrial, cultural, hazardous, non-home), with extra tiles that can be added by tile number.
 
+[1.4.0]: https://github.com/burnacid/ti-voting/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/burnacid/ti-voting/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/burnacid/ti-voting/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/burnacid/ti-voting/compare/v1.0.0...v1.1.0
