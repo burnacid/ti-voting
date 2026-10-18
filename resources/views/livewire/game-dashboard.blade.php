@@ -555,4 +555,9 @@
           </div>
         </div>
     @endif
+
+    <!-- Star Chart: random system tiles that are not on the map yet -->
+    @if($game->milty_draft_data)
+        <x-star-chart :draws="$starChartDraws" :pool-size="$starChartPoolSize" :is-speaker="$player->is_speaker" />
+    @endif
 </div>

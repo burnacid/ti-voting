@@ -664,6 +664,39 @@ class GameDashboard extends Component
         $this->refreshData();
     }
 
+    // Star Chart: draw a random system tile that is not on the map yet. Any player can draw, everyone sees the result
+    public function drawStarChart()
+    {
+        if (!$this->game->milty_draft_data) {
+            return;
+        }
+
+        $tile = $this->game->drawStarChartTile($this->player);
+
+        if (!$tile) {
+            $this->dispatch('flashMessage', ['There are no system tiles left to draw.', 'error']);
+            return;
+        }
+
+        Log::info('Star Chart tile drawn', ['tile' => $tile]);
+        $this->dispatch('flashMessage', ["Star Chart drew system tile {$tile}.", 'success']);
+        TriggerRefresh::dispatch($this->game);
+        $this->refreshData();
+    }
+
+    // The Speaker can undo a draw made by mistake, which puts the tile back in the pool
+    public function removeStarChartTile($tile)
+    {
+        if (!$this->player->is_speaker || !$this->game->starChartTileNumbers()->contains((string) $tile)) {
+            return;
+        }
+
+        $this->game->removeStarChartTile((string) $tile);
+        Log::info('Star Chart tile removed', ['tile' => (string) $tile]);
+        TriggerRefresh::dispatch($this->game);
+        $this->refreshData();
+    }
+
     public function toggleFracture()
     {
         if (!$this->player->is_speaker || !$this->game->isThundersEdgeGame()) {
@@ -827,6 +860,11 @@ class GameDashboard extends Component
             'factionChoices' => Game::factionsFromDraft($this->game->milty_draft_data)->has($this->player->faction ?? '')
                 ? collect()
                 : $this->game->availableFactions($this->player),
+            'starChartDraws' => collect($this->game->star_chart_tiles ?? [])->reverse()->map(fn ($draw) => [
+                ...$draw,
+                'planets' => app(PlanetService::class)->getTile($draw['tile'])['planets'] ?? [],
+            ])->values(),
+            'starChartPoolSize' => $this->game->milty_draft_data ? $this->game->starChartPool()->count() : 0,
             'rejoinRequests' => $players->filter(fn ($gamePlayer) => $gamePlayer->id !== $this->player->id && $gamePlayer->hasPendingRejoinRequest()),
             'currentAgenda' => $currentAgenda,
             'players' => $players,

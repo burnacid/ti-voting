@@ -1108,3 +1108,92 @@ test('removing a game also clears it from the old session', function () {
     expect(session('player_token'))->toBeNull();
     $this->get('/')->assertDontSee('Session Game');
 });
+
+function starChartDraft(array $config = []): array
+{
+    return [
+        'config' => array_merge(['include_pok' => false, 'include_te_tiles' => false, 'include_ds_tiles' => false], $config),
+        'draft' => ['players' => [
+            'p_1' => ['name' => 'Alice', 'faction' => 'The Federation of Sol', 'slice' => '0'],
+            'p_2' => ['name' => 'Bob', 'faction' => null, 'slice' => null],
+        ]],
+        // Slice 1 was not picked, so its tiles are not on the map
+        'slices' => [['tiles' => [19, 20, 21, 39]], ['tiles' => [22, 23]]],
+    ];
+}
+
+test('the star chart pool holds unused blue tiles of the expansions in the draft', function () {
+    [$base] = makeGame(['milty_draft_data' => starChartDraft()]);
+    [$expanded] = makeGame(['milty_draft_data' => starChartDraft(['include_pok' => true, 'include_te_tiles' => true, 'include_ds_tiles' => true])]);
+
+    $pool = $base->starChartPool();
+    expect($pool->all())->toBe(array_map('strval', range(22, 38)))
+        ->and($pool)->not->toContain('18');
+
+    expect($expanded->starChartPool())
+        ->toContain('22', '59', '97', '4253')
+        ->not->toContain('18', '19', '82', '112', '39');
+});
+
+test('any player can draw a star chart tile and everyone sees it', function () {
+    Event::fake([TriggerRefresh::class]);
+    [$game, $speaker, $other] = makeGame(['milty_draft_data' => starChartDraft()]);
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $other])
+        ->assertSee('Star Chart')
+        ->assertSee('17 tiles left')
+        ->call('drawStarChart');
+
+    $draw = $game->fresh()->star_chart_tiles[0];
+    expect($draw['player'])->toBe('Other')
+        ->and(range(22, 38))->toContain((int) $draw['tile'])
+        ->and($game->fresh()->starChartPool())->not->toContain($draw['tile']);
+
+    $planet = app(\App\Services\PlanetService::class)->getTile($draw['tile'])['planets'][0]['name'];
+    Livewire::test(GameDashboard::class, ['game' => $game->fresh(), 'player' => $speaker])
+        ->assertSee('16 tiles left')
+        ->assertSee($planet)
+        ->assertSee('Drawn by Other');
+
+    // A drawn system is on the map, so its planets can be elected
+    expect($game->fresh()->getPlanets()->pluck('name'))->toContain($planet);
+});
+
+test('star chart stops when no tiles are left', function () {
+    Event::fake([TriggerRefresh::class]);
+    [$game, $speaker] = makeGame(['milty_draft_data' => starChartDraft()]);
+    $game->update(['star_chart_tiles' => array_map(fn ($tile) => ['tile' => (string) $tile, 'player' => 'X', 'drawn_at' => now()->toIso8601String()], range(22, 38))]);
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->assertSee('0 tiles left')
+        ->call('drawStarChart')
+        ->assertDispatched('flashMessage');
+
+    expect($game->fresh()->star_chart_tiles)->toHaveCount(17);
+});
+
+test('only the speaker can undo a star chart draw', function () {
+    Event::fake([TriggerRefresh::class]);
+    [$game, $speaker, $other] = makeGame(['milty_draft_data' => starChartDraft()]);
+    $game->update(['star_chart_tiles' => [['tile' => '25', 'player' => 'Other', 'drawn_at' => now()->toIso8601String()]]]);
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $other])
+        ->assertDontSee('Undo drawing tile 25')
+        ->call('removeStarChartTile', '25');
+    expect($game->fresh()->starChartTileNumbers()->all())->toBe(['25']);
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->call('removeStarChartTile', '25');
+    expect($game->fresh()->star_chart_tiles)->toBeNull()
+        ->and($game->fresh()->starChartPool())->toContain('25');
+});
+
+test('star chart needs a milty draft', function () {
+    [$game, $speaker] = makeGame();
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->assertDontSee('Draw a system tile')
+        ->call('drawStarChart');
+
+    expect($game->fresh()->star_chart_tiles)->toBeNull();
+});

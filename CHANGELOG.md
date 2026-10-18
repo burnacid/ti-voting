@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 - A phone can play in several games: the homepage lists every game it is in, most recent first, with whether an agenda is open. A game can be removed from that list; the player stays in the game.
+- Star Chart, from the separate TI4 Star Chart Randomizer: in games with a Milty draft, any player can draw a random blue system tile that is not on the map yet, from the expansions in the draft. Every player sees the drawn tile with its planets, tiles are never drawn twice, and their planets can be elected on planet agendas. The Speaker can undo a draw.
 - A Home link on the game page, also handy in the installed app, which has no back button.
 
 ### Changed
@@ -15,6 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - The Milty draft loads as soon as the URL is entered when creating a game, and the field is labelled correctly.
 
 ### Fixed
+- Planet agendas no longer fail when the Milty draft is not finished and some players have not picked a slice yet.
 - Players no longer lose access to their game after 2 hours without activity, for example between agenda phases. The games a browser plays in are kept in their own cookie for 30 days, renewed on every visit, instead of in the session.
 - The app icons did not load on Apache servers, which reserve the `/icons/` path for their own icons. They are now served from `/app-icons/`.
 

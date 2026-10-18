@@ -23,6 +23,7 @@ class Game extends Model
         'milty_draft_data',
         'fracture_in_play',
         'representative_government',
+        'star_chart_tiles',
         'status',
     ];
 
@@ -31,6 +32,7 @@ class Game extends Model
         'milty_draft_data' => 'array',
         'fracture_in_play' => 'boolean',
         'representative_government' => 'boolean',
+        'star_chart_tiles' => 'array',
     ];
 
     public function players(): HasMany
@@ -157,6 +159,9 @@ class Game extends Model
             $Tiles = $Tiles->merge(PlanetService::FRACTURE_TILES);
         }
 
+        // Systems drawn with Star Chart are on the map too
+        $Tiles = $Tiles->merge($this->starChartTileNumbers());
+
         $planetInfo = $planetService->getPlanetsByTileNumber($Tiles->toArray());
         $planetInfo = collect($planetInfo);
         $planetInfo = $planetInfo->sortBy('name');
@@ -197,6 +202,11 @@ class Game extends Model
 
         $slices = collect([]);
         foreach($selectedSlices as $slice) {
+            // Players who did not pick a slice yet, e.g. when the draft is not finished
+            if ($slice === null || !isset($this->milty_draft_data['slices'][$slice])) {
+                continue;
+            }
+
             $slices->push($this->milty_draft_data['slices'][$slice]);
         }
 
@@ -265,6 +275,82 @@ class Game extends Model
             ->pluck('faction');
 
         return self::factionsFromDraft($this->milty_draft_data)->except($taken->all());
+    }
+
+    // Expansion of each system tile in planets.json and the Milty setting that puts its tiles in the game, null for always
+    private const STAR_CHART_SETS = [
+        'BaseGame' => null,
+        'PoK' => 'include_pok',
+        'TE' => 'include_te_tiles',
+        'DSPlus' => 'include_ds_tiles',
+    ];
+
+    /**
+     * Numbers of the system tiles drawn with Star Chart so far.
+     */
+    public function starChartTileNumbers(): Collection
+    {
+        return collect($this->star_chart_tiles ?? [])->pluck('tile');
+    }
+
+    /**
+     * The blue system tiles Star Chart can draw from: tiles of the expansions in the Milty draft
+     * that are not on the map yet, i.e. not in a drafted slice and not drawn before.
+     */
+    public function starChartPool(): Collection
+    {
+        $config = $this->milty_draft_data['config'] ?? [];
+        $slices = $this->milty_draft_data['slices'] ?? [];
+
+        $onMap = collect($this->milty_draft_data['draft']['players'] ?? [])
+            ->pluck('slice')
+            ->filter(fn ($slice) => $slice !== null && isset($slices[$slice]))
+            ->flatMap(fn ($slice) => $slices[$slice]['tiles'] ?? [])
+            ->map(fn ($tile) => (string) $tile)
+            ->merge($this->starChartTileNumbers());
+
+        return collect(app(PlanetService::class)->getTiles())
+            ->filter(function ($tile, $number) use ($config, $onMap) {
+                $set = $tile['set'] ?? '';
+                $inGame = array_key_exists($set, self::STAR_CHART_SETS)
+                    && (self::STAR_CHART_SETS[$set] === null || !empty($config[self::STAR_CHART_SETS[$set]]));
+
+                return ($tile['type'] ?? null) === 'blue'
+                    && empty($tile['nonDraftable'])
+                    && $inGame
+                    && !$onMap->contains((string) $number);
+            })
+            ->keys()
+            ->map(fn ($number) => (string) $number)
+            ->values();
+    }
+
+    /**
+     * Draw a random tile from the Star Chart pool for this player. Returns the tile number, or null when the pool is empty.
+     */
+    public function drawStarChartTile(Player $player): ?string
+    {
+        $pool = $this->starChartPool();
+        if ($pool->isEmpty()) {
+            return null;
+        }
+
+        $tile = $pool[random_int(0, $pool->count() - 1)];
+
+        $this->update(['star_chart_tiles' => [
+            ...($this->star_chart_tiles ?? []),
+            ['tile' => $tile, 'player' => $player->name, 'drawn_at' => now()->toIso8601String()],
+        ]]);
+
+        return $tile;
+    }
+
+    public function removeStarChartTile(string $tile): void
+    {
+        $this->update(['star_chart_tiles' => collect($this->star_chart_tiles ?? [])
+            ->reject(fn ($draw) => $draw['tile'] === $tile)
+            ->values()
+            ->all() ?: null]);
     }
 
     public function miltyFactionNames()

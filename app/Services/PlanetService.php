@@ -52,6 +52,19 @@ class PlanetService
         }
     }
 
+    /**
+     * A system tile as stored in planets.json, keyed by its number.
+     */
+    public function getTile(string $number): ?array
+    {
+        return $this->planets[$number] ?? null;
+    }
+
+    public function getTiles(): array
+    {
+        return $this->planets;
+    }
+
     public function getAllPlanets(): array
     {
         return $this->flattenedPlanets;
