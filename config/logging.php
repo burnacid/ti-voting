@@ -54,7 +54,7 @@ return [
 
         'stack' => [
             'driver' => 'stack',
-            'channels' => explode(',', env('LOG_STACK', 'single')),
+            'channels' => explode(',', env('LOG_STACK', 'database,daily')),
             'ignore_exceptions' => false,
         ],
 
@@ -92,6 +92,15 @@ return [
                 'connectionString' => 'tls://'.env('PAPERTRAIL_URL').':'.env('PAPERTRAIL_PORT'),
             ],
             'processors' => [PsrLogMessageProcessor::class],
+        ],
+
+        // Shown in the admin log viewer, entries older than LOG_DATABASE_DAYS are pruned nightly
+        'database' => [
+            'driver' => 'monolog',
+            'level' => env('LOG_DATABASE_LEVEL', 'info'),
+            'handler' => App\Logging\DatabaseHandler::class,
+            'processors' => [PsrLogMessageProcessor::class],
+            'days' => env('LOG_DATABASE_DAYS', 30),
         ],
 
         'stderr' => [

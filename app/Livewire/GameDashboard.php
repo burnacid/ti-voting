@@ -3,6 +3,7 @@
 namespace App\Livewire;
 
 use App\Events\TriggerRefresh;
+use App\Livewire\Concerns\SharesGameLogContext;
 use App\Services\PlanetService;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
@@ -18,6 +19,8 @@ use Illuminate\Validation\Rule;
 
 class GameDashboard extends Component
 {
+    use SharesGameLogContext;
+
     public Game $game;
 
     // Kept as an id and loaded on every request, as the Speaker can remove the player mid-game
@@ -48,7 +51,6 @@ class GameDashboard extends Component
         $this->loadAvailableAgendas();
 
         // Listen for game-specific channel
-        Log::info('Listening to: games.' . $this->game->id);
         $this->js('window.Echo.channel("games.' . $this->game->id . '").listen("TriggerRefresh", () => {
             Livewire.dispatch("triggerRefresh");
         })');
@@ -187,7 +189,6 @@ class GameDashboard extends Component
 
     #[On('triggerRefresh')]
     public function listenForRefresh(){
-        Log::info("Event Triggered");
         $this->refreshData();
     }
 
@@ -275,7 +276,7 @@ class GameDashboard extends Component
             return;
         }
 
-        Agenda::create([
+        $agenda = Agenda::create([
             'game_id' => $this->game->id,
             'title' => $this->newAgendaTitle,
             'description' => $this->newAgendaDescription,
@@ -286,6 +287,8 @@ class GameDashboard extends Component
             'reveal_step' => Agenda::STEP_WHEN_REVEALED,
             'voting_started_at' => now(),
         ]);
+
+        Log::info('Agenda revealed', ['agenda' => $agenda->title, 'options' => count($options)]);
 
         $this->reset(['newAgendaTitle', 'newAgendaDescription', 'newAgendaCardType', 'newAgendaElect', 'agendaType', 'customOptions', 'showCreateAgenda']);
         $this->dispatch('flashMessage', [
@@ -458,6 +461,7 @@ class GameDashboard extends Component
 
         try {
             $this->game->setSpeaker($newSpeaker);
+            Log::info('Speaker token transferred', ['to' => $newSpeaker->name]);
 
             $this->dispatch('flashMessage', [
                 "Speaker token transferred to {$newSpeaker->name}!",
@@ -467,6 +471,7 @@ class GameDashboard extends Component
             TriggerRefresh::dispatch($this->game);
 
         } catch (\Exception $e) {
+            report($e);
             $this->dispatch('flashMessage', [
                 'Failed to transfer speaker token: ' . $e->getMessage(),
                 'error'
@@ -491,6 +496,7 @@ class GameDashboard extends Component
 
         // Their votes are deleted with them
         $removedPlayer->delete();
+        Log::info('Player removed', ['removed' => $removedPlayer->name]);
 
         $this->dispatch('flashMessage', [
             "{$removedPlayer->name} was removed from the game.",
@@ -526,9 +532,11 @@ class GameDashboard extends Component
         if ($blockedIds->contains($blockedPlayer->id)) {
             $blockedIds = $blockedIds->reject(fn ($id) => $id === $blockedPlayer->id);
             $message = "{$blockedPlayer->name} can vote on this agenda again.";
+            Log::info('Player allowed to vote again', ['target' => $blockedPlayer->name, 'agenda' => $currentAgenda->title]);
         } else {
             $blockedIds->push($blockedPlayer->id);
             $message = "{$blockedPlayer->name} cannot vote on this agenda.";
+            Log::info('Player blocked from voting', ['target' => $blockedPlayer->name, 'agenda' => $currentAgenda->title]);
         }
 
         $currentAgenda->update(['blocked_player_ids' => $blockedIds->values()->all()]);
@@ -599,6 +607,8 @@ class GameDashboard extends Component
             return;
         }
 
+        Log::info('Vote cast', ['agenda' => $currentAgenda->title, 'option' => $this->selectedOption, 'influence' => (int) $this->influenceSpent]);
+
         $this->selectedOption = '';
         $this->influenceSpent = 0;
 
@@ -636,6 +646,7 @@ class GameDashboard extends Component
                 'status' => 'completed',
                 'voting_ended_at' => now(),
             ]);
+            Log::info('Voting ended', ['agenda' => $currentAgenda->title, 'votes' => $currentAgenda->votes()->count()]);
 
             $this->dispatch('flashMessage', [
                 'Voting has ended. Please announce the results to the other players.',
@@ -655,6 +666,7 @@ class GameDashboard extends Component
         $this->game->update(['fracture_in_play' => !$this->game->fracture_in_play]);
 
         $keptPlanets = $this->syncFracturePlanetsOnCurrentAgenda();
+        Log::info($this->game->fracture_in_play ? 'Fracture put in play' : 'Fracture taken out of play');
 
         if ($this->game->fracture_in_play) {
             $message = 'The Fracture is in play. Its planets are added to planet agendas, including the current one.';
@@ -718,9 +730,11 @@ class GameDashboard extends Component
         if ($currentAgenda->reveal_step === Agenda::STEP_WHEN_REVEALED) {
             $currentAgenda->update(['reveal_step' => Agenda::STEP_AFTER_REVEALED]);
             $message = 'Ask the players for "After an agenda is revealed" action cards.';
+            Log::info('"When" action cards checked', ['agenda' => $currentAgenda->title]);
         } else {
             $currentAgenda->update(['reveal_step' => null, 'voting_started_at' => now()]);
             $message = 'Voting has started!';
+            Log::info('Voting opened', ['agenda' => $currentAgenda->title]);
         }
 
         $this->dispatch('flashMessage', [$message, 'success']);
@@ -745,6 +759,7 @@ class GameDashboard extends Component
         }
 
         $currentAgenda->delete();
+        Log::info('Agenda discarded', ['agenda' => $currentAgenda->title]);
 
         $this->dispatch('flashMessage', [
             'Agenda discarded. Reveal the next agenda.',
