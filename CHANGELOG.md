@@ -4,7 +4,7 @@ All notable changes to TI Voting are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.4.1] - 2026-10-18
 
 ### Added
 - The URL path of the admin dashboard can be set with `ADMIN_PATH` in `.env`, e.g. `ADMIN_PATH=beheer` serves it at `/beheer` instead of `/admin`.
@@ -81,7 +81,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Milty draft integration to load factions and planets.
 - Planet agendas (any, industrial, cultural, hazardous, non-home), with extra tiles that can be added by tile number.
 
-[Unreleased]: https://github.com/burnacid/ti-voting/compare/v1.4.0...HEAD
+[1.4.1]: https://github.com/burnacid/ti-voting/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/burnacid/ti-voting/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/burnacid/ti-voting/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/burnacid/ti-voting/compare/v1.1.0...v1.2.0
