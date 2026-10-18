@@ -66,9 +66,6 @@
                             Remove
                         </button>
                     </div>
-                    <div class="mt-2">
-                        <x-rejoin-link :player="$gamePlayer" />
-                    </div>
                 </div>
             @endforeach
         </div>

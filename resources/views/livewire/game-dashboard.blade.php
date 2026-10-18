@@ -1,4 +1,33 @@
 <div class="space-y-6">
+    <!-- Requests to rejoin as a player, any other player confirms them -->
+    @foreach($rejoinRequests as $requested)
+        <div wire:key="rejoin-{{ $requested->id }}" class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4">
+            <p class="font-semibold text-blue-900 dark:text-blue-100">Someone wants to rejoin as {{ $requested->name }}</p>
+            <p class="text-sm text-blue-800 dark:text-blue-200 mt-1">
+                Only allow this if {{ $requested->name }} is at the table and lost access. They will play as {{ $requested->name }}{{ $requested->is_speaker ? ', including the Speaker controls' : '' }}.
+            </p>
+            <div class="mt-3 flex flex-col sm:flex-row gap-2">
+                <button wire:click="approveRejoin('{{ $requested->id }}')"
+                        class="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white font-semibold py-3 sm:py-2 px-4 rounded-lg transition-colors">
+                    Yes, it is {{ $requested->name }}
+                </button>
+                <button wire:click="declineRejoin('{{ $requested->id }}')"
+                        class="w-full sm:w-auto bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-100 font-semibold py-3 sm:py-2 px-4 rounded-lg transition-colors">
+                    Decline
+                </button>
+            </div>
+        </div>
+    @endforeach
+
+    @if($player->hasPendingRejoinRequest())
+        <div class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-xl p-4">
+            <p class="font-semibold text-yellow-900 dark:text-yellow-100">Someone is asking to rejoin as you</p>
+            <p class="text-sm text-yellow-800 dark:text-yellow-200 mt-1">
+                If that was not you on another device, ask the other players to decline it.
+            </p>
+        </div>
+    @endif
+
     <!-- Speaker Controls -->
     @if($player->is_speaker)
         @php
@@ -339,10 +368,13 @@
                                 </button>
                             @endif
                         </div>
-                        <x-rejoin-link :player="$gamePlayer" />
                     @endif
                 </div>
             @endforeach
+        </div>
+
+        <div class="mt-4">
+            <x-rejoin-link :game="$game" />
         </div>
     </div>
 

@@ -527,43 +527,95 @@ test('creating a game without a milty url works', function () {
     Http::assertNothingSent();
 });
 
-test('a rejoin link signs the browser in as that player', function () {
-    [$game, , $other] = makeGame();
+test('every player sees the game rejoin link and no session tokens', function () {
+    [$game, $speaker, $other] = makeGame();
 
-    $this->get($other->rejoinUrl())->assertRedirect(route('game.show', $game->code));
-    expect(session('player_token'))->toBe($other->session_token);
+    foreach ([[$speaker, $other], [$other, $speaker]] as [$viewer, $otherPlayer]) {
+        Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $viewer])
+            ->assertSee($game->rejoinUrl())
+            ->assertDontSee($otherPlayer->session_token);
+    }
 
-    $this->get(route('game.show', $game->code))->assertOk()->assertSee('Other');
+    $this->get($game->rejoinUrl())->assertOk()->assertSee('Rejoin Game')->assertSee('Who are you?');
 });
 
-test('an invalid rejoin link is refused', function () {
-    [$game] = makeGame();
+test('a player who lost access rejoins once another player confirms it', function () {
+    Event::fake([TriggerRefresh::class]);
+    [$game, $speaker, $other] = makeGame();
 
-    $this->get(route('game.rejoin', [$game->code, 'not-a-token']))
-        ->assertRedirect(route('join-group', $game->code))
-        ->assertSessionHas('error', 'This rejoin link is not valid.');
+    // The Speaker lost their session and asks to rejoin from a new browser
+    $request = Livewire::test(JoinGameForm::class, ['gameCode' => $game->code, 'rejoin' => true])
+        ->assertSee('Speaker')
+        ->set('playerName', 'Speaker')
+        ->call('requestRejoin')
+        ->assertSet('rejoinStatus', 'waiting')
+        ->assertSee('Waiting for another player');
+
+    // Nothing happens until someone confirms
+    $request->call('checkRejoin')->assertSet('rejoinStatus', 'waiting');
+    expect(session('player_token'))->toBeNull();
+
+    // The requested player cannot confirm themselves, another player can
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker->fresh()])
+        ->assertDontSee('Someone wants to rejoin as Speaker')
+        ->assertSee('Someone is asking to rejoin as you')
+        ->call('approveRejoin', $speaker->id);
+    expect($speaker->fresh()->rejoin_approved_at)->toBeNull();
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $other])
+        ->assertSee('Someone wants to rejoin as Speaker')
+        ->assertSee('including the Speaker controls')
+        ->call('approveRejoin', $speaker->id);
+
+    $request->call('checkRejoin')->assertRedirect(route('game.show', $game->code));
+    expect(session('player_token'))->toBe($speaker->session_token)
+        ->and($speaker->fresh()->rejoin_request_token)->toBeNull();
+});
+
+test('a declined rejoin request does not let the browser in', function () {
+    Event::fake([TriggerRefresh::class]);
+    [$game, $speaker, $other] = makeGame();
+
+    $request = Livewire::test(JoinGameForm::class, ['gameCode' => $game->code, 'rejoin' => true])
+        ->set('playerName', 'Other')
+        ->call('requestRejoin');
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->call('declineRejoin', $other->id);
+
+    $request->call('checkRejoin')
+        ->assertSet('rejoinStatus', 'declined')
+        ->assertSee('Your request to rejoin was declined');
     expect(session('player_token'))->toBeNull();
 });
 
-test('only the speaker sees rejoin links', function () {
-    [$game, $speaker, $other] = makeGame();
+test('a rejoin request expires when nobody confirms it', function () {
+    Event::fake([TriggerRefresh::class]);
+    [$game, , $other] = makeGame();
 
-    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
-        ->assertSee($other->rejoinUrl());
+    $request = Livewire::test(JoinGameForm::class, ['gameCode' => $game->code, 'rejoin' => true])
+        ->set('playerName', 'Other')
+        ->call('requestRejoin');
 
-    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $other])
-        ->assertDontSee('Rejoin link')
-        ->assertDontSee($speaker->session_token);
+    $this->travel(Player::REJOIN_REQUEST_MINUTES + 1)->minutes();
+
+    $request->call('checkRejoin')->assertSet('rejoinStatus', 'expired');
+    expect($other->fresh()->rejoin_request_token)->toBeNull();
 });
 
-test('joining with a taken name points to the rejoin link', function () {
-    [$game] = makeGame();
+test('joining with a taken name offers to ask to rejoin', function () {
+    Event::fake([TriggerRefresh::class]);
+    [$game, , $other] = makeGame();
 
     Livewire::test(JoinGameForm::class, ['gameCode' => $game->code])
         ->set('playerName', 'Other')
         ->call('joinGame')
         ->assertHasErrors('playerName')
-        ->assertSee('ask the Speaker for your rejoin link');
+        ->assertSee('Ask to rejoin as Other')
+        ->call('requestRejoin')
+        ->assertSet('rejoinStatus', 'waiting');
+
+    expect($other->fresh()->hasPendingRejoinRequest())->toBeTrue();
 });
 
 test('a removed player is dropped from an open elect player agenda unless voted for', function () {

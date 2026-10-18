@@ -19,11 +19,24 @@ class Player extends Model
         'session_token',
         'faction',
         'is_speaker',
+        'rejoin_request_token',
+        'rejoin_requested_at',
+        'rejoin_approved_at',
+    ];
+
+    protected $hidden = [
+        'session_token',
+        'rejoin_request_token',
     ];
 
     protected $casts = [
         'is_speaker' => 'boolean',
+        'rejoin_requested_at' => 'datetime',
+        'rejoin_approved_at' => 'datetime',
     ];
+
+    // How long a request to rejoin as this player waits for another player to confirm it
+    public const REJOIN_REQUEST_MINUTES = 10;
 
     public function game(): BelongsTo
     {
@@ -44,10 +57,16 @@ class Player extends Model
         return $token;
     }
 
-    // Signs a browser in as this player, for players who lost their session
-    public function rejoinUrl(): string
+    public function hasPendingRejoinRequest(): bool
     {
-        return route('game.rejoin', [$this->game->code, $this->session_token]);
+        return $this->rejoin_request_token !== null
+            && $this->rejoin_approved_at === null
+            && $this->rejoin_requested_at?->gt(now()->subMinutes(self::REJOIN_REQUEST_MINUTES));
+    }
+
+    public function clearRejoinRequest(): void
+    {
+        $this->update(['rejoin_request_token' => null, 'rejoin_requested_at' => null, 'rejoin_approved_at' => null]);
     }
 
     public function hasVotedOn(Agenda $agenda): bool

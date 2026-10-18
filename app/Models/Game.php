@@ -55,6 +55,12 @@ class Game extends Model
     // Law that, when voted "For", lets each player cast only 1 vote on each agenda
     public const REPRESENTATIVE_GOVERNMENT = 'Representative Government';
 
+    // Page where players who lost their session ask to rejoin, another player has to confirm it
+    public function rejoinUrl(): string
+    {
+        return route('game.rejoin', $this->code);
+    }
+
     public static function retentionDays(): int
     {
         return (int) config('app.game_retention_days', 7);

@@ -387,6 +387,34 @@ class GameDashboard extends Component
         }
     }
 
+    // Another player confirms that the person asking to rejoin as this player really is them
+    public function approveRejoin($playerId)
+    {
+        $requested = $this->game->players()->find($playerId);
+        if (!$requested || $requested->id === $this->player->id || !$requested->hasPendingRejoinRequest()) {
+            return;
+        }
+
+        $requested->update(['rejoin_approved_at' => now()]);
+        Log::info('Rejoin approved', ['rejoined' => $requested->name]);
+
+        $this->dispatch('flashMessage', ["{$requested->name} is let back in.", 'success']);
+        TriggerRefresh::dispatch($this->game);
+    }
+
+    public function declineRejoin($playerId)
+    {
+        $requested = $this->game->players()->find($playerId);
+        if (!$requested || $requested->id === $this->player->id || !$requested->hasPendingRejoinRequest()) {
+            return;
+        }
+
+        $requested->clearRejoinRequest();
+        Log::info('Rejoin declined', ['rejoined' => $requested->name]);
+
+        TriggerRefresh::dispatch($this->game);
+    }
+
     public function removePlayer($playerId)
     {
         if (!$this->player->is_speaker) {
@@ -775,6 +803,7 @@ class GameDashboard extends Component
 
         return view('livewire.game-dashboard', [
             'player' => $this->player,
+            'rejoinRequests' => $players->filter(fn ($gamePlayer) => $gamePlayer->id !== $this->player->id && $gamePlayer->hasPendingRejoinRequest()),
             'currentAgenda' => $currentAgenda,
             'players' => $players,
             'hasVoted' => $hasVoted,

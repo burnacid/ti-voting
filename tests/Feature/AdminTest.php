@@ -176,7 +176,7 @@ test('an admin can make a player the speaker and remove players', function () {
     $bob = Player::create(['game_id' => $game->id, 'name' => 'Bob', 'session_token' => Player::generateSessionToken()]);
 
     $view = Livewire::test(GameDetail::class, ['game' => $game])
-        ->assertSee($bob->rejoinUrl())
+        ->assertDontSee($bob->session_token)
         ->call('makeSpeaker', $bob->id);
 
     expect($bob->fresh()->is_speaker)->toBeTrue()

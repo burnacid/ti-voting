@@ -7,8 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## [Unreleased]
 
 ### Added
-- Rejoin links: a player who lost their session (cleared browser, other device) can get back into the game with a link the Speaker shares from the player list. Joining with a taken name now points to this.
-- On a game's admin page, an admin can make any player the Speaker, remove players and copy their rejoin links, for example when the Speaker lost their session.
+- Rejoining: a player who lost access (cleared browser, other phone), including the Speaker, can ask to rejoin under their name through the game's rejoin link or by joining with their taken name. Another player in the game confirms it is them, and they are let back in. Every player can copy the rejoin link from the game screen.
+- On a game's admin page, an admin can make any player the Speaker and remove players.
 - When The Argent Flight is in play (in the Milty draft or entered as a player's faction), the Speaker gets an extra step before voting opens: The Argent Flight votes first and announces their votes publicly.
 - Representative Government: when this law passes For, from then on each player casts 1 vote on each agenda instead of spending influence. The Speaker can also turn it on or off by hand, for example after a tie or when the law is repealed.
 - `GAME_RETENTION_DAYS` (default 7) and `LOG_DATABASE_DAYS` (default 30) in `.env` set how long games and log entries are kept.
