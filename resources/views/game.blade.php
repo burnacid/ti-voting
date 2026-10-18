@@ -13,6 +13,16 @@
 <body class="bg-gray-100 dark:bg-gray-900 min-h-screen">
     <div class="container mx-auto px-4 py-8">
         <div class="max-w-6xl mx-auto">
+            <!-- Back to the homepage, which lists this phone's games. The installed app has no browser back button -->
+            <a href="{{ route('home') }}"
+               class="inline-flex items-center gap-2 mb-4 py-1 pr-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">
+                <img src="/favicon.svg" alt="" class="w-7 h-7">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                </svg>
+                Home
+            </a>
+
             <!-- Game Header -->
             <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
                 <div class="flex justify-between items-center">

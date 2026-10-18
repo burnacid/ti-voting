@@ -9,6 +9,7 @@ use App\Support\PlayerGames;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Livewire\Component;
 
 class JoinGameForm extends Component
@@ -41,7 +42,6 @@ class JoinGameForm extends Component
         return [
             'gameCode' => 'required|string|size:6|exists:games,code',
             'playerName' => 'required|string|max:255',
-            'faction' => 'nullable|string|max:255',
         ];
     }
 
@@ -75,11 +75,20 @@ class JoinGameForm extends Component
             return;
         }
 
+        // With a Milty draft, players choose a drafted faction nobody else has chosen
+        $factions = $game->availableFactions();
+        if ($factions->isNotEmpty()) {
+            $this->validate(
+                ['faction' => ['required', Rule::in($factions->keys())]],
+                ['faction.required' => 'Choose the faction you drafted.', 'faction.in' => 'Another player already chose this faction.']
+            );
+        }
+
         $player = Player::create([
             'game_id' => $game->id,
             'name' => $this->playerName,
             'session_token' => Player::generateSessionToken(),
-            'faction' => $this->faction,
+            'faction' => $factions->has($this->faction) ? $this->faction : null,
             'is_speaker' => false,
         ]);
 
@@ -177,10 +186,11 @@ class JoinGameForm extends Component
 
     public function render()
     {
+        $game = strlen($this->gameCode) === 6 ? Game::where('code', strtoupper($this->gameCode))->first() : null;
+
         return view('livewire.join-game-form', [
-            'gamePlayers' => $this->rejoin
-                ? Game::where('code', $this->gameCode)->first()?->players()->orderBy('name')->pluck('name') ?? collect()
-                : collect(),
+            'gamePlayers' => $this->rejoin ? $game?->players()->orderBy('name')->pluck('name') ?? collect() : collect(),
+            'factions' => $game?->availableFactions() ?? collect(),
         ]);
     }
 }

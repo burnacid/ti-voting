@@ -63,7 +63,7 @@
                     </label>
                     <input type="text"
                            id="gameCode"
-                           wire:model="gameCode"
+                           wire:model.live.debounce.400ms="gameCode"
                            class="{{ $inputClass }} uppercase font-mono"
                            placeholder="Enter 6-character code"
                            maxlength="6">
@@ -94,17 +94,20 @@
                     @endif
                 </div>
 
-                <div>
-                    <label for="faction" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Faction (Optional)
-                    </label>
-                    <input type="text"
-                           id="faction"
-                           wire:model="faction"
-                           class="{{ $inputClass }}"
-                           placeholder="e.g., The Emirates of Hacan">
-                    @error('faction') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
-                </div>
+                @if($factions->isNotEmpty())
+                    <div>
+                        <label for="faction" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Your Faction
+                        </label>
+                        <select id="faction" wire:model="faction" class="{{ $inputClass }}">
+                            <option value="">Choose the faction you drafted</option>
+                            @foreach($factions as $factionName => $drafter)
+                                <option value="{{ $factionName }}">{{ $factionName }}{{ $drafter ? " ({$drafter})" : '' }}</option>
+                            @endforeach
+                        </select>
+                        @error('faction') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
+                    </div>
+                @endif
 
                 <button type="submit"
                         class="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800">

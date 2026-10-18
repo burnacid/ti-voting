@@ -7,7 +7,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## [Unreleased]
 
 ### Added
-- A phone can play in several games: the homepage lists every game it is in, most recent first, with whether an agenda is open.
+- A phone can play in several games: the homepage lists every game it is in, most recent first, with whether an agenda is open. A game can be removed from that list; the player stays in the game.
+- A Home link on the game page, also handy in the installed app, which has no back button.
+
+### Changed
+- Players no longer type a faction. In a game with a Milty draft they choose the faction they drafted from a list, which shows the drafter's name and leaves out factions other players already chose. Games without a Milty draft have no factions. Players without a drafted faction, for example after the Speaker added the Milty draft later, are asked to choose one on the game screen.
+- The Milty draft loads as soon as the URL is entered when creating a game, and the field is labelled correctly.
 
 ### Fixed
 - Players no longer lose access to their game after 2 hours without activity, for example between agenda phases. The games a browser plays in are kept in their own cookie for 30 days, renewed on every visit, instead of in the session.

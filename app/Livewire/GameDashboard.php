@@ -38,6 +38,8 @@ class GameDashboard extends Component
     public string $playerId;
     protected ?Player $player = null;
     public $selectedOption = '';
+    // Faction picked in the prompt shown when the game has a Milty draft and this player has no drafted faction yet
+    public $chosenFaction = '';
     public $influenceSpent = 0;
 
     // Speaker-only properties for creating agendas
@@ -387,6 +389,22 @@ class GameDashboard extends Component
                 'error'
             ]);
         }
+    }
+
+    public function chooseFaction()
+    {
+        $factions = $this->game->availableFactions($this->player);
+
+        $this->validate(
+            ['chosenFaction' => ['required', Rule::in($factions->keys())]],
+            ['chosenFaction.required' => 'Choose the faction you drafted.', 'chosenFaction.in' => 'Another player already chose this faction.']
+        );
+
+        $this->player->update(['faction' => $this->chosenFaction]);
+        Log::info('Faction chosen', ['faction' => $this->chosenFaction]);
+
+        $this->reset('chosenFaction');
+        TriggerRefresh::dispatch($this->game);
     }
 
     // Another player confirms that the person asking to rejoin as this player really is them
@@ -805,6 +823,10 @@ class GameDashboard extends Component
 
         return view('livewire.game-dashboard', [
             'player' => $this->player,
+            // Asked when the game has a Milty draft and this player's faction is not one of the drafted factions
+            'factionChoices' => Game::factionsFromDraft($this->game->milty_draft_data)->has($this->player->faction ?? '')
+                ? collect()
+                : $this->game->availableFactions($this->player),
             'rejoinRequests' => $players->filter(fn ($gamePlayer) => $gamePlayer->id !== $this->player->id && $gamePlayer->hasPendingRejoinRequest()),
             'currentAgenda' => $currentAgenda,
             'players' => $players,

@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Collection;
 
 class Game extends Model
 {
@@ -240,6 +241,30 @@ class Game extends Model
             ->first(fn ($player) => self::isArgentFlight($player['faction'] ?? null));
 
         return $miltyPlayer['name'] ?? null;
+    }
+
+    /**
+     * The factions picked in a Milty draft, as faction => name of the player in the draft, sorted by faction.
+     */
+    public static function factionsFromDraft(?array $draftData): Collection
+    {
+        return collect($draftData['draft']['players'] ?? [])
+            ->filter(fn ($player) => !empty($player['faction']))
+            ->mapWithKeys(fn ($player) => [$player['faction'] => $player['name'] ?? null])
+            ->sortKeys();
+    }
+
+    /**
+     * The drafted factions no other player in this game has chosen yet. Empty without Milty data.
+     */
+    public function availableFactions(?Player $except = null): Collection
+    {
+        $taken = $this->players()
+            ->when($except, fn ($query) => $query->whereKeyNot($except->id))
+            ->whereNotNull('faction')
+            ->pluck('faction');
+
+        return self::factionsFromDraft($this->milty_draft_data)->except($taken->all());
     }
 
     public function miltyFactionNames()

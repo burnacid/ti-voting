@@ -29,9 +29,11 @@
                     <div class="space-y-2">
                         @foreach($myPlayers as $myPlayer)
                             @php($openAgenda = $myPlayer->game->currentAgenda())
+                            <div x-data="{ confirming: false }">
+                            <div class="flex items-stretch gap-2">
                             <a href="{{ route('game.show', $myPlayer->game->code) }}"
                                @class([
-                                   'flex items-center justify-between gap-4 rounded-xl shadow-md p-4 transition-colors',
+                                   'flex flex-1 min-w-0 items-center justify-between gap-4 rounded-xl shadow-md p-4 transition-colors',
                                    'bg-blue-600 hover:bg-blue-700 text-white' => $loop->first,
                                    'bg-white hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-900 dark:text-white border border-gray-200 dark:border-gray-700' => !$loop->first,
                                ])>
@@ -52,6 +54,37 @@
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
                                 </svg>
                             </a>
+                            <button type="button"
+                                    x-on:click="confirming = !confirming"
+                                    x-bind:aria-expanded="confirming"
+                                    aria-label="Remove {{ $myPlayer->game->name }} from this list"
+                                    title="Remove from this list"
+                                    class="px-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-400 hover:text-red-600 dark:hover:text-red-400 shadow-md transition-colors">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                </svg>
+                            </button>
+                            </div>
+
+                            <!-- Confirmation: only removes the game from this phone's list, the player stays in the game -->
+                            <form x-show="confirming" x-cloak method="POST" action="{{ route('my-games.forget', $myPlayer->game->code) }}"
+                                  class="mt-2 rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 p-3">
+                                @csrf
+                                <p class="text-sm text-red-800 dark:text-red-200">
+                                    Remove <strong>{{ $myPlayer->game->name }}</strong> from this list? You stay in the game and can get back in through its rejoin link.
+                                </p>
+                                <div class="mt-2 flex flex-col sm:flex-row gap-2">
+                                    <button type="submit"
+                                            class="w-full sm:w-auto bg-red-600 hover:bg-red-700 text-white text-sm font-semibold py-2.5 sm:py-2 px-4 rounded-lg transition-colors">
+                                        Remove from list
+                                    </button>
+                                    <button type="button" x-on:click="confirming = false"
+                                            class="w-full sm:w-auto bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-100 text-sm font-semibold py-2.5 sm:py-2 px-4 rounded-lg transition-colors">
+                                        Cancel
+                                    </button>
+                                </div>
+                            </form>
+                            </div>
                         @endforeach
                     </div>
                 </section>

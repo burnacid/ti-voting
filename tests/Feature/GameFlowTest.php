@@ -977,3 +977,134 @@ test('deleted games and removed players drop off the list', function () {
         ->assertDontSee('Deleted Game')
         ->assertDontSee('Removed From Game');
 });
+
+function draftWithFactions(): array
+{
+    return ['draft' => ['players' => [
+        'p_1' => ['name' => 'Alice', 'faction' => 'The Argent Flight', 'slice' => '0'],
+        'p_2' => ['name' => 'Bob', 'faction' => 'The Federation of Sol', 'slice' => '1'],
+        'p_3' => ['name' => 'Carol', 'faction' => 'The Emirates of Hacan', 'slice' => '2'],
+    ]], 'slices' => [['tiles' => []], ['tiles' => []], ['tiles' => []]], 'config' => []];
+}
+
+test('creating a game with a milty draft asks for a drafted faction', function () {
+    Http::fake(['milty.shenanigans.be/*' => Http::response(draftWithFactions())]);
+
+    $form = Livewire::test(CreateGame::class)
+        ->set('gameName', 'Drafted Game')
+        ->set('playerName', 'Alice')
+        ->assertDontSee('Your Faction')
+        ->set('miltyUrl', 'https://milty.shenanigans.be/d/abc123')
+        ->assertSee('Draft loaded with 3 factions')
+        ->assertSee('The Argent Flight (Alice)')
+        ->call('createGame')
+        ->assertHasErrors(['faction' => 'required']);
+
+    $form->set('faction', 'Not A Drafted Faction')->call('createGame')->assertHasErrors('faction');
+
+    $form->set('faction', 'The Argent Flight')->call('createGame')->assertHasNoErrors()->assertRedirect();
+    expect(Player::where('name', 'Alice')->first()->faction)->toBe('The Argent Flight');
+});
+
+test('creating a game without milty has no faction', function () {
+    Livewire::test(CreateGame::class)
+        ->assertDontSee('Your Faction')
+        ->set('gameName', 'Plain Game')
+        ->set('playerName', 'Me')
+        ->set('faction', 'Typed Faction')
+        ->call('createGame')
+        ->assertRedirect();
+
+    expect(Player::where('name', 'Me')->first()->faction)->toBeNull();
+});
+
+test('joining a milty game offers the drafted factions nobody chose yet', function () {
+    Event::fake([TriggerRefresh::class]);
+    [$game, $speaker] = makeGame(['milty_draft_data' => draftWithFactions()]);
+    $speaker->update(['faction' => 'The Argent Flight']);
+
+    $form = Livewire::test(JoinGameForm::class, ['gameCode' => $game->code])
+        ->assertSee('The Federation of Sol (Bob)')
+        ->assertDontSee('The Argent Flight (Alice)')
+        ->set('playerName', 'Bob')
+        ->call('joinGame')
+        ->assertHasErrors(['faction' => 'required']);
+
+    $form->set('faction', 'The Argent Flight')->call('joinGame')->assertHasErrors('faction');
+    $form->set('faction', 'The Federation of Sol')->call('joinGame')->assertRedirect();
+
+    expect($game->players()->where('name', 'Bob')->first()->faction)->toBe('The Federation of Sol');
+});
+
+test('joining a game without milty has no faction', function () {
+    Event::fake([TriggerRefresh::class]);
+    [$game] = makeGame();
+
+    Livewire::test(JoinGameForm::class, ['gameCode' => $game->code])
+        ->assertDontSee('Your Faction')
+        ->set('playerName', 'Plain')
+        ->call('joinGame')
+        ->assertRedirect();
+
+    expect($game->players()->where('name', 'Plain')->first()->faction)->toBeNull();
+});
+
+test('players without a drafted faction are asked to choose one in the game', function () {
+    Event::fake([TriggerRefresh::class]);
+    [$game, $speaker, $other] = makeGame(['milty_draft_data' => draftWithFactions()]);
+    $speaker->update(['faction' => 'The Emirates of Hacan']);
+
+    // The Speaker already has a drafted faction
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker->fresh()])
+        ->assertDontSee('Choose your faction');
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $other])
+        ->assertSee('Choose your faction')
+        ->assertDontSee('The Emirates of Hacan (Carol)')
+        ->set('chosenFaction', 'The Emirates of Hacan')
+        ->call('chooseFaction')
+        ->assertHasErrors('chosenFaction')
+        ->set('chosenFaction', 'The Federation of Sol')
+        ->call('chooseFaction')
+        ->assertHasNoErrors()
+        ->assertDontSee('Choose your faction');
+
+    expect($other->fresh()->faction)->toBe('The Federation of Sol');
+});
+
+test('the game page links back home', function () {
+    [$game, , $other] = makeGame();
+
+    $this->withCookie(PlayerGames::COOKIE, json_encode([$game->code => $other->session_token]))
+        ->get(route('game.show', $game->code))
+        ->assertOk()
+        ->assertSee('href="' . route('home') . '"', false);
+});
+
+test('a game can be removed from this browser list without leaving it', function () {
+    [$kept, , $keptPlayer] = makeGame(['name' => 'Kept Game']);
+    [$removed, , $removedPlayer] = makeGame(['name' => 'Removed Game']);
+    $cookie = json_encode([$removed->code => $removedPlayer->session_token, $kept->code => $keptPlayer->session_token]);
+
+    $this->withCookie(PlayerGames::COOKIE, $cookie)
+        ->get('/')
+        ->assertSee(route('my-games.forget', $removed->code));
+
+    $this->withCookie(PlayerGames::COOKIE, $cookie)
+        ->post(route('my-games.forget', $removed->code))
+        ->assertRedirect(route('home'))
+        ->assertCookie(PlayerGames::COOKIE, json_encode([$kept->code => $keptPlayer->session_token]));
+
+    // Still a player in the game
+    expect(Player::find($removedPlayer->id))->not->toBeNull();
+});
+
+test('removing a game also clears it from the old session', function () {
+    [$game, , $other] = makeGame(['name' => 'Session Game']);
+
+    $this->withSession(['player_token' => $other->session_token])
+        ->post(route('my-games.forget', $game->code));
+
+    expect(session('player_token'))->toBeNull();
+    $this->get('/')->assertDontSee('Session Game');
+});

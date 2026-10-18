@@ -12,6 +12,20 @@ Route::get('/', function () {
     return view('welcome', ['myPlayers' => PlayerGames::players()]);
 })->name('home');
 
+// Removes a game from this browser's list of games. The player stays in the game
+Route::post('/my-games/{code}/forget', function (string $code) {
+    $code = strtoupper($code);
+    PlayerGames::forget($code);
+
+    // Before the games cookie existed the player was kept in the session, which would bring the game back
+    $game = Game::where('code', $code)->first();
+    if ($game && session('player_token') && $game->players()->where('session_token', session('player_token'))->exists()) {
+        session()->forget('player_token');
+    }
+
+    return redirect()->route('home');
+})->name('my-games.forget');
+
 Route::get('/create-game', function () {
     return view('create-game');
 })->name('create-game');

@@ -19,6 +19,28 @@
         </div>
     @endforeach
 
+    <!-- Pick a drafted faction, e.g. after the Speaker added the Milty draft -->
+    @if($factionChoices->isNotEmpty())
+        <form wire:submit="chooseFaction" class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4">
+            <label for="chosenFaction" class="block font-semibold text-blue-900 dark:text-blue-100">Choose your faction</label>
+            <p class="text-sm text-blue-800 dark:text-blue-200 mt-1">This game uses a Milty draft. Pick the faction you drafted.</p>
+            <div class="mt-3 flex flex-col sm:flex-row gap-2">
+                <select id="chosenFaction" wire:model="chosenFaction"
+                        class="w-full sm:flex-1 px-3 py-2.5 text-base sm:text-sm border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white">
+                    <option value="">Choose the faction you drafted</option>
+                    @foreach($factionChoices as $factionName => $drafter)
+                        <option value="{{ $factionName }}">{{ $factionName }}{{ $drafter ? " ({$drafter})" : '' }}</option>
+                    @endforeach
+                </select>
+                <button type="submit"
+                        class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 sm:py-2 px-4 rounded-lg transition-colors">
+                    Save
+                </button>
+            </div>
+            @error('chosenFaction') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
+        </form>
+    @endif
+
     @if($player->hasPendingRejoinRequest())
         <div class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-xl p-4">
             <p class="font-semibold text-yellow-900 dark:text-yellow-100">Someone is asking to rejoin as you</p>
