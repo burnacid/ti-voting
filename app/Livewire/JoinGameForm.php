@@ -6,6 +6,7 @@ use App\Events\TriggerRefresh;
 use App\Models\Game;
 use App\Models\Player;
 use App\Support\PlayerGames;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
@@ -75,22 +76,27 @@ class JoinGameForm extends Component
             return;
         }
 
-        // With a Milty draft, players choose a drafted faction nobody else has chosen
-        $factions = $game->availableFactions();
-        if ($factions->isNotEmpty()) {
-            $this->validate(
-                ['faction' => ['required', Rule::in($factions->keys())]],
-                ['faction.required' => 'Choose the faction you drafted.', 'faction.in' => 'Another player already chose this faction.']
-            );
-        }
+        // Locks the game, so two players joining at the same time cannot both take the same faction
+        $player = DB::transaction(function () use ($game) {
+            Game::whereKey($game->id)->lockForUpdate()->first();
 
-        $player = Player::create([
-            'game_id' => $game->id,
-            'name' => $this->playerName,
-            'session_token' => Player::generateSessionToken(),
-            'faction' => $factions->has($this->faction) ? $this->faction : null,
-            'is_speaker' => false,
-        ]);
+            // With a Milty draft, players choose a drafted faction nobody else has chosen
+            $factions = $game->availableFactions();
+            if ($factions->isNotEmpty()) {
+                $this->validate(
+                    ['faction' => ['required', Rule::in($factions->keys())]],
+                    ['faction.required' => 'Choose the faction you drafted.', 'faction.in' => 'Another player already chose this faction.']
+                );
+            }
+
+            return Player::create([
+                'game_id' => $game->id,
+                'name' => $this->playerName,
+                'session_token' => Player::generateSessionToken(),
+                'faction' => $factions->has($this->faction) ? $this->faction : null,
+                'is_speaker' => false,
+            ]);
+        });
 
         Log::info('Player joined', ['game' => $game->code, 'player' => $player->name, 'faction' => $player->faction ?: null]);
 
@@ -100,6 +106,24 @@ class JoinGameForm extends Component
         PlayerGames::remember($player);
 
         return redirect()->route('game.show', $game->code);
+    }
+
+    // Polled while choosing a faction: another player may take the chosen faction in the meantime
+    public function checkFaction()
+    {
+        $game = $this->game();
+
+        if (!$game || $this->faction === '' || $game->availableFactions()->has($this->faction)) {
+            return;
+        }
+
+        $this->addError('faction', "{$this->faction} was just chosen by another player. Choose another faction.");
+        $this->faction = '';
+    }
+
+    private function game(): ?Game
+    {
+        return strlen($this->gameCode) === 6 ? Game::where('code', strtoupper($this->gameCode))->first() : null;
     }
 
     /**
@@ -186,11 +210,14 @@ class JoinGameForm extends Component
 
     public function render()
     {
-        $game = strlen($this->gameCode) === 6 ? Game::where('code', strtoupper($this->gameCode))->first() : null;
+        $game = $this->game();
+        $drafted = Game::factionsFromDraft($game?->milty_draft_data);
 
         return view('livewire.join-game-form', [
             'gamePlayers' => $this->rejoin ? $game?->players()->orderBy('name')->pluck('name') ?? collect() : collect(),
             'factions' => $game?->availableFactions() ?? collect(),
+            // Drafted factions other players already chose, as faction => player name, shown but not selectable
+            'takenFactions' => $game ? $game->players()->whereIn('faction', $drafted->keys())->orderBy('faction')->pluck('name', 'faction') : collect(),
         ]);
     }
 }

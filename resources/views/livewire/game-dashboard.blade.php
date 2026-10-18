@@ -13,15 +13,6 @@
             'elect_planet_non_home' => ['label' => 'Elect a Non-Home Planet other than Mecatol Rex', 'planet' => true, 'hint' => 'Players will be able to vote for any non-home planet in the game except Mecatol Rex.'],
             'custom' => ['label' => 'Custom Options', 'planet' => false, 'hint' => null],
         ];
-        // Avatar colours in the player list, picked from the player's name
-        $avatarColors = [
-            'bg-blue-100 text-blue-800 dark:bg-blue-900/60 dark:text-blue-200',
-            'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-200',
-            'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-200',
-            'bg-rose-100 text-rose-800 dark:bg-rose-900/60 dark:text-rose-200',
-            'bg-violet-100 text-violet-800 dark:bg-violet-900/60 dark:text-violet-200',
-            'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/60 dark:text-cyan-200',
-        ];
         // Outline icons for the tabs (24x24, stroked)
         $tabIcons = [
             'speaker' => ['M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z', 'M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z'],
@@ -550,7 +541,7 @@
                     <!-- Header -->
                     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <div>
-                            <h2 class="text-lg sm:text-xl font-bold text-yellow-800 dark:text-yellow-200">Speaker Controls</h2>
+                            <h2 class="text-lg sm:text-xl font-bold text-yellow-800 dark:text-yellow-200">Speaker Settings</h2>
                             <p class="text-sm text-yellow-700 dark:text-yellow-300">
                                 @if($currentAgenda?->status === 'voting' && $currentAgenda->reveal_step)
                                     Resolve action cards with the agenda below before voting opens.
@@ -601,6 +592,21 @@
                                class="h-6 w-6 shrink-0 text-blue-600 rounded">
                     </label>
 
+                    <!-- Map data: Milty or TI4 Lab draft URL, or a map string -->
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-white/70 dark:bg-gray-800/60 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
+                        <span>
+                            <span class="block font-medium text-gray-900 dark:text-white">Map data</span>
+                            <span class="block text-sm text-gray-600 dark:text-gray-400">
+                                @if($game->milty_draft_data)
+                                    Used for planet agendas, faction choices and Star Chart.
+                                @else
+                                    No map yet. Add a draft URL or map string to use planet agendas, factions and Star Chart.
+                                @endif
+                            </span>
+                        </span>
+                        <livewire:update-milty-url :game="$game" :player="$player" :key="'map-' . $game->id" />
+                    </div>
+
                 </div>
             @endif
         </div>
@@ -640,9 +646,7 @@
                         @php($isMe = $gamePlayer->id === $player->id)
                         <li wire:key="player-{{ $gamePlayer->id }}"
                             class="min-w-0 flex items-center gap-3 p-3 rounded-lg border {{ $isMe ? 'border-blue-200 bg-blue-50/60 dark:border-blue-900 dark:bg-blue-950/30' : 'border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-900/30' }}">
-                            <span class="shrink-0 w-10 h-10 rounded-full grid place-items-center text-sm font-bold {{ $avatarColors[crc32($gamePlayer->name) % count($avatarColors)] }}" aria-hidden="true">
-                                {{ $gamePlayer->initials }}
-                            </span>
+                            <x-player-avatar :player="$gamePlayer" />
 
                             <div class="min-w-0 flex-1">
                                 <div class="flex items-center gap-1.5 min-w-0">

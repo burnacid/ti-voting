@@ -7,15 +7,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## [Unreleased]
 
 ### Added
+- Invite players: every player can open a QR code of the game's join link from the game header, for others to scan with their phone camera. The dialog also shows the game code and can copy or share the join link. The QR code is made by the app itself, so the link is not sent to an outside service.
 - Agendas that affect players by how they voted, such as Mutiny, Unconventional Measures or Conventions of War (an effect with "each player who voted For" or "Against"): after voting ends, the Speaker sees which outcome won and can show who is affected, i.e. the winning outcome's effect and the players who voted the way it names. On a tie, also when no votes were cast, the Speaker first picks the winning outcome.
 
 ### Changed
 - Voting ends by itself once every player who may vote has voted, so the Speaker no longer has to press End Voting. End Voting is still there to end voting early.
-- The game screen is less cluttered: the Speaker Controls, the players and the Star Chart are tabs below the current agenda, which stays visible. Create New Agenda and its form stay above the tabs. The Speaker starts on the Speaker tab, other players on Players, and the chosen tab is remembered on that device for each game. Players who only have the players list see no tabs.
+- The game screen is less cluttered: Speaker Settings, the players and the Star Chart are tabs below the current agenda, which stays visible. Create New Agenda and its form stay above the tabs. The Speaker starts on the Speaker tab, other players on Players, and the chosen tab is remembered on that device for each game. Players who only have the players list see no tabs.
 - The tabs have icons, and the Speaker's tab is called Speaker Settings.
 - A cleaner player list: compact rows with an avatar, Speaker and You badges, and a Voted, Waiting or Cannot vote status for each player. The header shows how many players voted. Make Speaker and Remove from game are in a menu on each player, so they are not tapped by accident.
-- The Speaker's "When" and "After" action card steps (and The Argent Flight step) are shown next to the agenda card instead of in the Speaker Controls, with Discard Agenda right beside the Done button.
+- A tidier game header: tap the game code to copy it, the map draft is a button, and a card shows who you play as, with your faction and whether you are the Speaker.
+- Change Map moved from the header to Speaker Settings and is called Change Map Data. The Speaker's screen updates right after changing it.
+- The Speaker's "When" and "After" action card steps (and The Argent Flight step) are shown next to the agenda card instead of in Speaker Settings, with Discard Agenda right beside the Done button.
 - When Representative Government ties, the Speaker breaks the tie in the results; if For wins, the law is put in effect automatically.
+
+### Fixed
+- A faction another player already chose can no longer be picked when joining. The faction list updates while the join page is open, a faction taken in the meantime is cleared with a message, and taken factions are shown as unavailable with who took them. Two players joining at the same moment can no longer get the same faction.
+- The Change Map Data dialog dims the page behind it again instead of covering it in black.
 
 ## [1.7.0] - 2026-10-18
 

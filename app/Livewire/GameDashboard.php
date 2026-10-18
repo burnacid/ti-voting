@@ -163,6 +163,7 @@ class GameDashboard extends Component
     }
 
     #[On('triggerRefresh')]
+    #[On('miltyUrlUpdated')]
     public function listenForRefresh(){
         $this->refreshData();
     }

@@ -89,6 +89,20 @@ test('speaker can update the milty url', function () {
         ->milty_draft_id->toBe('abc123');
 });
 
+test('every player can invite others with a qr code of the join link', function () {
+    [$game, $speaker, $other] = makeGame();
+
+    $this->withSession(['player_token' => $other->session_token])
+        ->get(route('game.show', $game->code))
+        ->assertOk()
+        ->assertSee('Invite players')
+        ->assertSee('Copy join link')
+        ->assertSee('<svg xmlns="http://www.w3.org/2000/svg"', false)
+        ->assertDontSee('<?xml', false);
+
+    expect($game->joinUrl())->toEndWith('/join/' . $game->code);
+});
+
 test('game page only shows the milty button to the speaker', function () {
     [$game, $speaker, $other] = makeGame();
 
@@ -1117,6 +1131,33 @@ test('joining a milty game offers the drafted factions nobody chose yet', functi
     expect($game->players()->where('name', 'Bob')->first()->faction)->toBe('The Federation of Sol');
 });
 
+test('factions other players chose are shown as taken and cannot be picked', function () {
+    Event::fake([TriggerRefresh::class]);
+    [$game, $speaker] = makeGame(['milty_draft_data' => draftWithFactions()]);
+    $speaker->update(['faction' => 'The Argent Flight']);
+
+    Livewire::test(JoinGameForm::class, ['gameCode' => $game->code])
+        ->assertSeeHtml('<option disabled>The Argent Flight (taken by Speaker)</option>')
+        ->assertSee('The Federation of Sol (Bob)');
+});
+
+test('a faction taken while choosing is cleared from the join form', function () {
+    Event::fake([TriggerRefresh::class]);
+    [$game, $speaker] = makeGame(['milty_draft_data' => draftWithFactions()]);
+
+    $form = Livewire::test(JoinGameForm::class, ['gameCode' => $game->code])
+        ->set('playerName', 'Bob')
+        ->set('faction', 'The Federation of Sol');
+
+    // Someone else joins with that faction before this form is sent
+    $speaker->update(['faction' => 'The Federation of Sol']);
+
+    $form->call('checkFaction')
+        ->assertSet('faction', '')
+        ->assertHasErrors('faction')
+        ->assertSeeHtml('<option disabled>The Federation of Sol (taken by Speaker)</option>');
+});
+
 test('joining a game without milty has no faction', function () {
     Event::fake([TriggerRefresh::class]);
     [$game] = makeGame();
@@ -1250,7 +1291,7 @@ test('players, speaker controls and star chart are tabs below the agenda', funct
         ->assertSeeHtml('id="tab-speaker"')
         ->assertSeeHtml('id="tab-star-chart"')
         ->assertSeeHtml("tab: 'speaker'")
-        ->assertSeeInOrder(['Test Agenda', 'id="tab-speaker"', 'id="tab-players"', 'id="tab-star-chart"', 'Speaker Controls', 'Draw a system tile'], false);
+        ->assertSeeInOrder(['Test Agenda', 'id="tab-speaker"', 'id="tab-players"', 'id="tab-star-chart"', 'Speaker Settings', 'Draw a system tile'], false);
 
     Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $other])
         ->assertSeeHtml('id="tab-players"')
