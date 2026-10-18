@@ -3,13 +3,17 @@
 namespace App\Livewire;
 
 use App\Events\TriggerRefresh;
+use App\Livewire\Concerns\SharesGameLogContext;
 use App\Services\MiltyService;
 use Illuminate\Contracts\View\Factory;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Log;
 use Livewire\Component;
 
 class UpdateMiltyUrl extends Component
 {
+    use SharesGameLogContext;
+
     public $game;
     public $player;
     public $miltyUrl = '';
@@ -72,6 +76,8 @@ class UpdateMiltyUrl extends Component
             'milty_draft_data' => $draftData,
             'milty_draft_id' => $draftId,
         ]);
+
+        Log::info('Milty URL updated', ['draft' => $draftId]);
 
         $this->dispatch('flashMessage', [
             "Updated Milty URL successfully.",

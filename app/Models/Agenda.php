@@ -53,12 +53,14 @@ class Agenda extends Model
         'options',
         'status',
         'reveal_step',
+        'blocked_player_ids',
         'voting_started_at',
         'voting_ended_at',
     ];
 
     protected $casts = [
         'options' => 'array',
+        'blocked_player_ids' => 'array',
         'voting_started_at' => 'datetime',
         'voting_ended_at' => 'datetime',
     ];
@@ -92,7 +94,18 @@ class Agenda extends Model
 
     public function allPlayersVoted(): bool
     {
-        return $this->votes()->count() >= $this->game->players()->count();
+        return $this->votes()->count() >= $this->eligiblePlayerCount();
+    }
+
+    public function isPlayerBlocked(Player $player): bool
+    {
+        return in_array($player->id, $this->blocked_player_ids ?? [], true);
+    }
+
+    // Players who may vote on this agenda, i.e. everyone the Speaker did not block
+    public function eligiblePlayerCount(): int
+    {
+        return $this->game->players()->whereNotIn('id', $this->blocked_player_ids ?? [])->count();
     }
 
     public function isVotingOpen(): bool

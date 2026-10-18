@@ -5,6 +5,7 @@ namespace App\Livewire;
 use App\Events\TriggerRefresh;
 use App\Models\Game;
 use App\Models\Player;
+use Illuminate\Support\Facades\Log;
 use Livewire\Component;
 
 class JoinGameForm extends Component
@@ -56,6 +57,8 @@ class JoinGameForm extends Component
             'faction' => $this->faction,
             'is_speaker' => false,
         ]);
+
+        Log::info('Player joined', ['game' => $game->code, 'player' => $player->name, 'faction' => $player->faction ?: null]);
 
         TriggerRefresh::dispatch($game);
 

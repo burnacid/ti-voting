@@ -161,6 +161,6 @@
         </div>
     </div>
 
-    @include('partials.version')
+    @include('partials.footer')
 </body>
 </html>

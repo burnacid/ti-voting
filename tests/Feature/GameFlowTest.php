@@ -388,6 +388,92 @@ test('speaker can discard a vetoed agenda and reveal another', function () {
     expect(Agenda::find($agenda->id))->toBeNull();
 });
 
+test('speaker can block a player from voting during the when and after steps', function () {
+    [$game, $speaker, $other] = makeGame();
+    $agenda = makeAgenda($game);
+    $agenda->update(['reveal_step' => Agenda::STEP_AFTER_REVEALED]);
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->call('toggleVotingBlock', $other->id)
+        ->assertSee('Cannot vote');
+
+    expect($agenda->fresh()->isPlayerBlocked($other))->toBeTrue();
+
+    $agenda->update(['reveal_step' => null]);
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $other])
+        ->assertSee('You cannot vote on this agenda')
+        ->assertDontSee('Submit Vote')
+        ->set('selectedOption', 'For')
+        ->set('influenceSpent', 3)
+        ->call('submitVote');
+    expect(Vote::count())->toBe(0);
+
+    // Only the Speaker has to vote now, after which all eligible players voted
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->assertSee('0 / 1 players voted')
+        ->set('selectedOption', 'For')
+        ->set('influenceSpent', 3)
+        ->call('submitVote')
+        ->assertSee('Voting Results');
+    expect($agenda->fresh()->allPlayersVoted())->toBeTrue();
+});
+
+test('voting blocks can be lifted but not changed once voting is open', function () {
+    [$game, $speaker, $other] = makeGame();
+    $agenda = makeAgenda($game);
+    $agenda->update(['reveal_step' => Agenda::STEP_WHEN_REVEALED]);
+
+    $speakerView = Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->call('toggleVotingBlock', $other->id)
+        ->call('toggleVotingBlock', $other->id);
+    expect($agenda->fresh()->isPlayerBlocked($other))->toBeFalse();
+
+    $agenda->update(['reveal_step' => null]);
+    $speakerView->call('toggleVotingBlock', $other->id);
+    expect($agenda->fresh()->isPlayerBlocked($other))->toBeFalse();
+});
+
+test('only the speaker can block votes or remove players', function () {
+    [$game, $speaker, $other] = makeGame();
+    $agenda = makeAgenda($game);
+    $agenda->update(['reveal_step' => Agenda::STEP_WHEN_REVEALED]);
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $other])
+        ->assertDontSee('Block vote')
+        ->assertDontSee('Remove')
+        ->call('toggleVotingBlock', $speaker->id)
+        ->call('removePlayer', $speaker->id);
+
+    expect($agenda->fresh()->isPlayerBlocked($speaker))->toBeFalse()
+        ->and(Player::find($speaker->id))->not->toBeNull();
+});
+
+test('speaker can remove another player but not themselves', function () {
+    [$game, $speaker, $other] = makeGame();
+    $agenda = makeAgenda($game);
+    Vote::create(['agenda_id' => $agenda->id, 'player_id' => $other->id, 'option' => 'For', 'influence_spent' => 2]);
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->call('removePlayer', $speaker->id)
+        ->call('removePlayer', $other->id)
+        ->assertDontSee('Other');
+
+    expect(Player::find($other->id))->toBeNull()
+        ->and(Player::find($speaker->id))->not->toBeNull()
+        ->and(Vote::count())->toBe(0);
+});
+
+test('a removed player is sent back to the join page', function () {
+    [$game, , $other] = makeGame();
+
+    $otherView = Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $other]);
+    $other->delete();
+
+    $otherView->call('refreshData')->assertRedirect(route('join-group', $game->code));
+    $otherView->call('submitVote')->assertRedirect(route('join-group', $game->code));
+});
+
 test('pages show the app version', function () {
     $this->get('/')->assertSee('v'.config('app.version'));
 });

@@ -106,6 +106,13 @@ class CreateGame extends Component
         // Update game with speaker
         $game->update(['speaker_id' => $player->id]);
 
+        Log::info('Game created', [
+            'game' => $game->code,
+            'player' => $player->name,
+            'name' => $game->name,
+            'milty' => $game->milty_draft_id !== null,
+        ]);
+
         // Store session token in session
         session(['player_token' => $player->session_token]);
 

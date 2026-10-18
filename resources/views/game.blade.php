@@ -62,7 +62,7 @@
         </div>
     </div>
 
-    @include('partials.version')
+    @include('partials.footer')
 
     <!-- Flash Messages -->
     <livewire:flash-messages />

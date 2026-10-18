@@ -34,7 +34,7 @@ class TriggerRefresh implements ShouldBroadcastNow
      */
     public function broadcastOn(): array
     {
-        Log::info('Sending trigger: games.'.$this->game->id);
+        Log::debug('Broadcasting refresh', ['game' => $this->game->code]);
         return [
             new Channel('games.'.$this->game->id),
         ];
