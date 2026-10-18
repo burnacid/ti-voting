@@ -865,3 +865,48 @@ test('every player sees when representative government is in effect', function (
             ->assertSee('Players cannot exhaust planets to vote');
     }
 });
+
+test('the site is an installable web app', function () {
+    $manifest = json_decode(file_get_contents(public_path('manifest.json')), true, flags: JSON_THROW_ON_ERROR);
+
+    expect($manifest)
+        ->name->toBe('TI4 Hidden Agenda')
+        ->display->toBe('standalone')
+        ->start_url->toBe('/');
+
+    foreach ($manifest['icons'] as $icon) {
+        expect(file_exists(public_path(ltrim($icon['src'], '/'))))->toBeTrue("Missing icon {$icon['src']}");
+    }
+    expect(collect($manifest['icons'])->pluck('purpose'))->toContain('maskable');
+
+    expect(file_exists(public_path('sw.js')))->toBeTrue()
+        ->and(file_exists(public_path('offline.html')))->toBeTrue();
+
+    $this->get('/')
+        ->assertOk()
+        ->assertSee('<link rel="manifest" href="/manifest.json">', false)
+        ->assertSee('apple-mobile-web-app-capable', false)
+        ->assertSee('Add it to your home screen');
+});
+
+test('the homepage offers to continue the game this browser plays', function () {
+    [$game, , $other] = makeGame();
+
+    $this->get('/')->assertDontSee('Continue your game');
+
+    $this->withSession(['player_token' => $other->session_token])
+        ->get('/')
+        ->assertSee('Continue your game')
+        ->assertSee('Playing as Other')
+        ->assertSee(route('game.show', $game->code));
+});
+
+test('the game page offers to install the web app', function () {
+    [$game, , $other] = makeGame();
+
+    $this->withSession(['player_token' => $other->session_token])
+        ->get(route('game.show', $game->code))
+        ->assertOk()
+        ->assertSee('Add it to your home screen')
+        ->assertSee('Install app');
+});

@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="logo-title">
+    <title id="logo-title">TI4 Hidden Agenda</title>
+    <defs>
+        <!-- Same colours as the digital agenda card -->
+        <linearGradient id="space" x1="0.2" y1="0" x2="0.8" y2="1">
+            <stop offset="0" stop-color="#1b3a5c"/>
+            <stop offset="0.5" stop-color="#0b1828"/>
+            <stop offset="1" stop-color="#050b15"/>
+        </linearGradient>
+        <linearGradient id="card" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#f3f9ff"/>
+            <stop offset="1" stop-color="#9cc8f0"/>
+        </linearGradient>
+        <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#fbbf24"/>
+            <stop offset="1" stop-color="#e38b2c"/>
+        </linearGradient>
+        <!-- Hides the part of the card that is already in the ballot slot -->
+        <clipPath id="above-slot">
+            <rect x="0" y="0" width="512" height="318"/>
+        </clipPath>
+    </defs>
+
+    <!-- System tile -->
+    <polygon points="256,16 463.8,136 463.8,376 256,496 48.2,376 48.2,136" fill="url(#space)"/>
+    <polygon points="256,40 443,148 443,364 256,472 69,364 69,148" fill="none" stroke="url(#gold)" stroke-width="6" stroke-linejoin="round"/>
+
+    <!-- Stars -->
+    <g fill="#ffffff">
+        <circle cx="128" cy="190" r="3" opacity="0.8"/>
+        <circle cx="390" cy="176" r="2.5" opacity="0.7"/>
+        <circle cx="152" cy="392" r="2" opacity="0.6"/>
+        <circle cx="372" cy="400" r="3" opacity="0.8"/>
+        <circle cx="404" cy="290" r="2" opacity="0.5"/>
+        <circle cx="104" cy="300" r="2.5" opacity="0.6"/>
+        <circle cx="300" cy="90" r="2" opacity="0.6"/>
+    </g>
+
+    <!-- Agenda card going into the ballot slot -->
+    <g clip-path="url(#above-slot)">
+        <g transform="rotate(-8 256 230)">
+            <rect x="182" y="112" width="148" height="236" rx="16" fill="#050b15"/>
+            <rect x="190" y="120" width="132" height="220" rx="11" fill="url(#card)"/>
+            <!-- Ribbon, like the LAW ribbon on the card -->
+            <rect x="174" y="148" width="164" height="30" fill="#2a1405"/>
+            <rect x="174" y="148" width="164" height="4" fill="url(#gold)"/>
+            <rect x="174" y="174" width="164" height="4" fill="url(#gold)"/>
+            <!-- Check mark: a vote cast -->
+            <path d="M222 238 L248 264 L292 212" fill="none" stroke="#1b3a5c" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+        </g>
+    </g>
+
+    <!-- Ballot slot -->
+    <rect x="132" y="306" width="248" height="26" rx="13" fill="#02060c" stroke="url(#gold)" stroke-width="5"/>
+</svg>

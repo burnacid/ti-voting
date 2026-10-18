@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="public/logo.svg" width="140" alt="TI4 Hidden Agenda logo: an agenda card dropped into a ballot slot on a hex tile">
+</p>
+
 # TI Voting
 A secret voting system for **Twilight Imperium 4th Edition (TI4)** agenda phase sessions. Players vote anonymously while the speaker can see the final results. Influence tracking is built in, and it integrates with [Milty](https://milty.shenanigans.be/) to automatically load faction and planet data from your draft.
 ## Features
