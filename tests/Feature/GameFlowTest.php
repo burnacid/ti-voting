@@ -9,6 +9,8 @@ use App\Models\Agenda;
 use App\Models\Game;
 use App\Models\Player;
 use App\Models\Vote;
+use App\Support\PlayerGames;
+use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
@@ -42,6 +44,12 @@ function makeGame(array $attributes = []): array
     $game->update(['speaker_id' => $speaker->id]);
 
     return [$game, $speaker, $other];
+}
+
+// The games this browser was told to remember in the response, code => session token
+function rememberedGames(): array
+{
+    return json_decode(Cookie::queued(PlayerGames::COOKIE)?->getValue() ?? '[]', true);
 }
 
 function makeAgenda(Game $game): Agenda
@@ -553,7 +561,7 @@ test('a player who lost access rejoins once another player confirms it', functio
 
     // Nothing happens until someone confirms
     $request->call('checkRejoin')->assertSet('rejoinStatus', 'waiting');
-    expect(session('player_token'))->toBeNull();
+    expect(rememberedGames())->toBe([]);
 
     // The requested player cannot confirm themselves, another player can
     Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker->fresh()])
@@ -568,7 +576,7 @@ test('a player who lost access rejoins once another player confirms it', functio
         ->call('approveRejoin', $speaker->id);
 
     $request->call('checkRejoin')->assertRedirect(route('game.show', $game->code));
-    expect(session('player_token'))->toBe($speaker->session_token)
+    expect(rememberedGames())->toBe([$game->code => $speaker->session_token])
         ->and($speaker->fresh()->rejoin_request_token)->toBeNull();
 });
 
@@ -586,7 +594,7 @@ test('a declined rejoin request does not let the browser in', function () {
     $request->call('checkRejoin')
         ->assertSet('rejoinStatus', 'declined')
         ->assertSee('Your request to rejoin was declined');
-    expect(session('player_token'))->toBeNull();
+    expect(rememberedGames())->toBe([]);
 });
 
 test('a rejoin request expires when nobody confirms it', function () {
@@ -909,4 +917,63 @@ test('the game page offers to install the web app', function () {
         ->assertOk()
         ->assertSee('Add it to your home screen')
         ->assertSee('Install app');
+});
+
+test('a browser can play in several games and continue each of them', function () {
+    [$first, , $firstPlayer] = makeGame(['name' => 'Friday Game']);
+    [$second, $secondPlayer] = makeGame(['name' => 'Sunday Game']);
+    $cookie = json_encode([$second->code => $secondPlayer->session_token, $first->code => $firstPlayer->session_token]);
+
+    $this->withCookie(PlayerGames::COOKIE, $cookie)
+        ->get('/')
+        ->assertSeeInOrder(['Continue one of your games', 'Sunday Game', 'Playing as Speaker (Speaker)', 'Friday Game', 'Playing as Other']);
+
+    // Both game pages open without a session, e.g. after it expired between agenda phases
+    $this->withCookie(PlayerGames::COOKIE, $cookie)->get(route('game.show', $first->code))->assertOk()->assertSee('Friday Game');
+    $this->withCookie(PlayerGames::COOKIE, $cookie)->get(route('game.show', $second->code))->assertOk()->assertSee('Sunday Game');
+});
+
+test('joining a game adds it to the games this browser remembers', function () {
+    Event::fake([TriggerRefresh::class]);
+    [$first, , $firstPlayer] = makeGame();
+    [$second] = makeGame();
+
+    Livewire::withCookie(PlayerGames::COOKIE, json_encode([$first->code => $firstPlayer->session_token]))
+        ->test(JoinGameForm::class, ['gameCode' => $second->code])
+        ->set('playerName', 'Newcomer')
+        ->call('joinGame')
+        ->assertRedirect(route('game.show', $second->code));
+
+    $newcomer = $second->players()->where('name', 'Newcomer')->first();
+    expect(rememberedGames())->toBe([$second->code => $newcomer->session_token, $first->code => $firstPlayer->session_token]);
+});
+
+test('a player from before the games cookie keeps their game', function () {
+    [$game, , $other] = makeGame();
+
+    $this->withSession(['player_token' => $other->session_token])
+        ->get(route('game.show', $game->code))
+        ->assertOk();
+
+    expect(rememberedGames())->toBe([$game->code => $other->session_token]);
+});
+
+test('deleted games and removed players drop off the list', function () {
+    [$kept, , $keptPlayer] = makeGame(['name' => 'Kept Game']);
+    [$deleted, $deletedPlayer] = makeGame(['name' => 'Deleted Game']);
+    [$removedFrom, , $removedPlayer] = makeGame(['name' => 'Removed From Game']);
+    $cookie = json_encode([
+        $kept->code => $keptPlayer->session_token,
+        $deleted->code => $deletedPlayer->session_token,
+        $removedFrom->code => $removedPlayer->session_token,
+    ]);
+    $deleted->delete();
+    $removedPlayer->delete();
+
+    $this->withCookie(PlayerGames::COOKIE, $cookie)
+        ->get('/')
+        ->assertSee('Continue your game')
+        ->assertSee('Kept Game')
+        ->assertDontSee('Deleted Game')
+        ->assertDontSee('Removed From Game');
 });

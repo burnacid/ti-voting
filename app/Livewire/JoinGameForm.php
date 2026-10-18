@@ -5,6 +5,7 @@ namespace App\Livewire;
 use App\Events\TriggerRefresh;
 use App\Models\Game;
 use App\Models\Player;
+use App\Support\PlayerGames;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
@@ -86,8 +87,8 @@ class JoinGameForm extends Component
 
         TriggerRefresh::dispatch($game);
 
-        // Store session token in session
-        session(['player_token' => $player->session_token]);
+        // Remember the game in this browser
+        PlayerGames::remember($player);
 
         return redirect()->route('game.show', $game->code);
     }
@@ -142,7 +143,7 @@ class JoinGameForm extends Component
         if ($player->rejoin_approved_at) {
             $player->clearRejoinRequest();
             session()->forget('rejoin_request');
-            session(['player_token' => $player->session_token]);
+            PlayerGames::remember($player);
             Log::info('Player rejoined', ['game' => $player->game->code, 'player' => $player->name]);
 
             return redirect()->route('game.show', $player->game->code);

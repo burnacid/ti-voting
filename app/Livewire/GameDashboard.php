@@ -5,6 +5,7 @@ namespace App\Livewire;
 use App\Events\TriggerRefresh;
 use App\Livewire\Concerns\SharesGameLogContext;
 use App\Services\PlanetService;
+use App\Support\PlayerGames;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -84,6 +85,7 @@ class GameDashboard extends Component
 
     private function leaveRemovedGame()
     {
+        PlayerGames::forget($this->game->code);
         session()->flash('error', 'You were removed from this game.');
         $this->redirectRoute('join-group', $this->game->code);
     }

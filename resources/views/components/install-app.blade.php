@@ -20,7 +20,7 @@
      x-cloak
      {{ $attributes->merge(['class' => 'relative flex flex-col sm:flex-row sm:items-center gap-3 text-left bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-md p-4 pr-10']) }}>
     <div class="flex flex-1 items-center gap-3 min-w-0">
-        <img src="/icons/icon-192.png" alt="" class="w-12 h-12 shrink-0">
+        <img src="/app-icons/icon-192.png" alt="" class="w-12 h-12 shrink-0">
         <div class="min-w-0">
             <p class="font-semibold text-gray-900 dark:text-white">Add it to your home screen</p>
             <p x-show="prompt" class="text-sm text-gray-600 dark:text-gray-300">Open it like an app, full screen and one tap away during the game.</p>

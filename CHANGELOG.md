@@ -4,6 +4,15 @@ All notable changes to TI Voting are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- A phone can play in several games: the homepage lists every game it is in, most recent first, with whether an agenda is open.
+
+### Fixed
+- Players no longer lose access to their game after 2 hours without activity, for example between agenda phases. The games a browser plays in are kept in their own cookie for 30 days, renewed on every visit, instead of in the session.
+- The app icons did not load on Apache servers, which reserve the `/icons/` path for their own icons. They are now served from `/app-icons/`.
+
 ## [1.5.0] - 2026-10-18
 
 ### Added
@@ -111,6 +120,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Milty draft integration to load factions and planets.
 - Planet agendas (any, industrial, cultural, hazardous, non-home), with extra tiles that can be added by tile number.
 
+[Unreleased]: https://github.com/burnacid/ti-voting/compare/v1.5.0...HEAD
 [1.5.0]: https://github.com/burnacid/ti-voting/compare/v1.4.2...v1.5.0
 [1.4.2]: https://github.com/burnacid/ti-voting/compare/v1.4.1...v1.4.2
 [1.4.1]: https://github.com/burnacid/ti-voting/compare/v1.4.0...v1.4.1

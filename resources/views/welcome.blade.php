@@ -20,19 +20,41 @@
                 </p>
             </div>
 
-            <!-- Back to the game this browser is playing, the installed app always opens on this page -->
-            @if($currentPlayer)
-                <a href="{{ route('game.show', $currentPlayer->game->code) }}"
-                   class="flex items-center justify-between gap-4 text-left bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-md p-4 sm:p-5 mb-8 transition-colors">
-                    <span class="min-w-0">
-                        <span class="block text-sm text-blue-100">Continue your game</span>
-                        <span class="block text-lg font-semibold truncate">{{ $currentPlayer->game->name }}</span>
-                        <span class="block text-sm text-blue-100">Playing as {{ $currentPlayer->name }} · <span class="font-mono">{{ $currentPlayer->game->code }}</span></span>
-                    </span>
-                    <svg class="w-6 h-6 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-                    </svg>
-                </a>
+            <!-- Games this browser plays in, the installed app always opens on this page -->
+            @if($myPlayers->isNotEmpty())
+                <section class="text-left mb-8">
+                    <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2">
+                        {{ $myPlayers->count() === 1 ? 'Continue your game' : 'Continue one of your games' }}
+                    </h2>
+                    <div class="space-y-2">
+                        @foreach($myPlayers as $myPlayer)
+                            @php($openAgenda = $myPlayer->game->currentAgenda())
+                            <a href="{{ route('game.show', $myPlayer->game->code) }}"
+                               @class([
+                                   'flex items-center justify-between gap-4 rounded-xl shadow-md p-4 transition-colors',
+                                   'bg-blue-600 hover:bg-blue-700 text-white' => $loop->first,
+                                   'bg-white hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-900 dark:text-white border border-gray-200 dark:border-gray-700' => !$loop->first,
+                               ])>
+                                <span class="min-w-0">
+                                    <span class="flex flex-wrap items-center gap-2">
+                                        <span class="text-lg font-semibold truncate">{{ $myPlayer->game->name }}</span>
+                                        @if($openAgenda)
+                                            <span @class(['px-2 py-0.5 rounded-full text-xs font-medium', 'bg-white/20' => $loop->first, 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' => !$loop->first])>
+                                                {{ $openAgenda->isVotingOpen() ? 'Voting open' : 'Agenda revealed' }}
+                                            </span>
+                                        @endif
+                                    </span>
+                                    <span @class(['block text-sm', 'text-blue-100' => $loop->first, 'text-gray-600 dark:text-gray-400' => !$loop->first])>
+                                        Playing as {{ $myPlayer->name }}{{ $myPlayer->is_speaker ? ' (Speaker)' : '' }} · <span class="font-mono">{{ $myPlayer->game->code }}</span>
+                                    </span>
+                                </span>
+                                <svg class="w-6 h-6 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                                </svg>
+                            </a>
+                        @endforeach
+                    </div>
+                </section>
             @endif
 
             <!-- Install as a web app: the browser's prompt on Android, instructions on iPhone -->

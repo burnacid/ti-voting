@@ -5,6 +5,7 @@ namespace App\Livewire;
 use App\Models\Game;
 use App\Models\Player;
 use App\Services\MiltyService;
+use App\Support\PlayerGames;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Livewire\Component;
@@ -121,8 +122,8 @@ class CreateGame extends Component
             'milty' => $game->milty_draft_id !== null,
         ]);
 
-        // Store session token in session
-        session(['player_token' => $player->session_token]);
+        // Remember the game in this browser
+        PlayerGames::remember($player);
 
         return redirect()->route('game.show', $game->code);
     }
