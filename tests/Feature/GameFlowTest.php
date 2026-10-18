@@ -900,3 +900,13 @@ test('the homepage offers to continue the game this browser plays', function () 
         ->assertSee('Playing as Other')
         ->assertSee(route('game.show', $game->code));
 });
+
+test('the game page offers to install the web app', function () {
+    [$game, , $other] = makeGame();
+
+    $this->withSession(['player_token' => $other->session_token])
+        ->get(route('game.show', $game->code))
+        ->assertOk()
+        ->assertSee('Add it to your home screen')
+        ->assertSee('Install app');
+});

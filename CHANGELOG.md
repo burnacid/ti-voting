@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 - A logo: an agenda card going into a ballot slot on a hex tile. It is shown on the homepage and in the README.
-- The site can be installed as a web app: "Add to Home Screen" on iPhone or "Install app" on Android opens it full screen with its own icon. The homepage shows how to install it.
+- The site can be installed as a web app: "Add to Home Screen" on iPhone or "Install app" on Android opens it full screen with its own icon. The homepage and the game screen show how to install it; the hint can be dismissed.
 - The homepage offers "Continue your game" when this phone is already playing a game, so the installed app takes you straight back.
 - A friendly offline page when a page cannot load without a connection.
 

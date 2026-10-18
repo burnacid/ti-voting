@@ -58,6 +58,8 @@
                 </div>
             </div>
 
+            <x-install-app class="mb-6" />
+
             <!-- Game Content -->
             <livewire:game-dashboard :game="$game" :player="$player" />
         </div>
