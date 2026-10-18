@@ -52,6 +52,7 @@ class GameDashboard extends Component
     public $customTileNumbers = '';
     public $showCreateAgenda = false;
     public $speakerViewResults = false;
+    public $showAffectedPlayers = false; // Speaker shows who an outcome like 'Each player who voted "For"' applies to
     public $selectedPresetAgenda = ''; // New property for preset agenda selection
     public $availableAgendas = []; // New property to store available agendas
 
@@ -264,7 +265,7 @@ class GameDashboard extends Component
 
         Log::info('Agenda revealed', ['agenda' => $agenda->title, 'options' => count($options)]);
 
-        $this->reset(['newAgendaTitle', 'newAgendaDescription', 'newAgendaCardType', 'newAgendaElect', 'agendaType', 'customOptions', 'showCreateAgenda']);
+        $this->reset(['newAgendaTitle', 'newAgendaDescription', 'newAgendaCardType', 'newAgendaElect', 'agendaType', 'customOptions', 'showCreateAgenda', 'showAffectedPlayers']);
         $this->dispatch('flashMessage', [
             'New agenda revealed. Ask the players for "When an agenda is revealed" action cards.',
             'success'
@@ -618,7 +619,7 @@ class GameDashboard extends Component
     }
 
     /**
-     * Put Representative Government in effect when it was voted "For". On a tie the Speaker decides and can enable it by hand.
+     * Put Representative Government in effect when it was voted "For". On a tie it waits for the Speaker to break it.
      */
     private function applyRepresentativeGovernment(Agenda $agenda): void
     {
@@ -626,23 +627,51 @@ class GameDashboard extends Component
             return;
         }
 
-        $results = $agenda->getVoteResults();
-        $for = $results['For']['influence'] ?? 0;
-        $against = $results['Against']['influence'] ?? 0;
+        $outcome = $agenda->outcome();
 
-        if ($for > $against) {
+        if ($outcome === 'For') {
             $this->game->update(['representative_government' => true]);
-            Log::info('Representative Government put in effect', ['for' => $for, 'against' => $against]);
+            Log::info('Representative Government put in effect', ['tiebreak' => $agenda->tiebreak_option !== null]);
             $this->dispatch('flashMessage', [
                 'Representative Government passed: from now on each player casts 1 vote on each agenda.',
                 'success'
             ]);
-        } elseif ($for > 0 && $for === $against) {
+        } elseif ($outcome === null) {
             $this->dispatch('flashMessage', [
-                'Representative Government is tied. As Speaker you decide; if For wins, turn it on in the Speaker controls.',
+                'Representative Government is tied. As Speaker you decide: break the tie in the results.',
                 'info'
             ]);
         }
+    }
+
+    // On a tie the Speaker decides the outcome of the agenda that just ended
+    public function breakTie($option)
+    {
+        if (!$this->player->is_speaker || $this->game->currentAgenda()) {
+            return;
+        }
+
+        $agenda = $this->game->lastCompletedAgenda();
+        if (!$agenda || !$agenda->isTied() || !in_array($option, $agenda->leadingOptions(), true)) {
+            return;
+        }
+
+        $agenda->update(['tiebreak_option' => $option]);
+        Log::info('Tie broken by the Speaker', ['agenda' => $agenda->title, 'outcome' => $option]);
+
+        $this->dispatch('flashMessage', ["You broke the tie: {$option} wins.", 'success']);
+        $this->applyRepresentativeGovernment($agenda);
+        TriggerRefresh::dispatch($this->game);
+        $this->refreshData();
+    }
+
+    public function toggleAffectedPlayers()
+    {
+        if (!$this->player->is_speaker) {
+            return;
+        }
+
+        $this->showAffectedPlayers = !$this->showAffectedPlayers;
     }
 
     public function toggleRepresentativeGovernment()

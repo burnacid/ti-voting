@@ -57,6 +57,7 @@ class Agenda extends Model
         'status',
         'reveal_step',
         'blocked_player_ids',
+        'tiebreak_option',
         'voting_started_at',
         'voting_ended_at',
     ];
@@ -93,6 +94,74 @@ class Agenda extends Model
         }
 
         return $results;
+    }
+
+    /**
+     * The options with the most votes, Abstain left out. More than one means a tie the Speaker breaks,
+     * which includes no votes being cast at all.
+     */
+    public function leadingOptions(): array
+    {
+        $results = collect($this->getVoteResults())->except('Abstain');
+        $most = $results->max('influence');
+
+        return $results->filter(fn ($result) => $result['influence'] === $most)->keys()->all();
+    }
+
+    public function isTied(): bool
+    {
+        return count($this->leadingOptions()) > 1;
+    }
+
+    /**
+     * The winning option, or null while a tie is not broken by the Speaker yet.
+     */
+    public function outcome(): ?string
+    {
+        $leading = $this->leadingOptions();
+
+        if (count($leading) === 1) {
+            return $leading[0];
+        }
+
+        return in_array($this->tiebreak_option, $leading, true) ? $this->tiebreak_option : null;
+    }
+
+    // Agendas whose outcome depends on how players voted, e.g. 'Each player who voted "For" gains 1 victory point'
+    public function affectsVoters(): bool
+    {
+        return preg_match('/\bvoted\s+["“]?(for|against)\b/i', $this->description ?? '') === 1;
+    }
+
+    /**
+     * The effect text of an outcome, i.e. the "FOR :" or "AGAINST :" paragraph of the card.
+     */
+    public function outcomeEffect(string $option): ?string
+    {
+        foreach (preg_split('/\R+/', trim($this->description ?? '')) as $paragraph) {
+            if (preg_match('/^' . preg_quote($option, '/') . '\s*:\s*(.+)$/i', trim($paragraph), $matches)) {
+                return $matches[1];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * The players an outcome applies to, grouped by the vote it names, e.g. ['For' => [players who voted For]].
+     * Empty when the outcome does not depend on how players voted.
+     */
+    public function playersAffectedBy(string $option): array
+    {
+        preg_match_all('/\bvoted\s+["“]?(for|against)\b/i', $this->outcomeEffect($option) ?? '', $matches);
+
+        return collect($matches[1])
+            ->map(fn ($vote) => ucfirst(strtolower($vote)))
+            ->unique()
+            ->mapWithKeys(fn ($vote) => [
+                $vote => $this->votes()->with('player')->where('option', $vote)->get()->pluck('player.name')->filter()->sort()->values()->all(),
+            ])
+            ->all();
     }
 
     public function allPlayersVoted(): bool

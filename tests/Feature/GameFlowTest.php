@@ -829,6 +829,87 @@ test('representative government voted against or tied is not put in effect', fun
     expect($game->fresh()->representative_government)->toBeFalse();
 })->with([[2, 6], [4, 4]]);
 
+function makeMutiny(Game $game): Agenda
+{
+    $agenda = makeAgenda($game);
+    $agenda->update([
+        'title' => 'Mutiny',
+        'description' => "FOR : Each player who voted \"For\" gains 1 victory point.\nAGAINST : Each player who voted \"For\" loses 1 victory point.",
+    ]);
+
+    return $agenda;
+}
+
+test('after an agenda that affects voters the speaker can show who is affected', function () {
+    [$game, $speaker, $other] = makeGame();
+    $agenda = makeMutiny($game);
+    Vote::create(['agenda_id' => $agenda->id, 'player_id' => $speaker->id, 'option' => 'For', 'influence_spent' => 2]);
+    Vote::create(['agenda_id' => $agenda->id, 'player_id' => $other->id, 'option' => 'Against', 'influence_spent' => 5]);
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->call('endVoting')
+        ->assertSee('Against wins')
+        ->assertDontSee('Players who voted')
+        ->call('toggleAffectedPlayers')
+        ->assertSee('Each player who voted &quot;For&quot; loses 1 victory point.', false)
+        ->assertSeeInOrder(['Players who voted', 'For', 'Speaker']);
+
+    expect($agenda->fresh()->playersAffectedBy('Against'))->toBe(['For' => ['Speaker']])
+        ->and($agenda->fresh()->playersAffectedBy('For'))->toBe(['For' => ['Speaker']]);
+});
+
+test('agendas that do not depend on how players voted have no affected players', function () {
+    [$game, $speaker] = makeGame();
+    $agenda = makeAgenda($game);
+    $agenda->update(['description' => "FOR : Players cannot use BOMBARDMENT against units that are on cultural planets.\nAGAINST : Each player that voted \"Against\" discards all of their action cards."]);
+
+    expect(makeAgenda($game)->affectsVoters())->toBeFalse()
+        ->and($agenda->fresh()->affectsVoters())->toBeTrue()
+        ->and($agenda->fresh()->playersAffectedBy('For'))->toBe([])
+        ->and($agenda->fresh()->playersAffectedBy('Against'))->toBe(['Against' => []]);
+});
+
+test('on a tie the speaker breaks it before seeing who is affected', function () {
+    [$game, $speaker, $other] = makeGame();
+    $agenda = makeMutiny($game);
+    Vote::create(['agenda_id' => $agenda->id, 'player_id' => $speaker->id, 'option' => 'For', 'influence_spent' => 4]);
+    Vote::create(['agenda_id' => $agenda->id, 'player_id' => $other->id, 'option' => 'Against', 'influence_spent' => 4]);
+
+    $view = Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->call('endVoting')
+        ->assertSee('The vote is tied')
+        ->assertDontSee('Show who is affected');
+
+    // Only the tied options can win, and only the Speaker decides
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $other])->call('breakTie', 'For');
+    $view->call('breakTie', 'Abstain');
+    expect($agenda->fresh()->tiebreak_option)->toBeNull();
+
+    $view->call('breakTie', 'For')
+        ->assertSee('For wins (tie broken by the Speaker)')
+        ->call('toggleAffectedPlayers')
+        ->assertSee('gains 1 victory point');
+
+    expect($agenda->fresh()->outcome())->toBe('For');
+});
+
+test('representative government is put in effect when the speaker breaks a tie for it', function () {
+    [$game, $speaker, $other] = makeGame();
+    $agenda = makeAgenda($game);
+    $agenda->update([
+        'title' => 'Representative Government',
+        'description' => "FOR : Each player may cast 1 vote on each agenda instead.\nAGAINST : Each player that voted \"Against\" exhausts all of their cultural planets.",
+    ]);
+    Vote::create(['agenda_id' => $agenda->id, 'player_id' => $speaker->id, 'option' => 'For', 'influence_spent' => 3]);
+    Vote::create(['agenda_id' => $agenda->id, 'player_id' => $other->id, 'option' => 'Against', 'influence_spent' => 3]);
+
+    $view = Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])->call('endVoting');
+    expect($game->fresh()->representative_government)->toBeFalse();
+
+    $view->call('breakTie', 'For');
+    expect($game->fresh()->representative_government)->toBeTrue();
+});
+
 test('only the speaker can turn representative government on or off', function () {
     [$game, $speaker, $other] = makeGame();
 

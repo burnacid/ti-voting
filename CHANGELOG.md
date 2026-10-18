@@ -4,6 +4,15 @@ All notable changes to TI Voting are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Agendas that affect players by how they voted, such as Mutiny, Unconventional Measures or Conventions of War (an effect with "each player who voted For" or "Against"): after voting ends, the Speaker sees which outcome won and can show who is affected, i.e. the winning outcome's effect and the players who voted the way it names. On a tie, also when no votes were cast, the Speaker first picks the winning outcome.
+
+### Changed
+- The Speaker's "When" and "After" action card steps (and The Argent Flight step) are shown next to the agenda card instead of in the Speaker Controls, with Discard Agenda right beside the Done button.
+- When Representative Government ties, the Speaker breaks the tie in the results; if For wins, the law is put in effect automatically.
+
 ## [1.7.0] - 2026-10-18
 
 ### Added

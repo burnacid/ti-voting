@@ -73,7 +73,7 @@
                     <h2 class="text-lg sm:text-xl font-bold text-yellow-800 dark:text-yellow-200">Speaker Controls</h2>
                     <p class="text-sm text-yellow-700 dark:text-yellow-300">
                         @if($currentAgenda?->status === 'voting' && $currentAgenda->reveal_step)
-                            Resolve action cards before voting opens.
+                            Resolve action cards with the agenda below before voting opens.
                         @elseif($currentAgenda?->status === 'voting')
                             Voting is open.
                         @else
@@ -89,13 +89,7 @@
                             Create New Agenda
                         </button>
                     @endunless
-                @elseif($currentAgenda->reveal_step)
-                    <button wire:click="discardAgenda"
-                            wire:confirm="Discard this agenda, for example because it was vetoed? You can then reveal the next agenda."
-                            class="w-full sm:w-auto bg-gray-600 hover:bg-gray-700 active:bg-gray-800 text-white font-semibold py-3 sm:py-2 px-4 rounded-lg transition-colors">
-                        Discard Agenda
-                    </button>
-                @else
+                @elseif(!$currentAgenda->reveal_step)
                     <button wire:click="endVoting"
                             wire:confirm="Are you sure you want to end voting? The results will only be visible to you."
                             class="w-full sm:w-auto bg-red-600 hover:bg-red-700 active:bg-red-800 text-white font-semibold py-3 sm:py-2 px-4 rounded-lg transition-colors">
@@ -133,52 +127,6 @@
                        @checked($game->representative_government)
                        class="h-6 w-6 shrink-0 text-blue-600 rounded">
             </label>
-
-            <!-- Action card checks before voting opens -->
-            @if($currentAgenda?->status === 'voting' && $currentAgenda->reveal_step)
-                @php($steps = $currentAgenda->revealSteps())
-                @php($stepIndex = (int) array_search($currentAgenda->reveal_step, $steps))
-                @php($nextStep = $currentAgenda->nextRevealStep())
-                @php($isArgentStep = $currentAgenda->reveal_step === \App\Models\Agenda::STEP_ARGENT_VOTES)
-                <div class="bg-white dark:bg-gray-800 rounded-lg p-4 sm:p-6 border border-gray-200 dark:border-gray-700">
-                    <div class="flex items-center gap-3 mb-3">
-                        <div class="flex flex-1 gap-1.5" aria-hidden="true">
-                            @foreach($steps as $index => $step)
-                                <span class="h-1.5 flex-1 rounded-full {{ $index <= $stepIndex ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-700' }}"></span>
-                            @endforeach
-                        </div>
-                        <p class="text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">
-                            Step {{ $stepIndex + 1 }} of {{ count($steps) }}
-                        </p>
-                    </div>
-                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                        @if($isArgentStep)
-                            The Argent Flight votes first
-                        @else
-                            &ldquo;{{ $currentAgenda->reveal_step_label }}&rdquo; cards
-                        @endif
-                    </h3>
-                    <p class="text-sm text-gray-700 dark:text-gray-300 mb-4">
-                        @if($currentAgenda->reveal_step === \App\Models\Agenda::STEP_WHEN_REVEALED)
-                            Ask the players if anyone wants to play a card with &ldquo;When an agenda is revealed&rdquo;, such as Veto. Resolve those cards before continuing. If the agenda is discarded, use Discard Agenda and reveal the next one.
-                        @elseif($isArgentStep)
-                            {{ $game->argentFlightPlayerName() ?? 'The Argent Flight player' }} votes before everyone else and announces their votes publicly. Ask them to say which outcome they vote for and how many votes they cast. They still enter their vote in the app once voting opens.
-                        @else
-                            Ask the players if anyone wants to play a card with &ldquo;After an agenda is revealed&rdquo;, such as a Rider or Assassinate Representative. Resolve those cards before continuing.
-                        @endif
-                    </p>
-                    <button wire:click="completeRevealStep"
-                            class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold py-3 sm:py-2 px-4 rounded-lg transition-colors">
-                        @if($nextStep === \App\Models\Agenda::STEP_AFTER_REVEALED)
-                            {{ 'Done, continue to "After" cards' }}
-                        @elseif($nextStep === \App\Models\Agenda::STEP_ARGENT_VOTES)
-                            Done, continue to The Argent Flight
-                        @else
-                            Done, start voting
-                        @endif
-                    </button>
-                </div>
-            @endif
 
             <!-- Create Agenda Form -->
             @if($showCreateAgenda && $currentAgenda?->status !== 'voting')
@@ -429,7 +377,58 @@
 
             <div class="flex-1 min-w-0">
 
-            @if($currentAgenda->reveal_step)
+            @if($currentAgenda->reveal_step && $player->is_speaker)
+                <!-- Action card checks before voting opens -->
+                @php($steps = $currentAgenda->revealSteps())
+                @php($stepIndex = (int) array_search($currentAgenda->reveal_step, $steps))
+                @php($nextStep = $currentAgenda->nextRevealStep())
+                @php($isArgentStep = $currentAgenda->reveal_step === \App\Models\Agenda::STEP_ARGENT_VOTES)
+                <div class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="flex flex-1 gap-1.5" aria-hidden="true">
+                            @foreach($steps as $index => $step)
+                                <span class="h-1.5 flex-1 rounded-full {{ $index <= $stepIndex ? 'bg-blue-600' : 'bg-yellow-200 dark:bg-yellow-800' }}"></span>
+                            @endforeach
+                        </div>
+                        <p class="text-xs font-medium text-yellow-800 dark:text-yellow-200 whitespace-nowrap">
+                            Step {{ $stepIndex + 1 }} of {{ count($steps) }}
+                        </p>
+                    </div>
+                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                        @if($isArgentStep)
+                            The Argent Flight votes first
+                        @else
+                            &ldquo;{{ $currentAgenda->reveal_step_label }}&rdquo; cards
+                        @endif
+                    </h3>
+                    <p class="text-sm text-gray-700 dark:text-gray-300 mb-4">
+                        @if($currentAgenda->reveal_step === \App\Models\Agenda::STEP_WHEN_REVEALED)
+                            Ask the players if anyone wants to play a card with &ldquo;When an agenda is revealed&rdquo;, such as Veto. Resolve those cards before continuing. If the agenda is discarded, use Discard Agenda and reveal the next one.
+                        @elseif($isArgentStep)
+                            {{ $game->argentFlightPlayerName() ?? 'The Argent Flight player' }} votes before everyone else and announces their votes publicly. Ask them to say which outcome they vote for and how many votes they cast. They still enter their vote in the app once voting opens.
+                        @else
+                            Ask the players if anyone wants to play a card with &ldquo;After an agenda is revealed&rdquo;, such as a Rider or Assassinate Representative. Resolve those cards before continuing.
+                        @endif
+                    </p>
+                    <div class="flex flex-col sm:flex-row gap-2">
+                        <button wire:click="completeRevealStep"
+                                class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold py-3 sm:py-2 px-4 rounded-lg transition-colors">
+                            @if($nextStep === \App\Models\Agenda::STEP_AFTER_REVEALED)
+                                {{ 'Done, continue to "After" cards' }}
+                            @elseif($nextStep === \App\Models\Agenda::STEP_ARGENT_VOTES)
+                                Done, continue to The Argent Flight
+                            @else
+                                Done, start voting
+                            @endif
+                        </button>
+                        <button wire:click="discardAgenda"
+                                wire:confirm="Discard this agenda, for example because it was vetoed? You can then reveal the next agenda."
+                                class="w-full sm:w-auto bg-gray-600 hover:bg-gray-700 active:bg-gray-800 text-white font-semibold py-3 sm:py-2 px-4 rounded-lg transition-colors">
+                            Discard Agenda
+                        </button>
+                    </div>
+                </div>
+            @elseif($currentAgenda->reveal_step)
                 <div class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
                     <p class="text-yellow-800 dark:text-yellow-200 font-medium">Voting has not started yet</p>
                     <p class="text-sm text-yellow-800 dark:text-yellow-200 mt-1">
@@ -549,6 +548,64 @@
                             @endif
                         @endforeach
                     </div>
+
+                    <!-- Outcomes like 'Each player who voted "For"': the Speaker shows who they apply to -->
+                    @if($player->is_speaker && $currentAgenda->status === 'completed' && $currentAgenda->affectsVoters())
+                        @php($outcome = $currentAgenda->outcome())
+                        <div class="mt-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                            @if($outcome === null)
+                                <p class="font-semibold text-blue-900 dark:text-blue-100">The vote is tied</p>
+                                <p class="text-sm text-blue-800 dark:text-blue-200 mt-1">
+                                    This agenda affects players by how they voted. As Speaker you break the tie first, then you can see who is affected.
+                                </p>
+                                <div class="mt-3 flex flex-col sm:flex-row gap-2">
+                                    @foreach($currentAgenda->leadingOptions() as $option)
+                                        <button wire:click="breakTie(@js($option))"
+                                                wire:confirm="Break the tie in favour of {{ $option }}?"
+                                                class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold py-3 sm:py-2 px-4 rounded-lg transition-colors">
+                                            {{ $option }} wins
+                                        </button>
+                                    @endforeach
+                                </div>
+                            @else
+                                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                    <p class="font-semibold text-blue-900 dark:text-blue-100">
+                                        {{ $outcome }} wins{{ $currentAgenda->tiebreak_option ? ' (tie broken by the Speaker)' : '' }}
+                                    </p>
+                                    <button wire:click="toggleAffectedPlayers"
+                                            class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold py-3 sm:py-2 px-4 rounded-lg transition-colors">
+                                        {{ $showAffectedPlayers ? 'Hide who is affected' : 'Show who is affected' }}
+                                    </button>
+                                </div>
+
+                                @if($showAffectedPlayers)
+                                    @php($effect = $currentAgenda->outcomeEffect($outcome))
+                                    @php($affected = $currentAgenda->playersAffectedBy($outcome))
+                                    <div class="mt-3 space-y-3">
+                                        @if($effect)
+                                            <p class="text-sm text-blue-800 dark:text-blue-200"><strong>{{ $outcome }}:</strong> {{ $effect }}</p>
+                                        @endif
+                                        @forelse($affected as $vote => $names)
+                                            <div>
+                                                <p class="text-sm font-medium text-gray-900 dark:text-white">Players who voted &ldquo;{{ $vote }}&rdquo;</p>
+                                                @if(empty($names))
+                                                    <p class="text-sm text-gray-600 dark:text-gray-300">Nobody, so this outcome affects no one.</p>
+                                                @else
+                                                    <ul class="mt-1 flex flex-wrap gap-2">
+                                                        @foreach($names as $name)
+                                                            <li class="px-2.5 py-1 rounded-md text-sm font-medium bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-blue-200 dark:border-blue-800">{{ $name }}</li>
+                                                        @endforeach
+                                                    </ul>
+                                                @endif
+                                            </div>
+                                        @empty
+                                            <p class="text-sm text-gray-600 dark:text-gray-300">This outcome does not depend on how players voted.</p>
+                                        @endforelse
+                                    </div>
+                                @endif
+                            @endif
+                        </div>
+                    @endif
                 </div>
             @endif
             </div>
