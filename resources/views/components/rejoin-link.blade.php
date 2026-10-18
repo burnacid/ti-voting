@@ -13,7 +13,7 @@
         <div class="flex gap-2">
             <input type="text" readonly value="{{ $player->rejoinUrl() }}" x-ref="link" x-on:focus="$event.target.select()"
                    aria-label="Rejoin link for {{ $player->name }}"
-                   class="min-w-0 flex-1 px-2 py-1.5 font-mono text-xs border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800">
+                   class="min-w-0 flex-1 px-2 py-1.5 font-mono text-xs border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">
             <button type="button"
                     x-on:click="navigator.clipboard.writeText($refs.link.value).then(() => { copied = true; setTimeout(() => copied = false, 2000) })"
                     class="shrink-0 font-medium bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-md transition-colors"
