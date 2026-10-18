@@ -4,6 +4,17 @@ All notable changes to TI Voting are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- A logo: an agenda card going into a ballot slot on a hex tile. It is shown on the homepage and in the README.
+- The site can be installed as a web app: "Add to Home Screen" on iPhone or "Install app" on Android opens it full screen with its own icon. The homepage shows how to install it.
+- The homepage offers "Continue your game" when this phone is already playing a game, so the installed app takes you straight back.
+- A friendly offline page when a page cannot load without a connection.
+
+### Changed
+- The favicon, browser tab icon and iPhone home screen icon use the new logo instead of the Laravel logo.
+
 ## [1.4.2] - 2026-10-18
 
 ### Added
@@ -100,6 +111,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Milty draft integration to load factions and planets.
 - Planet agendas (any, industrial, cultural, hazardous, non-home), with extra tiles that can be added by tile number.
 
+[Unreleased]: https://github.com/burnacid/ti-voting/compare/v1.4.2...HEAD
 [1.4.2]: https://github.com/burnacid/ti-voting/compare/v1.4.1...v1.4.2
 [1.4.1]: https://github.com/burnacid/ti-voting/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/burnacid/ti-voting/compare/v1.3.0...v1.4.0

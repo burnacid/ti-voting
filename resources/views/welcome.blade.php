@@ -4,18 +4,69 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>TI4 Hidden Agenda</title>
+    @include('partials.icons')
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="bg-gray-100 dark:bg-gray-900 min-h-screen">
     <div class="container mx-auto px-4 py-8">
         <div class="max-w-4xl mx-auto text-center">
             <div class="mb-12">
+                <img src="/logo.svg" alt="" class="mx-auto mb-6 w-28 h-28 md:w-36 md:h-36 drop-shadow-lg">
                 <h1 class="text-4xl md:text-6xl font-bold text-gray-900 dark:text-white mb-4">
                     TI4 Hidden Agenda
                 </h1>
                 <p class="text-xl text-gray-600 dark:text-gray-300 mb-8">
                     Secret voting for Twilight Imperium 4th Edition agenda phase
                 </p>
+            </div>
+
+            <!-- Back to the game this browser is playing, the installed app always opens on this page -->
+            @if($currentPlayer)
+                <a href="{{ route('game.show', $currentPlayer->game->code) }}"
+                   class="flex items-center justify-between gap-4 text-left bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-md p-4 sm:p-5 mb-8 transition-colors">
+                    <span class="min-w-0">
+                        <span class="block text-sm text-blue-100">Continue your game</span>
+                        <span class="block text-lg font-semibold truncate">{{ $currentPlayer->game->name }}</span>
+                        <span class="block text-sm text-blue-100">Playing as {{ $currentPlayer->name }} · <span class="font-mono">{{ $currentPlayer->game->code }}</span></span>
+                    </span>
+                    <svg class="w-6 h-6 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                    </svg>
+                </a>
+            @endif
+
+            <!-- Install as a web app: the browser's prompt on Android, instructions on iPhone -->
+            <div x-data="{
+                    prompt: window.deferredInstallPrompt ?? null,
+                    installed: window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true,
+                    ios: /iphone|ipad|ipod/i.test(navigator.userAgent),
+                    async install() {
+                        this.prompt.prompt();
+                        await this.prompt.userChoice;
+                        this.prompt = window.deferredInstallPrompt = null;
+                    },
+                 }"
+                 x-on:install-available.window="prompt = window.deferredInstallPrompt"
+                 x-on:appinstalled.window="installed = true"
+                 x-show="!installed && (prompt || ios)"
+                 x-cloak
+                 class="flex flex-col sm:flex-row sm:items-center gap-3 text-left bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-md p-4 mb-8">
+                <div class="flex flex-1 items-center gap-3 min-w-0">
+                <img src="/icons/icon-192.png" alt="" class="w-12 h-12 shrink-0">
+                <div class="min-w-0">
+                    <p class="font-semibold text-gray-900 dark:text-white">Add it to your home screen</p>
+                    <p x-show="prompt" class="text-sm text-gray-600 dark:text-gray-300">Open it like an app, full screen and one tap away during the game.</p>
+                    <p x-show="!prompt && ios" class="text-sm text-gray-600 dark:text-gray-300">
+                        In Safari, tap the Share button
+                        <svg class="inline w-4 h-4 -mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-label="Share"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v12m0-12l-4 4m4-4l4 4M5 13v6a2 2 0 002 2h10a2 2 0 002-2v-6"/></svg>
+                        and choose &ldquo;Add to Home Screen&rdquo;.
+                    </p>
+                </div>
+                </div>
+                <button type="button" x-show="prompt" x-on:click="install()"
+                        class="w-full sm:w-auto shrink-0 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 sm:py-2 px-4 rounded-lg transition-colors">
+                    Install app
+                </button>
             </div>
 
             <div class="grid md:grid-cols-2 gap-8 mb-12">

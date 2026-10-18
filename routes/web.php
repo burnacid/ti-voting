@@ -2,12 +2,18 @@
 
 use App\Http\Controllers\Admin\DashboardController;
 use App\Models\Game;
+use App\Models\Player;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
-    return view('welcome');
+    // The installed web app always opens here, so offer the game this browser is playing
+    $currentPlayer = session('player_token')
+        ? Player::with('game')->where('session_token', session('player_token'))->first()
+        : null;
+
+    return view('welcome', ['currentPlayer' => $currentPlayer]);
 })->name('home');
 
 Route::get('/create-game', function () {
