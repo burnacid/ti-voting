@@ -33,9 +33,22 @@ function makeAdminGame(string $name = 'Admin Test Game', ?string $createdAt = nu
     return $game;
 }
 
-test('admin pages require a login', function (string $url) {
-    $this->get($url)->assertRedirect(route('admin.login'));
-})->with(['/admin', '/admin/games', '/admin/logs']);
+test('admin pages require a login', function (string $route) {
+    $this->get(route($route))->assertRedirect(route('admin.login'));
+})->with(['admin.dashboard', 'admin.games', 'admin.logs']);
+
+test('the admin path can be set in the environment', function () {
+    putenv('ADMIN_PATH=/secret-panel/');
+    $this->refreshApplication();
+
+    try {
+        expect(route('admin.dashboard', absolute: false))->toBe('/secret-panel');
+        $this->get('/secret-panel/games')->assertRedirect('/secret-panel/login');
+        $this->get('/admin')->assertNotFound();
+    } finally {
+        putenv('ADMIN_PATH');
+    }
+});
 
 test('an admin can log in with the right password only', function () {
     $user = User::factory()->create(['password' => 'correct horse battery']);
@@ -81,7 +94,7 @@ test('the dashboard shows stats', function () {
     ]);
 
     $this->actingAs(User::factory()->create())
-        ->get('/admin')
+        ->get(route('admin.dashboard'))
         ->assertOk()
         ->assertSee('Games created per day')
         ->assertSee('Mutiny');

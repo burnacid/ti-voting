@@ -25,7 +25,19 @@ return [
     |
     */
 
-    'version' => '1.4.0',
+    'version' => '1.4.1',
+
+    /*
+    |--------------------------------------------------------------------------
+    | Admin Path
+    |--------------------------------------------------------------------------
+    |
+    | The URL path of the admin dashboard, e.g. "admin" serves it at /admin.
+    | Set a less obvious path in production to keep it out of sight.
+    |
+    */
+
+    'admin_path' => trim(env('ADMIN_PATH', 'admin'), '/') ?: 'admin',
 
     /*
     |--------------------------------------------------------------------------
