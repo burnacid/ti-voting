@@ -8,6 +8,56 @@ A secret voting system for **Twilight Imperium 4th Edition (TI4)** agenda phase 
 - **Preset agendas** — choose from a library of TI4 agenda cards
 - **Real-time updates** — votes and state changes sync instantly via WebSockets (Laravel Reverb)
 - **No accounts required** — players join using a game code and a display name
+## Screenshots
+<table>
+  <tr>
+    <td align="center" width="33%">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/08-player-agenda-card-dark.png">
+        <img src="docs/screenshots/08-player-agenda-card-light.png" width="240" alt="The revealed agenda shown as a digital agenda card">
+      </picture>
+      <br><sub>The revealed agenda as a digital card</sub>
+    </td>
+    <td align="center" width="33%">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/09-player-vote-dark.png">
+        <img src="docs/screenshots/09-player-vote-light.png" width="240" alt="A player choosing an outcome and the influence to spend">
+      </picture>
+      <br><sub>Players vote in secret on their phone</sub>
+    </td>
+    <td align="center" width="33%">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/10-speaker-results-dark.png">
+        <img src="docs/screenshots/10-speaker-results-light.png" width="240" alt="Voting results with the influence per outcome">
+      </picture>
+      <br><sub>The Speaker sees the results</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="33%">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/05-agenda-search-dark.png">
+        <img src="docs/screenshots/05-agenda-search-light.png" width="240" alt="Searching the preset agendas while creating an agenda">
+      </picture>
+      <br><sub>Search the preset agendas</sub>
+    </td>
+    <td align="center" width="33%">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/07-speaker-argent-flight-dark.png">
+        <img src="docs/screenshots/07-speaker-argent-flight-light.png" width="240" alt="The Speaker's step for The Argent Flight voting first">
+      </picture>
+      <br><sub>Guided steps before voting opens</sub>
+    </td>
+    <td align="center" width="33%">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/13-rejoin-approve-dark.png">
+        <img src="docs/screenshots/13-rejoin-approve-light.png" width="240" alt="A player confirming that someone may rejoin the game">
+      </picture>
+      <br><sub>Lost your phone? Another player lets you back in</sub>
+    </td>
+  </tr>
+</table>
+
 ## Requirements
 - PHP 8.2+
 - Composer
