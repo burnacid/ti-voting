@@ -850,3 +850,18 @@ test('the preset agenda search lists every preset and fills in the form', functi
         ->assertSet('newAgendaTitle', 'Mutiny')
         ->assertSet('newAgendaCardType', 'directive');
 });
+
+test('every player sees when representative government is in effect', function () {
+    [$game, $speaker, $other] = makeGame();
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $other])
+        ->assertDontSee('Players cannot exhaust planets to vote');
+
+    $game->update(['representative_government' => true]);
+
+    foreach ([$speaker, $other] as $viewer) {
+        Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $viewer])
+            ->assertSee('Representative Government is in effect')
+            ->assertSee('Players cannot exhaust planets to vote');
+    }
+});

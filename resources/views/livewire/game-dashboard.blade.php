@@ -307,6 +307,19 @@
         </div>
     @endif
 
+    <!-- Laws in effect, shown to every player -->
+    @if($game->representative_government)
+        <div class="flex items-start gap-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4">
+            <span class="shrink-0 mt-0.5 px-2 py-0.5 rounded text-xs font-semibold uppercase bg-amber-200 text-amber-900 dark:bg-amber-800 dark:text-amber-100">Law</span>
+            <div>
+                <p class="font-semibold text-amber-900 dark:text-amber-100">Representative Government is in effect</p>
+                <p class="text-sm text-amber-800 dark:text-amber-200">
+                    Players cannot exhaust planets to vote. Each player casts 1 vote on each agenda.
+                </p>
+            </div>
+        </div>
+    @endif
+
     <!-- Players List -->
     <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
         <div class="flex justify-between items-center mb-4">
