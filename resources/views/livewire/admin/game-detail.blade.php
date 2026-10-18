@@ -12,7 +12,9 @@
                 <div class="mt-2 flex flex-wrap gap-2 text-xs">
                     @if($game->milty_url)
                         <a href="{{ $game->milty_url }}" target="_blank" rel="noopener noreferrer"
-                           class="px-2 py-0.5 rounded bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 hover:underline">Milty draft</a>
+                           class="px-2 py-0.5 rounded bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 hover:underline">Map draft</a>
+                    @elseif($game->milty_draft_data['map_string'] ?? null)
+                        <span class="px-2 py-0.5 rounded bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 font-mono" title="Map string">{{ Str::limit($game->milty_draft_data['map_string'], 40) }}</span>
                     @endif
                     @if($game->isThundersEdgeGame())
                         <span class="px-2 py-0.5 rounded bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">

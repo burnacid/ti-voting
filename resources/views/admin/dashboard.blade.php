@@ -23,7 +23,7 @@
             <div class="text-xl font-bold tabular-nums">{{ $averagePlayers }}</div>
         </div>
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-4">
-            <div class="text-sm text-gray-600 dark:text-gray-400">Created with Milty's Draft</div>
+            <div class="text-sm text-gray-600 dark:text-gray-400">Created with a draft or map</div>
             <div class="text-xl font-bold tabular-nums">
                 {{ $miltyGames }}
                 <span class="text-sm font-normal text-gray-500 dark:text-gray-400">/ {{ $gameCount }}</span>

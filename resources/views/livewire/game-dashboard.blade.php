@@ -23,7 +23,7 @@
     @if($factionChoices->isNotEmpty())
         <form wire:submit="chooseFaction" class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4">
             <label for="chosenFaction" class="block font-semibold text-blue-900 dark:text-blue-100">Choose your faction</label>
-            <p class="text-sm text-blue-800 dark:text-blue-200 mt-1">This game uses a Milty draft. Pick the faction you drafted.</p>
+            <p class="text-sm text-blue-800 dark:text-blue-200 mt-1">This game has a draft or map. Pick your faction.</p>
             <div class="mt-3 flex flex-col sm:flex-row gap-2">
                 <select id="chosenFaction" wire:model="chosenFaction"
                         class="w-full sm:flex-1 px-3 py-2.5 text-base sm:text-sm border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white">
@@ -269,7 +269,7 @@
 
                             @unless($hasMilty)
                                 <p class="mt-2 text-xs text-red-600 dark:text-red-400">
-                                    Not all options are available as this game was not created with Milty's Draft Tool. To use all agenda types, create a new game using the draft tool and import your players and factions from this game.
+                                    Not all options are available as this game has no map. To use all agenda types, the Speaker can add a Milty or TI4 Lab draft URL, or a map string, with Change Map.
                                 </p>
                             @endunless
                         </fieldset>

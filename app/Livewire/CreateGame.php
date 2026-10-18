@@ -4,11 +4,12 @@ namespace App\Livewire;
 
 use App\Models\Game;
 use App\Models\Player;
-use App\Services\MiltyService;
+use App\Services\DraftImporter;
 use App\Support\PlayerGames;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\Rule;
+use InvalidArgumentException;
 use Livewire\Component;
 
 class CreateGame extends Component
@@ -17,7 +18,9 @@ class CreateGame extends Component
     public $playerName = '';
     public $faction = '';
 
+    // A Milty or TI4 Lab draft URL, or a map string
     public $miltyUrl = '';
+    public $miltyDraftUrl = null;
     public $hasMiltyData = false;
     public $miltyDraftData = null;
     public $miltyDraftId = null;
@@ -28,7 +31,7 @@ class CreateGame extends Component
         return [
             'gameName' => 'required|string|max:255',
             'playerName' => 'required|string|max:255',
-            'miltyUrl' => 'nullable|url',
+            'miltyUrl' => 'nullable|string|max:2000',
         ];
     }
 
@@ -45,25 +48,17 @@ class CreateGame extends Component
 
     protected function fetchMiltyData()
     {
-        $miltyService = new MiltyService();
-        $draftId = $miltyService->extractDraftId($this->miltyUrl);
-
-        if (!$draftId) {
-            $this->miltyError = 'Invalid Milty URL format. Expected format: https://milty.shenanigans.be/d/{draft_id}';
+        try {
+            $draft = (new DraftImporter())->import($this->miltyUrl);
+        } catch (InvalidArgumentException $e) {
+            $this->miltyError = $e->getMessage();
             $this->resetMiltyData();
             return;
         }
 
-        $draftData = $miltyService->fetchDraftData($draftId);
-
-        if (!$draftData) {
-            $this->miltyError = 'Could not fetch Milty draft data. Please check the URL and try again.';
-            $this->resetMiltyData();
-            return;
-        }
-
-        $this->miltyDraftId = $draftId;
-        $this->miltyDraftData = $draftData;
+        $this->miltyDraftUrl = $draft['milty_url'];
+        $this->miltyDraftId = $draft['milty_draft_id'];
+        $this->miltyDraftData = $draft['milty_draft_data'];
         $this->hasMiltyData = true;
         $this->miltyError = null;
 
@@ -83,6 +78,7 @@ class CreateGame extends Component
 
     protected function resetMiltyData()
     {
+        $this->miltyDraftUrl = null;
         $this->miltyDraftId = null;
         $this->miltyDraftData = null;
         $this->hasMiltyData = false;
@@ -121,7 +117,7 @@ class CreateGame extends Component
             'code' => Game::generateCode(),
             'name' => $this->gameName,
             'status' => 'waiting',
-            'milty_url' => $this->miltyUrl,
+            'milty_url' => $this->miltyDraftUrl,
             'milty_draft_id' => $this->miltyDraftId,
             'milty_draft_data' => $this->miltyDraftData,
         ]);
@@ -141,7 +137,7 @@ class CreateGame extends Component
             'game' => $game->code,
             'player' => $player->name,
             'name' => $game->name,
-            'milty' => $game->milty_draft_id !== null,
+            'milty' => $game->milty_draft_data['source'] ?? ($game->milty_draft_data ? 'milty' : null),
         ]);
 
         // Remember the game in this browser
