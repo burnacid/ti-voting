@@ -4,6 +4,22 @@ All notable changes to TI Voting are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2026-10-18
+
+### Added
+- A phone can play in several games: the homepage lists every game it is in, most recent first, with whether an agenda is open. A game can be removed from that list; the player stays in the game.
+- Star Chart, from the separate TI4 Star Chart Randomizer: in games with a Milty draft, any player can draw a random blue system tile that is not on the map yet, from the expansions in the draft. Every player sees the drawn tile with its planets, tiles are never drawn twice, and their planets can be elected on planet agendas. The Speaker can undo a draw.
+- A Home link on the game page, also handy in the installed app, which has no back button.
+
+### Changed
+- Players no longer type a faction. In a game with a Milty draft they choose the faction they drafted from a list, which shows the drafter's name and leaves out factions other players already chose. Games without a Milty draft have no factions. Players without a drafted faction, for example after the Speaker added the Milty draft later, are asked to choose one on the game screen.
+- The Milty draft loads as soon as the URL is entered when creating a game, and the field is labelled correctly.
+
+### Fixed
+- Planet agendas no longer fail when the Milty draft is not finished and some players have not picked a slice yet.
+- Players no longer lose access to their game after 2 hours without activity, for example between agenda phases. The games a browser plays in are kept in their own cookie for 30 days, renewed on every visit, instead of in the session.
+- The app icons did not load on Apache servers, which reserve the `/icons/` path for their own icons. They are now served from `/app-icons/`.
+
 ## [1.5.0] - 2026-10-18
 
 ### Added
@@ -111,6 +127,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Milty draft integration to load factions and planets.
 - Planet agendas (any, industrial, cultural, hazardous, non-home), with extra tiles that can be added by tile number.
 
+[1.6.0]: https://github.com/burnacid/ti-voting/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/burnacid/ti-voting/compare/v1.4.2...v1.5.0
 [1.4.2]: https://github.com/burnacid/ti-voting/compare/v1.4.1...v1.4.2
 [1.4.1]: https://github.com/burnacid/ti-voting/compare/v1.4.0...v1.4.1

@@ -10,6 +10,7 @@ A secret voting system for **Twilight Imperium 4th Edition (TI4)** agenda phase 
 - **Speaker controls** — only the speaker can create agendas and reveal results
 - **Milty integration** — paste a Milty draft URL to auto-load faction and planet data for all players
 - **Preset agendas** — choose from a library of TI4 agenda cards
+- **Star Chart** — draw a random unused system tile, from the expansions in your Milty draft
 - **Real-time updates** — votes and state changes sync instantly via WebSockets (Laravel Reverb)
 - **No accounts required** — players join using a game code and a display name
 ## Screenshots

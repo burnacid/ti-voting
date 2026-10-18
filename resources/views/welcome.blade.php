@@ -20,19 +20,74 @@
                 </p>
             </div>
 
-            <!-- Back to the game this browser is playing, the installed app always opens on this page -->
-            @if($currentPlayer)
-                <a href="{{ route('game.show', $currentPlayer->game->code) }}"
-                   class="flex items-center justify-between gap-4 text-left bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-md p-4 sm:p-5 mb-8 transition-colors">
-                    <span class="min-w-0">
-                        <span class="block text-sm text-blue-100">Continue your game</span>
-                        <span class="block text-lg font-semibold truncate">{{ $currentPlayer->game->name }}</span>
-                        <span class="block text-sm text-blue-100">Playing as {{ $currentPlayer->name }} · <span class="font-mono">{{ $currentPlayer->game->code }}</span></span>
-                    </span>
-                    <svg class="w-6 h-6 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-                    </svg>
-                </a>
+            <!-- Games this browser plays in, the installed app always opens on this page -->
+            @if($myPlayers->isNotEmpty())
+                <section class="text-left mb-8">
+                    <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2">
+                        {{ $myPlayers->count() === 1 ? 'Continue your game' : 'Continue one of your games' }}
+                    </h2>
+                    <div class="space-y-2">
+                        @foreach($myPlayers as $myPlayer)
+                            @php($openAgenda = $myPlayer->game->currentAgenda())
+                            <div x-data="{ confirming: false }">
+                            <div class="flex items-stretch gap-2">
+                            <a href="{{ route('game.show', $myPlayer->game->code) }}"
+                               @class([
+                                   'flex flex-1 min-w-0 items-center justify-between gap-4 rounded-xl shadow-md p-4 transition-colors',
+                                   'bg-blue-600 hover:bg-blue-700 text-white' => $loop->first,
+                                   'bg-white hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-900 dark:text-white border border-gray-200 dark:border-gray-700' => !$loop->first,
+                               ])>
+                                <span class="min-w-0">
+                                    <span class="flex flex-wrap items-center gap-2">
+                                        <span class="text-lg font-semibold truncate">{{ $myPlayer->game->name }}</span>
+                                        @if($openAgenda)
+                                            <span @class(['px-2 py-0.5 rounded-full text-xs font-medium', 'bg-white/20' => $loop->first, 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' => !$loop->first])>
+                                                {{ $openAgenda->isVotingOpen() ? 'Voting open' : 'Agenda revealed' }}
+                                            </span>
+                                        @endif
+                                    </span>
+                                    <span @class(['block text-sm', 'text-blue-100' => $loop->first, 'text-gray-600 dark:text-gray-400' => !$loop->first])>
+                                        Playing as {{ $myPlayer->name }}{{ $myPlayer->is_speaker ? ' (Speaker)' : '' }} · <span class="font-mono">{{ $myPlayer->game->code }}</span>
+                                    </span>
+                                </span>
+                                <svg class="w-6 h-6 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                                </svg>
+                            </a>
+                            <button type="button"
+                                    x-on:click="confirming = !confirming"
+                                    x-bind:aria-expanded="confirming"
+                                    aria-label="Remove {{ $myPlayer->game->name }} from this list"
+                                    title="Remove from this list"
+                                    class="px-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-400 hover:text-red-600 dark:hover:text-red-400 shadow-md transition-colors">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                </svg>
+                            </button>
+                            </div>
+
+                            <!-- Confirmation: only removes the game from this phone's list, the player stays in the game -->
+                            <form x-show="confirming" x-cloak method="POST" action="{{ route('my-games.forget', $myPlayer->game->code) }}"
+                                  class="mt-2 rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 p-3">
+                                @csrf
+                                <p class="text-sm text-red-800 dark:text-red-200">
+                                    Remove <strong>{{ $myPlayer->game->name }}</strong> from this list? You stay in the game and can get back in through its rejoin link.
+                                </p>
+                                <div class="mt-2 flex flex-col sm:flex-row gap-2">
+                                    <button type="submit"
+                                            class="w-full sm:w-auto bg-red-600 hover:bg-red-700 text-white text-sm font-semibold py-2.5 sm:py-2 px-4 rounded-lg transition-colors">
+                                        Remove from list
+                                    </button>
+                                    <button type="button" x-on:click="confirming = false"
+                                            class="w-full sm:w-auto bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-100 text-sm font-semibold py-2.5 sm:py-2 px-4 rounded-lg transition-colors">
+                                        Cancel
+                                    </button>
+                                </div>
+                            </form>
+                            </div>
+                        @endforeach
+                    </div>
+                </section>
             @endif
 
             <!-- Install as a web app: the browser's prompt on Android, instructions on iPhone -->

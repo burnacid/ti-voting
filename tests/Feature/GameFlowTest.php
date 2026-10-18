@@ -9,6 +9,8 @@ use App\Models\Agenda;
 use App\Models\Game;
 use App\Models\Player;
 use App\Models\Vote;
+use App\Support\PlayerGames;
+use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
@@ -42,6 +44,12 @@ function makeGame(array $attributes = []): array
     $game->update(['speaker_id' => $speaker->id]);
 
     return [$game, $speaker, $other];
+}
+
+// The games this browser was told to remember in the response, code => session token
+function rememberedGames(): array
+{
+    return json_decode(Cookie::queued(PlayerGames::COOKIE)?->getValue() ?? '[]', true);
 }
 
 function makeAgenda(Game $game): Agenda
@@ -553,7 +561,7 @@ test('a player who lost access rejoins once another player confirms it', functio
 
     // Nothing happens until someone confirms
     $request->call('checkRejoin')->assertSet('rejoinStatus', 'waiting');
-    expect(session('player_token'))->toBeNull();
+    expect(rememberedGames())->toBe([]);
 
     // The requested player cannot confirm themselves, another player can
     Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker->fresh()])
@@ -568,7 +576,7 @@ test('a player who lost access rejoins once another player confirms it', functio
         ->call('approveRejoin', $speaker->id);
 
     $request->call('checkRejoin')->assertRedirect(route('game.show', $game->code));
-    expect(session('player_token'))->toBe($speaker->session_token)
+    expect(rememberedGames())->toBe([$game->code => $speaker->session_token])
         ->and($speaker->fresh()->rejoin_request_token)->toBeNull();
 });
 
@@ -586,7 +594,7 @@ test('a declined rejoin request does not let the browser in', function () {
     $request->call('checkRejoin')
         ->assertSet('rejoinStatus', 'declined')
         ->assertSee('Your request to rejoin was declined');
-    expect(session('player_token'))->toBeNull();
+    expect(rememberedGames())->toBe([]);
 });
 
 test('a rejoin request expires when nobody confirms it', function () {
@@ -909,4 +917,283 @@ test('the game page offers to install the web app', function () {
         ->assertOk()
         ->assertSee('Add it to your home screen')
         ->assertSee('Install app');
+});
+
+test('a browser can play in several games and continue each of them', function () {
+    [$first, , $firstPlayer] = makeGame(['name' => 'Friday Game']);
+    [$second, $secondPlayer] = makeGame(['name' => 'Sunday Game']);
+    $cookie = json_encode([$second->code => $secondPlayer->session_token, $first->code => $firstPlayer->session_token]);
+
+    $this->withCookie(PlayerGames::COOKIE, $cookie)
+        ->get('/')
+        ->assertSeeInOrder(['Continue one of your games', 'Sunday Game', 'Playing as Speaker (Speaker)', 'Friday Game', 'Playing as Other']);
+
+    // Both game pages open without a session, e.g. after it expired between agenda phases
+    $this->withCookie(PlayerGames::COOKIE, $cookie)->get(route('game.show', $first->code))->assertOk()->assertSee('Friday Game');
+    $this->withCookie(PlayerGames::COOKIE, $cookie)->get(route('game.show', $second->code))->assertOk()->assertSee('Sunday Game');
+});
+
+test('joining a game adds it to the games this browser remembers', function () {
+    Event::fake([TriggerRefresh::class]);
+    [$first, , $firstPlayer] = makeGame();
+    [$second] = makeGame();
+
+    Livewire::withCookie(PlayerGames::COOKIE, json_encode([$first->code => $firstPlayer->session_token]))
+        ->test(JoinGameForm::class, ['gameCode' => $second->code])
+        ->set('playerName', 'Newcomer')
+        ->call('joinGame')
+        ->assertRedirect(route('game.show', $second->code));
+
+    $newcomer = $second->players()->where('name', 'Newcomer')->first();
+    expect(rememberedGames())->toBe([$second->code => $newcomer->session_token, $first->code => $firstPlayer->session_token]);
+});
+
+test('a player from before the games cookie keeps their game', function () {
+    [$game, , $other] = makeGame();
+
+    $this->withSession(['player_token' => $other->session_token])
+        ->get(route('game.show', $game->code))
+        ->assertOk();
+
+    expect(rememberedGames())->toBe([$game->code => $other->session_token]);
+});
+
+test('deleted games and removed players drop off the list', function () {
+    [$kept, , $keptPlayer] = makeGame(['name' => 'Kept Game']);
+    [$deleted, $deletedPlayer] = makeGame(['name' => 'Deleted Game']);
+    [$removedFrom, , $removedPlayer] = makeGame(['name' => 'Removed From Game']);
+    $cookie = json_encode([
+        $kept->code => $keptPlayer->session_token,
+        $deleted->code => $deletedPlayer->session_token,
+        $removedFrom->code => $removedPlayer->session_token,
+    ]);
+    $deleted->delete();
+    $removedPlayer->delete();
+
+    $this->withCookie(PlayerGames::COOKIE, $cookie)
+        ->get('/')
+        ->assertSee('Continue your game')
+        ->assertSee('Kept Game')
+        ->assertDontSee('Deleted Game')
+        ->assertDontSee('Removed From Game');
+});
+
+function draftWithFactions(): array
+{
+    return ['draft' => ['players' => [
+        'p_1' => ['name' => 'Alice', 'faction' => 'The Argent Flight', 'slice' => '0'],
+        'p_2' => ['name' => 'Bob', 'faction' => 'The Federation of Sol', 'slice' => '1'],
+        'p_3' => ['name' => 'Carol', 'faction' => 'The Emirates of Hacan', 'slice' => '2'],
+    ]], 'slices' => [['tiles' => []], ['tiles' => []], ['tiles' => []]], 'config' => []];
+}
+
+test('creating a game with a milty draft asks for a drafted faction', function () {
+    Http::fake(['milty.shenanigans.be/*' => Http::response(draftWithFactions())]);
+
+    $form = Livewire::test(CreateGame::class)
+        ->set('gameName', 'Drafted Game')
+        ->set('playerName', 'Alice')
+        ->assertDontSee('Your Faction')
+        ->set('miltyUrl', 'https://milty.shenanigans.be/d/abc123')
+        ->assertSee('Draft loaded with 3 factions')
+        ->assertSee('The Argent Flight (Alice)')
+        ->call('createGame')
+        ->assertHasErrors(['faction' => 'required']);
+
+    $form->set('faction', 'Not A Drafted Faction')->call('createGame')->assertHasErrors('faction');
+
+    $form->set('faction', 'The Argent Flight')->call('createGame')->assertHasNoErrors()->assertRedirect();
+    expect(Player::where('name', 'Alice')->first()->faction)->toBe('The Argent Flight');
+});
+
+test('creating a game without milty has no faction', function () {
+    Livewire::test(CreateGame::class)
+        ->assertDontSee('Your Faction')
+        ->set('gameName', 'Plain Game')
+        ->set('playerName', 'Me')
+        ->set('faction', 'Typed Faction')
+        ->call('createGame')
+        ->assertRedirect();
+
+    expect(Player::where('name', 'Me')->first()->faction)->toBeNull();
+});
+
+test('joining a milty game offers the drafted factions nobody chose yet', function () {
+    Event::fake([TriggerRefresh::class]);
+    [$game, $speaker] = makeGame(['milty_draft_data' => draftWithFactions()]);
+    $speaker->update(['faction' => 'The Argent Flight']);
+
+    $form = Livewire::test(JoinGameForm::class, ['gameCode' => $game->code])
+        ->assertSee('The Federation of Sol (Bob)')
+        ->assertDontSee('The Argent Flight (Alice)')
+        ->set('playerName', 'Bob')
+        ->call('joinGame')
+        ->assertHasErrors(['faction' => 'required']);
+
+    $form->set('faction', 'The Argent Flight')->call('joinGame')->assertHasErrors('faction');
+    $form->set('faction', 'The Federation of Sol')->call('joinGame')->assertRedirect();
+
+    expect($game->players()->where('name', 'Bob')->first()->faction)->toBe('The Federation of Sol');
+});
+
+test('joining a game without milty has no faction', function () {
+    Event::fake([TriggerRefresh::class]);
+    [$game] = makeGame();
+
+    Livewire::test(JoinGameForm::class, ['gameCode' => $game->code])
+        ->assertDontSee('Your Faction')
+        ->set('playerName', 'Plain')
+        ->call('joinGame')
+        ->assertRedirect();
+
+    expect($game->players()->where('name', 'Plain')->first()->faction)->toBeNull();
+});
+
+test('players without a drafted faction are asked to choose one in the game', function () {
+    Event::fake([TriggerRefresh::class]);
+    [$game, $speaker, $other] = makeGame(['milty_draft_data' => draftWithFactions()]);
+    $speaker->update(['faction' => 'The Emirates of Hacan']);
+
+    // The Speaker already has a drafted faction
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker->fresh()])
+        ->assertDontSee('Choose your faction');
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $other])
+        ->assertSee('Choose your faction')
+        ->assertDontSee('The Emirates of Hacan (Carol)')
+        ->set('chosenFaction', 'The Emirates of Hacan')
+        ->call('chooseFaction')
+        ->assertHasErrors('chosenFaction')
+        ->set('chosenFaction', 'The Federation of Sol')
+        ->call('chooseFaction')
+        ->assertHasNoErrors()
+        ->assertDontSee('Choose your faction');
+
+    expect($other->fresh()->faction)->toBe('The Federation of Sol');
+});
+
+test('the game page links back home', function () {
+    [$game, , $other] = makeGame();
+
+    $this->withCookie(PlayerGames::COOKIE, json_encode([$game->code => $other->session_token]))
+        ->get(route('game.show', $game->code))
+        ->assertOk()
+        ->assertSee('href="' . route('home') . '"', false);
+});
+
+test('a game can be removed from this browser list without leaving it', function () {
+    [$kept, , $keptPlayer] = makeGame(['name' => 'Kept Game']);
+    [$removed, , $removedPlayer] = makeGame(['name' => 'Removed Game']);
+    $cookie = json_encode([$removed->code => $removedPlayer->session_token, $kept->code => $keptPlayer->session_token]);
+
+    $this->withCookie(PlayerGames::COOKIE, $cookie)
+        ->get('/')
+        ->assertSee(route('my-games.forget', $removed->code));
+
+    $this->withCookie(PlayerGames::COOKIE, $cookie)
+        ->post(route('my-games.forget', $removed->code))
+        ->assertRedirect(route('home'))
+        ->assertCookie(PlayerGames::COOKIE, json_encode([$kept->code => $keptPlayer->session_token]));
+
+    // Still a player in the game
+    expect(Player::find($removedPlayer->id))->not->toBeNull();
+});
+
+test('removing a game also clears it from the old session', function () {
+    [$game, , $other] = makeGame(['name' => 'Session Game']);
+
+    $this->withSession(['player_token' => $other->session_token])
+        ->post(route('my-games.forget', $game->code));
+
+    expect(session('player_token'))->toBeNull();
+    $this->get('/')->assertDontSee('Session Game');
+});
+
+function starChartDraft(array $config = []): array
+{
+    return [
+        'config' => array_merge(['include_pok' => false, 'include_te_tiles' => false, 'include_ds_tiles' => false], $config),
+        'draft' => ['players' => [
+            'p_1' => ['name' => 'Alice', 'faction' => 'The Federation of Sol', 'slice' => '0'],
+            'p_2' => ['name' => 'Bob', 'faction' => null, 'slice' => null],
+        ]],
+        // Slice 1 was not picked, so its tiles are not on the map
+        'slices' => [['tiles' => [19, 20, 21, 39]], ['tiles' => [22, 23]]],
+    ];
+}
+
+test('the star chart pool holds unused blue tiles of the expansions in the draft', function () {
+    [$base] = makeGame(['milty_draft_data' => starChartDraft()]);
+    [$expanded] = makeGame(['milty_draft_data' => starChartDraft(['include_pok' => true, 'include_te_tiles' => true, 'include_ds_tiles' => true])]);
+
+    $pool = $base->starChartPool();
+    expect($pool->all())->toBe(array_map('strval', range(22, 38)))
+        ->and($pool)->not->toContain('18');
+
+    expect($expanded->starChartPool())
+        ->toContain('22', '59', '97', '4253')
+        ->not->toContain('18', '19', '82', '112', '39');
+});
+
+test('any player can draw a star chart tile and everyone sees it', function () {
+    Event::fake([TriggerRefresh::class]);
+    [$game, $speaker, $other] = makeGame(['milty_draft_data' => starChartDraft()]);
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $other])
+        ->assertSee('Star Chart')
+        ->assertSee('17 tiles left')
+        ->call('drawStarChart');
+
+    $draw = $game->fresh()->star_chart_tiles[0];
+    expect($draw['player'])->toBe('Other')
+        ->and(range(22, 38))->toContain((int) $draw['tile'])
+        ->and($game->fresh()->starChartPool())->not->toContain($draw['tile']);
+
+    $planet = app(\App\Services\PlanetService::class)->getTile($draw['tile'])['planets'][0]['name'];
+    Livewire::test(GameDashboard::class, ['game' => $game->fresh(), 'player' => $speaker])
+        ->assertSee('16 tiles left')
+        ->assertSee($planet)
+        ->assertSee('Drawn by Other');
+
+    // A drawn system is on the map, so its planets can be elected
+    expect($game->fresh()->getPlanets()->pluck('name'))->toContain($planet);
+});
+
+test('star chart stops when no tiles are left', function () {
+    Event::fake([TriggerRefresh::class]);
+    [$game, $speaker] = makeGame(['milty_draft_data' => starChartDraft()]);
+    $game->update(['star_chart_tiles' => array_map(fn ($tile) => ['tile' => (string) $tile, 'player' => 'X', 'drawn_at' => now()->toIso8601String()], range(22, 38))]);
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->assertSee('0 tiles left')
+        ->call('drawStarChart')
+        ->assertDispatched('flashMessage');
+
+    expect($game->fresh()->star_chart_tiles)->toHaveCount(17);
+});
+
+test('only the speaker can undo a star chart draw', function () {
+    Event::fake([TriggerRefresh::class]);
+    [$game, $speaker, $other] = makeGame(['milty_draft_data' => starChartDraft()]);
+    $game->update(['star_chart_tiles' => [['tile' => '25', 'player' => 'Other', 'drawn_at' => now()->toIso8601String()]]]);
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $other])
+        ->assertDontSee('Undo drawing tile 25')
+        ->call('removeStarChartTile', '25');
+    expect($game->fresh()->starChartTileNumbers()->all())->toBe(['25']);
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->call('removeStarChartTile', '25');
+    expect($game->fresh()->star_chart_tiles)->toBeNull()
+        ->and($game->fresh()->starChartPool())->toContain('25');
+});
+
+test('star chart needs a milty draft', function () {
+    [$game, $speaker] = makeGame();
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->assertDontSee('Draw a system tile')
+        ->call('drawStarChart');
+
+    expect($game->fresh()->star_chart_tiles)->toBeNull();
 });

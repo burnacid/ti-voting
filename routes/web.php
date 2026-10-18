@@ -2,19 +2,29 @@
 
 use App\Http\Controllers\Admin\DashboardController;
 use App\Models\Game;
-use App\Models\Player;
+use App\Support\PlayerGames;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
-    // The installed web app always opens here, so offer the game this browser is playing
-    $currentPlayer = session('player_token')
-        ? Player::with('game')->where('session_token', session('player_token'))->first()
-        : null;
-
-    return view('welcome', ['currentPlayer' => $currentPlayer]);
+    // The installed web app always opens here, so offer the games this browser plays in
+    return view('welcome', ['myPlayers' => PlayerGames::players()]);
 })->name('home');
+
+// Removes a game from this browser's list of games. The player stays in the game
+Route::post('/my-games/{code}/forget', function (string $code) {
+    $code = strtoupper($code);
+    PlayerGames::forget($code);
+
+    // Before the games cookie existed the player was kept in the session, which would bring the game back
+    $game = Game::where('code', $code)->first();
+    if ($game && session('player_token') && $game->players()->where('session_token', session('player_token'))->exists()) {
+        session()->forget('player_token');
+    }
+
+    return redirect()->route('home');
+})->name('my-games.forget');
 
 Route::get('/create-game', function () {
     return view('create-game');
@@ -41,17 +51,14 @@ Route::get('/game/{code}', function (string $code) {
 
     Log::shareContext(['game' => $game->code]);
 
-    // Check if player has a valid session for this game
-    $playerToken = session('player_token');
-    $player = null;
-
-    if ($playerToken) {
-        $player = $game->players()->where('session_token', $playerToken)->first();
-    }
+    $player = PlayerGames::playerFor($game);
 
     if (!$player) {
         return redirect()->route('join-group', $code)->with('error', 'You need to join this game first.');
     }
+
+    // Keeps the game at the top of this browser's games and renews the cookie
+    PlayerGames::remember($player);
 
     return view('game', ['game' => $game, 'player' => $player]);
 })->name('game.show');

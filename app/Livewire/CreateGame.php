@@ -5,8 +5,10 @@ namespace App\Livewire;
 use App\Models\Game;
 use App\Models\Player;
 use App\Services\MiltyService;
+use App\Support\PlayerGames;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Validation\Rule;
 use Livewire\Component;
 
 class CreateGame extends Component
@@ -26,7 +28,6 @@ class CreateGame extends Component
         return [
             'gameName' => 'required|string|max:255',
             'playerName' => 'required|string|max:255',
-            'faction' => 'nullable|string|max:255',
             'miltyUrl' => 'nullable|url',
         ];
     }
@@ -65,6 +66,19 @@ class CreateGame extends Component
         $this->miltyDraftData = $draftData;
         $this->hasMiltyData = true;
         $this->miltyError = null;
+
+        // A faction picked for an earlier draft URL may not be in this draft
+        if (!$this->factions()->has($this->faction)) {
+            $this->faction = '';
+        }
+    }
+
+    /**
+     * The factions picked in the Milty draft, as faction => name of the player in the draft.
+     */
+    protected function factions()
+    {
+        return Game::factionsFromDraft($this->miltyDraftData);
     }
 
     protected function resetMiltyData()
@@ -72,6 +86,7 @@ class CreateGame extends Component
         $this->miltyDraftId = null;
         $this->miltyDraftData = null;
         $this->hasMiltyData = false;
+        $this->faction = '';
     }
 
     public function createGame()
@@ -85,6 +100,14 @@ class CreateGame extends Component
                 $this->addError('miltyUrl', $this->miltyError);
                 return;
             }
+        }
+
+        // With a Milty draft, players choose the faction they drafted
+        if ($this->factions()->isNotEmpty()) {
+            $this->validate(
+                ['faction' => ['required', Rule::in($this->factions()->keys())]],
+                ['faction.required' => 'Choose the faction you drafted.']
+            );
         }
 
         $throttleKey = 'create-game|' . request()->ip();
@@ -107,7 +130,7 @@ class CreateGame extends Component
             'game_id' => $game->id,
             'name' => $this->playerName,
             'session_token' => Player::generateSessionToken(),
-            'faction' => $this->faction,
+            'faction' => $this->factions()->has($this->faction) ? $this->faction : null,
             'is_speaker' => true, // First player is the speaker
         ]);
 
@@ -121,14 +144,14 @@ class CreateGame extends Component
             'milty' => $game->milty_draft_id !== null,
         ]);
 
-        // Store session token in session
-        session(['player_token' => $player->session_token]);
+        // Remember the game in this browser
+        PlayerGames::remember($player);
 
         return redirect()->route('game.show', $game->code);
     }
 
     public function render()
     {
-        return view('livewire.create-game');
+        return view('livewire.create-game', ['factions' => $this->factions()]);
     }
 }
