@@ -15,29 +15,29 @@ class CleanupOldGames extends Command
      *
      * @var string
      */
-    protected $signature = 'games:cleanup {--days=7 : Number of days to retain games}';
+    protected $signature = 'games:cleanup {--days= : Delete games inactive for this many days (default: GAME_RETENTION_DAYS)}';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Delete games older than the specified number of days (default: 7 days)';
+    protected $description = 'Delete games without activity for the specified number of days';
 
     /**
      * Execute the console command.
      */
     public function handle(): int
     {
-        $days = (int) $this->option('days');
+        $days = (int) ($this->option('days') ?? Game::retentionDays());
         $cutoffDate = now()->subDays($days);
 
-        // Get old games
-        $oldGames = Game::where('created_at', '<', $cutoffDate)->get();
+        // Get games without activity since the cutoff
+        $oldGames = Game::inactiveFor($days)->get();
         $gamesToDelete = $oldGames->count();
 
         if ($gamesToDelete === 0) {
-            $this->info("No games found older than {$days} days (before {$cutoffDate->format('Y-m-d H:i:s')}).");
+            $this->info("No games found without activity for {$days} days (since {$cutoffDate->format('Y-m-d H:i:s')}).");
             return self::SUCCESS;
         }
 

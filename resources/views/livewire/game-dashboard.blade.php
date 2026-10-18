@@ -1,4 +1,33 @@
 <div class="space-y-6">
+    <!-- Requests to rejoin as a player, any other player confirms them -->
+    @foreach($rejoinRequests as $requested)
+        <div wire:key="rejoin-{{ $requested->id }}" class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4">
+            <p class="font-semibold text-blue-900 dark:text-blue-100">Someone wants to rejoin as {{ $requested->name }}</p>
+            <p class="text-sm text-blue-800 dark:text-blue-200 mt-1">
+                Only allow this if {{ $requested->name }} is at the table and lost access. They will play as {{ $requested->name }}{{ $requested->is_speaker ? ', including the Speaker controls' : '' }}.
+            </p>
+            <div class="mt-3 flex flex-col sm:flex-row gap-2">
+                <button wire:click="approveRejoin('{{ $requested->id }}')"
+                        class="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white font-semibold py-3 sm:py-2 px-4 rounded-lg transition-colors">
+                    Yes, it is {{ $requested->name }}
+                </button>
+                <button wire:click="declineRejoin('{{ $requested->id }}')"
+                        class="w-full sm:w-auto bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-100 font-semibold py-3 sm:py-2 px-4 rounded-lg transition-colors">
+                    Decline
+                </button>
+            </div>
+        </div>
+    @endforeach
+
+    @if($player->hasPendingRejoinRequest())
+        <div class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-xl p-4">
+            <p class="font-semibold text-yellow-900 dark:text-yellow-100">Someone is asking to rejoin as you</p>
+            <p class="text-sm text-yellow-800 dark:text-yellow-200 mt-1">
+                If that was not you on another device, ask the other players to decline it.
+            </p>
+        </div>
+    @endif
+
     <!-- Speaker Controls -->
     @if($player->is_speaker)
         @php
@@ -69,32 +98,62 @@
                 </label>
             @endif
 
+            <!-- Law: Representative Government -->
+            <label class="flex items-center justify-between gap-4 bg-white/70 dark:bg-gray-800/60 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3 cursor-pointer">
+                <span>
+                    <span class="block font-medium text-gray-900 dark:text-white">Representative Government is in effect</span>
+                    <span class="block text-sm text-gray-600 dark:text-gray-400">
+                        Each player casts 1 vote on each agenda instead of spending influence. Turned on when the law passes For.
+                    </span>
+                </span>
+                <input type="checkbox"
+                       wire:click="toggleRepresentativeGovernment"
+                       @checked($game->representative_government)
+                       class="h-6 w-6 shrink-0 text-blue-600 rounded">
+            </label>
+
             <!-- Action card checks before voting opens -->
             @if($currentAgenda?->status === 'voting' && $currentAgenda->reveal_step)
-                @php($isWhenStep = $currentAgenda->reveal_step === \App\Models\Agenda::STEP_WHEN_REVEALED)
+                @php($steps = $currentAgenda->revealSteps())
+                @php($stepIndex = (int) array_search($currentAgenda->reveal_step, $steps))
+                @php($nextStep = $currentAgenda->nextRevealStep())
+                @php($isArgentStep = $currentAgenda->reveal_step === \App\Models\Agenda::STEP_ARGENT_VOTES)
                 <div class="bg-white dark:bg-gray-800 rounded-lg p-4 sm:p-6 border border-gray-200 dark:border-gray-700">
                     <div class="flex items-center gap-3 mb-3">
                         <div class="flex flex-1 gap-1.5" aria-hidden="true">
-                            <span class="h-1.5 flex-1 rounded-full bg-blue-600"></span>
-                            <span class="h-1.5 flex-1 rounded-full {{ $isWhenStep ? 'bg-gray-200 dark:bg-gray-700' : 'bg-blue-600' }}"></span>
+                            @foreach($steps as $index => $step)
+                                <span class="h-1.5 flex-1 rounded-full {{ $index <= $stepIndex ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-700' }}"></span>
+                            @endforeach
                         </div>
                         <p class="text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">
-                            Step {{ $isWhenStep ? 1 : 2 }} of 2
+                            Step {{ $stepIndex + 1 }} of {{ count($steps) }}
                         </p>
                     </div>
                     <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                        &ldquo;{{ $currentAgenda->reveal_step_label }}&rdquo; cards
+                        @if($isArgentStep)
+                            The Argent Flight votes first
+                        @else
+                            &ldquo;{{ $currentAgenda->reveal_step_label }}&rdquo; cards
+                        @endif
                     </h3>
                     <p class="text-sm text-gray-700 dark:text-gray-300 mb-4">
-                        @if($isWhenStep)
+                        @if($currentAgenda->reveal_step === \App\Models\Agenda::STEP_WHEN_REVEALED)
                             Ask the players if anyone wants to play a card with &ldquo;When an agenda is revealed&rdquo;, such as Veto. Resolve those cards before continuing. If the agenda is discarded, use Discard Agenda and reveal the next one.
+                        @elseif($isArgentStep)
+                            {{ $game->argentFlightPlayerName() ?? 'The Argent Flight player' }} votes before everyone else and announces their votes publicly. Ask them to say which outcome they vote for and how many votes they cast. They still enter their vote in the app once voting opens.
                         @else
                             Ask the players if anyone wants to play a card with &ldquo;After an agenda is revealed&rdquo;, such as a Rider or Assassinate Representative. Resolve those cards before continuing.
                         @endif
                     </p>
                     <button wire:click="completeRevealStep"
                             class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold py-3 sm:py-2 px-4 rounded-lg transition-colors">
-                        {{ $isWhenStep ? 'Done, continue to "After" cards' : 'Done, start voting' }}
+                        @if($nextStep === \App\Models\Agenda::STEP_AFTER_REVEALED)
+                            {{ 'Done, continue to "After" cards' }}
+                        @elseif($nextStep === \App\Models\Agenda::STEP_ARGENT_VOTES)
+                            Done, continue to The Argent Flight
+                        @else
+                            Done, start voting
+                        @endif
                     </button>
                 </div>
             @endif
@@ -111,16 +170,7 @@
                                 Preset agenda <span class="font-normal text-gray-500 dark:text-gray-400">(optional)</span>
                             </label>
                             <div class="flex gap-2">
-                                <select id="selectedPresetAgenda"
-                                        wire:model.live="selectedPresetAgenda"
-                                        class="{{ $inputClass }} min-w-0 flex-1">
-                                    <option value="">-- Create Custom Agenda --</option>
-                                    @foreach($availableAgendas as $agenda)
-                                        <option value="{{ $agenda['Name'] }}">
-                                            {{ $agenda['Name'] }} ({{ ucfirst($agenda['Type']) }})
-                                        </option>
-                                    @endforeach
-                                </select>
+                                <x-agenda-search :agendas="$availableAgendas" :input-class="$inputClass" />
                                 @if($selectedPresetAgenda)
                                     <button type="button"
                                             wire:click="clearPresetSelection"
@@ -130,7 +180,7 @@
                                 @endif
                             </div>
                             <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                Pick a preset to fill in the form, or create a custom one from scratch.
+                                Search by name or effect to fill in the form, or leave it empty to create a custom agenda.
                             </p>
                         </div>
 
@@ -257,6 +307,19 @@
         </div>
     @endif
 
+    <!-- Laws in effect, shown to every player -->
+    @if($game->representative_government)
+        <div class="flex items-start gap-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4">
+            <span class="shrink-0 mt-0.5 px-2 py-0.5 rounded text-xs font-semibold uppercase bg-amber-200 text-amber-900 dark:bg-amber-800 dark:text-amber-100">Law</span>
+            <div>
+                <p class="font-semibold text-amber-900 dark:text-amber-100">Representative Government is in effect</p>
+                <p class="text-sm text-amber-800 dark:text-amber-200">
+                    Players cannot exhaust planets to vote. Each player casts 1 vote on each agenda.
+                </p>
+            </div>
+        </div>
+    @endif
+
     <!-- Players List -->
     <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
         <div class="flex justify-between items-center mb-4">
@@ -322,6 +385,10 @@
                 </div>
             @endforeach
         </div>
+
+        <div class="mt-4">
+            <x-rejoin-link :game="$game" />
+        </div>
     </div>
 
     <!-- Current Agenda -->
@@ -344,7 +411,15 @@
                 <div class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
                     <p class="text-yellow-800 dark:text-yellow-200 font-medium">Voting has not started yet</p>
                     <p class="text-sm text-yellow-800 dark:text-yellow-200 mt-1">
-                        The Speaker is asking for &ldquo;{{ $currentAgenda->reveal_step_label }}&rdquo; action cards. Voting opens when the Speaker is done.
+                        @if($currentAgenda->reveal_step === \App\Models\Agenda::STEP_ARGENT_VOTES)
+                            @if(\App\Models\Game::isArgentFlight($player->faction))
+                                You play The Argent Flight, so you vote first: announce your votes to everyone. Voting opens when the Speaker is done.
+                            @else
+                                The Argent Flight votes first and announces their votes. Voting opens when the Speaker is done.
+                            @endif
+                        @else
+                            The Speaker is asking for &ldquo;{{ $currentAgenda->reveal_step_label }}&rdquo; action cards. Voting opens when the Speaker is done.
+                        @endif
                     </p>
                 </div>
             @elseif($currentAgenda->status === 'voting' && $currentAgenda->isPlayerBlocked($player))
@@ -374,7 +449,13 @@
                         @error('selectedOption') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
                     </div>
 
-                    @if($selectedOption !== 'Abstain')
+                    @if($game->representative_government)
+                        <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                            <p class="text-sm text-blue-800 dark:text-blue-200">
+                                Representative Government is in effect: your vote counts as 1 vote.
+                            </p>
+                        </div>
+                    @elseif($selectedOption !== 'Abstain')
                     <div>
                         <label for="influenceSpent" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                             Influence to spend (1-99):
@@ -453,19 +534,3 @@
         </div>
     @endif
 </div>
-
-<script>
-    document.addEventListener('livewire:initialized', () => {
-        Livewire.on('option-selected', (event) => {
-            const isAbstain = event.detail.option === 'Abstain';
-            const influenceInput = document.getElementById('influenceSpent');
-
-            if (isAbstain) {
-                influenceInput.value = '0';
-                influenceInput.disabled = true;
-            } else {
-                influenceInput.disabled = false;
-            }
-        });
-    });
-</script>

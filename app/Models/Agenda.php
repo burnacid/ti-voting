@@ -15,10 +15,13 @@ class Agenda extends Model
     // Before voting opens, the Speaker checks for these action card timings, in this order
     public const STEP_WHEN_REVEALED = 'when_revealed';
     public const STEP_AFTER_REVEALED = 'after_revealed';
+    // Only when The Argent Flight is in the game: they vote first and announce their votes publicly
+    public const STEP_ARGENT_VOTES = 'argent_votes';
 
     public const REVEAL_STEP_LABELS = [
         self::STEP_WHEN_REVEALED => 'When an agenda is revealed',
         self::STEP_AFTER_REVEALED => 'After an agenda is revealed',
+        self::STEP_ARGENT_VOTES => 'The Argent Flight votes first',
     ];
 
     // Elect line as printed on the agenda cards, keyed by the "Elect" value in agendas.json
@@ -111,6 +114,29 @@ class Agenda extends Model
     public function isVotingOpen(): bool
     {
         return $this->status === 'voting' && $this->reveal_step === null;
+    }
+
+    /**
+     * The steps the Speaker goes through before voting opens, in order.
+     */
+    public function revealSteps(): array
+    {
+        return array_values(array_filter([
+            self::STEP_WHEN_REVEALED,
+            self::STEP_AFTER_REVEALED,
+            $this->game->hasArgentFlight() ? self::STEP_ARGENT_VOTES : null,
+        ]));
+    }
+
+    /**
+     * The step after the current one, or null when voting opens next.
+     */
+    public function nextRevealStep(): ?string
+    {
+        $steps = $this->revealSteps();
+        $index = array_search($this->reveal_step, $steps, true);
+
+        return $index === false ? null : ($steps[$index + 1] ?? null);
     }
 
     public function getRevealStepLabelAttribute(): ?string

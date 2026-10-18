@@ -3,6 +3,7 @@
 use App\Events\TriggerRefresh;
 use App\Livewire\CreateGame;
 use App\Livewire\GameDashboard;
+use App\Livewire\JoinGameForm;
 use App\Livewire\UpdateMiltyUrl;
 use App\Models\Agenda;
 use App\Models\Game;
@@ -524,4 +525,343 @@ test('creating a game without a milty url works', function () {
 
     expect(Game::count())->toBe(1);
     Http::assertNothingSent();
+});
+
+test('every player sees the game rejoin link and no session tokens', function () {
+    [$game, $speaker, $other] = makeGame();
+
+    foreach ([[$speaker, $other], [$other, $speaker]] as [$viewer, $otherPlayer]) {
+        Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $viewer])
+            ->assertSee($game->rejoinUrl())
+            ->assertDontSee($otherPlayer->session_token);
+    }
+
+    $this->get($game->rejoinUrl())->assertOk()->assertSee('Rejoin Game')->assertSee('Who are you?');
+});
+
+test('a player who lost access rejoins once another player confirms it', function () {
+    Event::fake([TriggerRefresh::class]);
+    [$game, $speaker, $other] = makeGame();
+
+    // The Speaker lost their session and asks to rejoin from a new browser
+    $request = Livewire::test(JoinGameForm::class, ['gameCode' => $game->code, 'rejoin' => true])
+        ->assertSee('Speaker')
+        ->set('playerName', 'Speaker')
+        ->call('requestRejoin')
+        ->assertSet('rejoinStatus', 'waiting')
+        ->assertSee('Waiting for another player');
+
+    // Nothing happens until someone confirms
+    $request->call('checkRejoin')->assertSet('rejoinStatus', 'waiting');
+    expect(session('player_token'))->toBeNull();
+
+    // The requested player cannot confirm themselves, another player can
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker->fresh()])
+        ->assertDontSee('Someone wants to rejoin as Speaker')
+        ->assertSee('Someone is asking to rejoin as you')
+        ->call('approveRejoin', $speaker->id);
+    expect($speaker->fresh()->rejoin_approved_at)->toBeNull();
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $other])
+        ->assertSee('Someone wants to rejoin as Speaker')
+        ->assertSee('including the Speaker controls')
+        ->call('approveRejoin', $speaker->id);
+
+    $request->call('checkRejoin')->assertRedirect(route('game.show', $game->code));
+    expect(session('player_token'))->toBe($speaker->session_token)
+        ->and($speaker->fresh()->rejoin_request_token)->toBeNull();
+});
+
+test('a declined rejoin request does not let the browser in', function () {
+    Event::fake([TriggerRefresh::class]);
+    [$game, $speaker, $other] = makeGame();
+
+    $request = Livewire::test(JoinGameForm::class, ['gameCode' => $game->code, 'rejoin' => true])
+        ->set('playerName', 'Other')
+        ->call('requestRejoin');
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->call('declineRejoin', $other->id);
+
+    $request->call('checkRejoin')
+        ->assertSet('rejoinStatus', 'declined')
+        ->assertSee('Your request to rejoin was declined');
+    expect(session('player_token'))->toBeNull();
+});
+
+test('a rejoin request expires when nobody confirms it', function () {
+    Event::fake([TriggerRefresh::class]);
+    [$game, , $other] = makeGame();
+
+    $request = Livewire::test(JoinGameForm::class, ['gameCode' => $game->code, 'rejoin' => true])
+        ->set('playerName', 'Other')
+        ->call('requestRejoin');
+
+    $this->travel(Player::REJOIN_REQUEST_MINUTES + 1)->minutes();
+
+    $request->call('checkRejoin')->assertSet('rejoinStatus', 'expired');
+    expect($other->fresh()->rejoin_request_token)->toBeNull();
+});
+
+test('joining with a taken name offers to ask to rejoin', function () {
+    Event::fake([TriggerRefresh::class]);
+    [$game, , $other] = makeGame();
+
+    Livewire::test(JoinGameForm::class, ['gameCode' => $game->code])
+        ->set('playerName', 'Other')
+        ->call('joinGame')
+        ->assertHasErrors('playerName')
+        ->assertSee('Ask to rejoin as Other')
+        ->call('requestRejoin')
+        ->assertSet('rejoinStatus', 'waiting');
+
+    expect($other->fresh()->hasPendingRejoinRequest())->toBeTrue();
+});
+
+test('a removed player is dropped from an open elect player agenda unless voted for', function () {
+    [$game, $speaker, $other] = makeGame();
+    $third = Player::create(['game_id' => $game->id, 'name' => 'Third', 'session_token' => Player::generateSessionToken()]);
+    $agenda = makeAgenda($game);
+    $agenda->update(['elect' => 'player', 'options' => ['Speaker', 'Other', 'Third', 'Abstain']]);
+    Vote::create(['agenda_id' => $agenda->id, 'player_id' => $speaker->id, 'option' => 'Third', 'influence_spent' => 2]);
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->call('removePlayer', $other->id)
+        ->call('removePlayer', $third->id);
+
+    expect($agenda->fresh()->options)->toBe(['Speaker', 'Third', 'Abstain']);
+});
+
+test('the milty url control of a removed player does not crash', function () {
+    [$game, $speaker, $other] = makeGame();
+    Http::fake();
+
+    $control = Livewire::test(UpdateMiltyUrl::class, ['game' => $game, 'player' => $speaker]);
+    $game->setSpeaker($other);
+    $game->removePlayer($speaker->fresh());
+
+    $control->set('miltyUrl', 'https://milty.shenanigans.be/d/abc123')
+        ->call('updateMiltyUrl')
+        ->assertDispatched('flashMessage');
+
+    expect($game->fresh()->milty_url)->toBeNull();
+    Http::assertNothingSent();
+});
+
+test('creating games is rate limited', function () {
+    Http::fake();
+
+    foreach (range(1, 10) as $attempt) {
+        Livewire::test(CreateGame::class)->set('gameName', "Game {$attempt}")->set('playerName', 'Me')->call('createGame');
+    }
+
+    Livewire::test(CreateGame::class)
+        ->set('gameName', 'One too many')
+        ->set('playerName', 'Me')
+        ->call('createGame')
+        ->assertHasErrors('gameName');
+
+    expect(Game::count())->toBe(10);
+});
+
+test('joining games is rate limited', function () {
+    [$game] = makeGame();
+
+    foreach (range(1, 30) as $attempt) {
+        Livewire::test(JoinGameForm::class, ['gameCode' => 'NOPE00'])->set('playerName', 'X')->call('joinGame');
+    }
+
+    Livewire::test(JoinGameForm::class, ['gameCode' => $game->code])
+        ->set('playerName', 'Late')
+        ->call('joinGame')
+        ->assertHasErrors('gameCode');
+
+    expect($game->players()->where('name', 'Late')->exists())->toBeFalse();
+});
+
+test('preset planet agendas pick the matching planet type', function (string $preset, string $agendaType) {
+    [$miltyGame, $miltySpeaker] = makeGame(['milty_draft_data' => ['draft' => ['players' => []], 'slices' => []]]);
+    [$plainGame, $plainSpeaker] = makeGame();
+
+    Livewire::test(GameDashboard::class, ['game' => $miltyGame, 'player' => $miltySpeaker])
+        ->set('selectedPresetAgenda', $preset)
+        ->assertSet('agendaType', $agendaType);
+
+    // Without Milty data there are no planets to elect
+    Livewire::test(GameDashboard::class, ['game' => $plainGame, 'player' => $plainSpeaker])
+        ->set('selectedPresetAgenda', $preset)
+        ->assertSet('agendaType', 'custom');
+})->with([
+    ['Compensated Disarmament', 'elect_planet_any'],
+    ['Research Team: Biotic', 'elect_planet_industrial'],
+    ['Demilitarized Zone', 'elect_planet_cultural'],
+    ['Core Mining', 'elect_planet_hazardous'],
+    ['Colonial Redistribution', 'elect_planet_non_home'],
+]);
+
+test('other preset agendas keep their voting type', function (string $preset, string $agendaType) {
+    [$game, $speaker] = makeGame();
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->set('selectedPresetAgenda', $preset)
+        ->assertSet('agendaType', $agendaType);
+})->with([
+    ['Anti-Intellectual Revolution', 'for_against'],
+    ['Committee Formation', 'elect_player'],
+    ['Judicial Abolishment', 'custom'],
+    ['Galactic Crisis Pact', 'for_against'],
+]);
+
+test('planet agendas list the planets once with abstain last', function () {
+    [$game, $speaker] = makeGame(['milty_draft_data' => ['draft' => ['players' => []], 'slices' => []]]);
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->set('selectedPresetAgenda', 'Research Team: Biotic')
+        ->set('customTileNumbers', '18')
+        ->call('createAgenda');
+
+    $options = $game->currentAgenda()->options;
+    expect(array_is_list($options))->toBeTrue()
+        ->and(end($options))->toBe('Abstain')
+        ->and($options)->toContain('Mecatol Rex')
+        ->and(count($options))->toBe(count(array_unique($options)));
+});
+
+test('with the argent flight in the milty draft the speaker gets an extra step before voting', function () {
+    $draft = ['draft' => ['players' => [
+        ['name' => 'Alice', 'faction' => 'The Argent Flight'],
+        ['name' => 'Bob', 'faction' => 'The Federation of Sol'],
+    ]], 'slices' => []];
+    [$game, $speaker, $other] = makeGame(['milty_draft_data' => $draft]);
+    $agenda = makeAgenda($game);
+    $agenda->update(['reveal_step' => Agenda::STEP_AFTER_REVEALED]);
+
+    $speakerView = Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->assertSee('Step 2 of 3')
+        ->assertSee('Done, continue to The Argent Flight')
+        ->call('completeRevealStep')
+        ->assertSee('The Argent Flight votes first')
+        ->assertSee('Alice votes before everyone else')
+        ->assertSee('Done, start voting');
+
+    expect($agenda->fresh()->reveal_step)->toBe(Agenda::STEP_ARGENT_VOTES);
+
+    // Voting is still closed while the Argent Flight announces their votes
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $other])
+        ->assertSee('The Argent Flight votes first and announces their votes')
+        ->set('selectedOption', 'For')
+        ->set('influenceSpent', 3)
+        ->call('submitVote');
+    expect(Vote::count())->toBe(0);
+
+    $speakerView->call('completeRevealStep');
+    expect($agenda->fresh()->isVotingOpen())->toBeTrue();
+});
+
+test('the argent flight is also recognised from a player faction', function () {
+    [$game, $speaker, $other] = makeGame();
+    $other->update(['faction' => 'Argent Flight']);
+    $agenda = makeAgenda($game);
+    $agenda->update(['reveal_step' => Agenda::STEP_ARGENT_VOTES]);
+
+    expect($game->hasArgentFlight())->toBeTrue()
+        ->and($game->argentFlightPlayerName())->toBe('Other');
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $other])
+        ->assertSee('You play The Argent Flight, so you vote first');
+});
+
+test('without the argent flight voting opens after the after step', function () {
+    [$game, $speaker] = makeGame();
+    $agenda = makeAgenda($game);
+    $agenda->update(['reveal_step' => Agenda::STEP_AFTER_REVEALED]);
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->assertSee('Step 2 of 2')
+        ->call('completeRevealStep');
+
+    expect($agenda->fresh()->isVotingOpen())->toBeTrue();
+});
+
+test('representative government passing for gives every player 1 vote', function () {
+    [$game, $speaker, $other] = makeGame();
+    $agenda = makeAgenda($game);
+    $agenda->update(['title' => 'Representative Government']);
+    Vote::create(['agenda_id' => $agenda->id, 'player_id' => $speaker->id, 'option' => 'For', 'influence_spent' => 5]);
+    Vote::create(['agenda_id' => $agenda->id, 'player_id' => $other->id, 'option' => 'Against', 'influence_spent' => 3]);
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->call('endVoting')
+        ->assertDispatched('flashMessage');
+
+    expect($game->fresh()->representative_government)->toBeTrue();
+
+    // The next agenda counts 1 vote per player, whatever influence is entered
+    makeAgenda($game);
+    Livewire::test(GameDashboard::class, ['game' => $game->fresh(), 'player' => $other])
+        ->assertSee('your vote counts as 1 vote')
+        ->assertDontSee('Influence to spend')
+        ->set('selectedOption', 'For')
+        ->set('influenceSpent', 12)
+        ->call('submitVote')
+        ->assertHasNoErrors();
+
+    expect(Vote::where('player_id', $other->id)->latest('id')->first()->influence_spent)->toBe(1);
+});
+
+test('representative government voted against or tied is not put in effect', function (int $for, int $against) {
+    [$game, $speaker, $other] = makeGame();
+    $agenda = makeAgenda($game);
+    $agenda->update(['title' => 'Representative Government']);
+    Vote::create(['agenda_id' => $agenda->id, 'player_id' => $speaker->id, 'option' => 'For', 'influence_spent' => $for]);
+    Vote::create(['agenda_id' => $agenda->id, 'player_id' => $other->id, 'option' => 'Against', 'influence_spent' => $against]);
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])->call('endVoting');
+
+    expect($game->fresh()->representative_government)->toBeFalse();
+})->with([[2, 6], [4, 4]]);
+
+test('only the speaker can turn representative government on or off', function () {
+    [$game, $speaker, $other] = makeGame();
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $other])
+        ->assertDontSee('Representative Government is in effect')
+        ->call('toggleRepresentativeGovernment');
+    expect($game->fresh()->representative_government)->toBeFalse();
+
+    $speakerView = Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->call('toggleRepresentativeGovernment');
+    expect($game->fresh()->representative_government)->toBeTrue();
+
+    // Removed again, e.g. by Repeal Law
+    $speakerView->call('toggleRepresentativeGovernment');
+    expect($game->fresh()->representative_government)->toBeFalse();
+});
+
+test('the preset agenda search lists every preset and fills in the form', function () {
+    [$game, $speaker] = makeGame();
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->call('toggleCreateAgenda')
+        ->assertSee('Search agendas')
+        ->assertSee('role="combobox"', false)
+        ->assertSee('Representative Government')
+        ->set('selectedPresetAgenda', 'Mutiny')
+        ->assertSet('newAgendaTitle', 'Mutiny')
+        ->assertSet('newAgendaCardType', 'directive');
+});
+
+test('every player sees when representative government is in effect', function () {
+    [$game, $speaker, $other] = makeGame();
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $other])
+        ->assertDontSee('Players cannot exhaust planets to vote');
+
+    $game->update(['representative_government' => true]);
+
+    foreach ([$speaker, $other] as $viewer) {
+        Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $viewer])
+            ->assertSee('Representative Government is in effect')
+            ->assertSee('Players cannot exhaust planets to vote');
+    }
 });

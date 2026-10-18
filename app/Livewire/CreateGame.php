@@ -6,6 +6,7 @@ use App\Models\Game;
 use App\Models\Player;
 use App\Services\MiltyService;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\RateLimiter;
 use Livewire\Component;
 
 class CreateGame extends Component
@@ -85,6 +86,13 @@ class CreateGame extends Component
                 return;
             }
         }
+
+        $throttleKey = 'create-game|' . request()->ip();
+        if (RateLimiter::tooManyAttempts($throttleKey, 10)) {
+            $this->addError('gameName', 'Too many games created. Try again in ' . ceil(RateLimiter::availableIn($throttleKey) / 60) . ' minutes.');
+            return;
+        }
+        RateLimiter::hit($throttleKey, 3600);
 
         $game = Game::create([
             'code' => Game::generateCode(),

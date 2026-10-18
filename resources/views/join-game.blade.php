@@ -15,7 +15,7 @@
                     ← Back to Home
                 </a>
                 <h1 class="text-3xl font-bold text-gray-900 dark:text-white mt-4">
-                    Join Game
+                    {{ ($rejoin ?? false) ? 'Rejoin Game' : 'Join Game' }}
                 </h1>
                 @if(isset($game))
                     <p class="text-gray-600 dark:text-gray-300 mt-2">
@@ -38,7 +38,7 @@
             @endif
 
             <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-                <livewire:join-game-form :game-code="$code ?? ''" />
+                <livewire:join-game-form :game-code="$code ?? ''" :rejoin="$rejoin ?? false" />
             </div>
         </div>
     </div>

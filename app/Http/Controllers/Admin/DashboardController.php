@@ -33,7 +33,8 @@ class DashboardController extends Controller
             'averagePlayers' => $gameCount ? round(Player::count() / $gameCount, 1) : 0,
             'miltyGames' => Game::whereNotNull('milty_draft_data')->count(),
             'gameCount' => $gameCount,
-            'cleanupCount' => Game::olderThan(7)->count(),
+            'cleanupCount' => Game::inactiveFor(Game::retentionDays())->count(),
+            'retentionDays' => Game::retentionDays(),
             'gamesPerDay' => $this->gamesPerDay(),
             'topAgendas' => Agenda::query()
                 ->select('title')

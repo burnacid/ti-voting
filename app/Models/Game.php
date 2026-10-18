@@ -21,6 +21,7 @@ class Game extends Model
         'milty_draft_id',
         'milty_draft_data',
         'fracture_in_play',
+        'representative_government',
         'status',
     ];
 
@@ -28,6 +29,7 @@ class Game extends Model
         'status' => 'string',
         'milty_draft_data' => 'array',
         'fracture_in_play' => 'boolean',
+        'representative_government' => 'boolean',
     ];
 
     public function players(): HasMany
@@ -50,12 +52,57 @@ class Game extends Model
         return $this->agendas()->where('status', 'voting')->first();
     }
 
-    /**
-     * Scope to get games older than the specified number of days
-     */
-    public function scopeOlderThan($query, int $days = 7)
+    // Law that, when voted "For", lets each player cast only 1 vote on each agenda
+    public const REPRESENTATIVE_GOVERNMENT = 'Representative Government';
+
+    // Page where players who lost their session ask to rejoin, another player has to confirm it
+    public function rejoinUrl(): string
     {
-        return $query->where('created_at', '<', now()->subDays($days));
+        return route('game.rejoin', $this->code);
+    }
+
+    public static function retentionDays(): int
+    {
+        return (int) config('app.game_retention_days', 7);
+    }
+
+    /**
+     * Scope to games without any activity in the given number of days: no change to the game,
+     * no player joining and no agenda changed or voted on.
+     */
+    public function scopeInactiveFor($query, int $days)
+    {
+        $cutoff = now()->subDays($days);
+
+        return $query
+            ->where('updated_at', '<', $cutoff)
+            ->whereDoesntHave('players', fn ($query) => $query->where('created_at', '>=', $cutoff))
+            ->whereDoesntHave('agendas', fn ($query) => $query->where('updated_at', '>=', $cutoff))
+            ->whereDoesntHave('agendas.votes', fn ($query) => $query->where('created_at', '>=', $cutoff));
+    }
+
+    /**
+     * Remove a player and their votes. They are also taken off an open "Elect Player" agenda,
+     * unless someone already voted for them. A removed Speaker passes the token to the longest-joined player.
+     */
+    public function removePlayer(Player $player): void
+    {
+        if ($player->game_id !== $this->id) {
+            throw new \InvalidArgumentException('Player does not belong to this game');
+        }
+
+        $player->delete();
+
+        $currentAgenda = $this->currentAgenda();
+        if ($currentAgenda?->elect === 'player' && !$currentAgenda->votes()->where('option', $player->name)->exists()) {
+            $currentAgenda->update([
+                'options' => collect($currentAgenda->options)->reject(fn ($option) => $option === $player->name)->values()->all(),
+            ]);
+        }
+
+        if ($player->is_speaker && $newSpeaker = $this->players()->oldest()->first()) {
+            $this->setSpeaker($newSpeaker);
+        }
     }
 
     public function lastCompletedAgenda(): ?Agenda
@@ -163,6 +210,36 @@ class Game extends Model
         }
 
         return $tiles;
+    }
+
+    public static function isArgentFlight(?string $faction): bool
+    {
+        return $faction !== null && stripos($faction, 'Argent') !== false;
+    }
+
+    /**
+     * Whether The Argent Flight is in play, from the Milty draft or a faction a player entered.
+     */
+    public function hasArgentFlight(): bool
+    {
+        return $this->miltyFactionNames()->contains(fn ($faction) => self::isArgentFlight($faction))
+            || $this->players()->get()->contains(fn ($player) => self::isArgentFlight($player->faction));
+    }
+
+    /**
+     * Name of the player playing The Argent Flight, from the players in this game or else the Milty draft.
+     */
+    public function argentFlightPlayerName(): ?string
+    {
+        $player = $this->players()->get()->first(fn ($player) => self::isArgentFlight($player->faction));
+        if ($player) {
+            return $player->name;
+        }
+
+        $miltyPlayer = collect($this->milty_draft_data['draft']['players'] ?? [])
+            ->first(fn ($player) => self::isArgentFlight($player['faction'] ?? null));
+
+        return $miltyPlayer['name'] ?? null;
     }
 
     public function miltyFactionNames()

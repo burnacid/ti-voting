@@ -19,6 +19,9 @@
                             Thunder's Edge{{ $game->fracture_in_play ? ' · Fracture in play' : '' }}
                         </span>
                     @endif
+                    @if($game->representative_government)
+                        <span class="px-2 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">Representative Government</span>
+                    @endif
                 </div>
             </div>
             <div class="flex flex-col sm:flex-row gap-2 shrink-0">
@@ -48,6 +51,21 @@
                     </div>
                     <div class="text-sm text-gray-600 dark:text-gray-300">{{ $gamePlayer->faction ?? 'No faction' }}</div>
                     <div class="text-xs text-gray-500 dark:text-gray-400">Joined {{ $gamePlayer->created_at->diffForHumans() }}</div>
+
+                    <div class="mt-2 flex flex-wrap gap-2">
+                        @unless($gamePlayer->is_speaker)
+                            <button wire:click="makeSpeaker('{{ $gamePlayer->id }}')"
+                                    wire:confirm="Make {{ $gamePlayer->name }} the Speaker?"
+                                    class="text-xs font-medium bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-md transition-colors">
+                                Make Speaker
+                            </button>
+                        @endunless
+                        <button wire:click="removePlayer('{{ $gamePlayer->id }}')"
+                                wire:confirm="Remove {{ $gamePlayer->name }} from the game? Their votes are deleted too."
+                                class="text-xs font-medium bg-gray-200 hover:bg-red-600 hover:text-white dark:bg-gray-600 px-3 py-2 rounded-md transition-colors">
+                            Remove
+                        </button>
+                    </div>
                 </div>
             @endforeach
         </div>

@@ -3,18 +3,18 @@
     <section class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-4 sm:p-6">
         <h2 class="text-lg font-bold mb-1">Cleanup</h2>
         <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
-            Games are deleted automatically every night at 02:00 once they are older than 7 days. You can also run the cleanup now.
+            Games are deleted automatically every night at 02:00 once they have had no activity for {{ \App\Models\Game::retentionDays() }} days. You can also run the cleanup now.
         </p>
 
         <form wire:submit="runCleanup" class="flex flex-col sm:flex-row sm:items-end gap-3">
             <div>
-                <label for="cleanupDays" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Delete games older than (days)</label>
+                <label for="cleanupDays" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Delete games inactive for (days)</label>
                 <input type="number" id="cleanupDays" wire:model.live.debounce.300ms="cleanupDays" min="1" max="365"
                        class="w-full sm:w-32 px-3 py-2.5 text-base sm:text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700">
             </div>
             <button type="submit"
                     @disabled($cleanupCount === 0)
-                    wire:confirm="Delete {{ $cleanupCount }} game(s) older than {{ $cleanupDays }} days, with their players, agendas and votes?"
+                    wire:confirm="Delete {{ $cleanupCount }} game(s) without activity for {{ $cleanupDays }} days, with their players, agendas and votes?"
                     class="w-full sm:w-auto bg-red-600 hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-semibold py-3 sm:py-2 px-4 rounded-lg transition-colors">
                 Delete {{ $cleanupCount }} {{ Str::plural('game', $cleanupCount) }}
             </button>

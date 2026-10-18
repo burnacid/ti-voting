@@ -50,6 +50,19 @@ Route::get('/game/{code}', function (string $code) {
     return view('game', ['game' => $game, 'player' => $player]);
 })->name('game.show');
 
+// For players who lost their session: pick your name, another player confirms it is you
+Route::get('/game/{code}/rejoin', function (string $code) {
+    $game = Game::where('code', strtoupper($code))->first();
+
+    if (!$game) {
+        return redirect()->route('home')->with('error', 'Game not found.');
+    }
+
+    Log::shareContext(['game' => $game->code]);
+
+    return view('join-game', ['code' => $game->code, 'game' => $game, 'rejoin' => true]);
+})->name('game.rejoin');
+
 // Admin
 Route::prefix(config('app.admin_path'))->name('admin.')->group(function () {
     Route::view('/login', 'admin.login')->middleware('guest')->name('login');
