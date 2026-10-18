@@ -489,14 +489,18 @@ class GameDashboard extends Component
             return;
         }
 
+        $oneVoteEach = $this->game->representative_government;
+
         $this->validate([
             'selectedOption' => ['required', 'string', Rule::in($currentAgenda->options)],
-            'influenceSpent' => $this->selectedOption === 'Abstain' ? 'integer' : 'required|integer|min:1|max:99',
+            'influenceSpent' => $this->selectedOption === 'Abstain' || $oneVoteEach ? 'nullable' : 'required|integer|min:1|max:99',
         ]);
 
-        // Force influence to 0 when abstaining
+        // Force influence to 0 when abstaining, and to 1 vote under Representative Government
         if ($this->selectedOption === 'Abstain') {
             $this->influenceSpent = 0;
+        } elseif ($oneVoteEach) {
+            $this->influenceSpent = 1;
         }
 
         try {
@@ -559,9 +563,57 @@ class GameDashboard extends Component
                 'Voting has ended. Please announce the results to the other players.',
                 'info'
             ]);
+            $this->applyRepresentativeGovernment($currentAgenda);
             $this->refreshData();
             TriggerRefresh::dispatch($this->game);
         }
+    }
+
+    /**
+     * Put Representative Government in effect when it was voted "For". On a tie the Speaker decides and can enable it by hand.
+     */
+    private function applyRepresentativeGovernment(Agenda $agenda): void
+    {
+        if (strcasecmp($agenda->title, Game::REPRESENTATIVE_GOVERNMENT) !== 0 || $this->game->representative_government) {
+            return;
+        }
+
+        $results = $agenda->getVoteResults();
+        $for = $results['For']['influence'] ?? 0;
+        $against = $results['Against']['influence'] ?? 0;
+
+        if ($for > $against) {
+            $this->game->update(['representative_government' => true]);
+            Log::info('Representative Government put in effect', ['for' => $for, 'against' => $against]);
+            $this->dispatch('flashMessage', [
+                'Representative Government passed: from now on each player casts 1 vote on each agenda.',
+                'success'
+            ]);
+        } elseif ($for > 0 && $for === $against) {
+            $this->dispatch('flashMessage', [
+                'Representative Government is tied. As Speaker you decide; if For wins, turn it on in the Speaker controls.',
+                'info'
+            ]);
+        }
+    }
+
+    public function toggleRepresentativeGovernment()
+    {
+        if (!$this->player->is_speaker) {
+            return;
+        }
+
+        $this->game->update(['representative_government' => !$this->game->representative_government]);
+        Log::info($this->game->representative_government ? 'Representative Government put in effect' : 'Representative Government removed');
+
+        $this->dispatch('flashMessage', [
+            $this->game->representative_government
+                ? 'Representative Government is in effect: each player casts 1 vote on each agenda.'
+                : 'Representative Government is no longer in effect: players spend influence to vote again.',
+            'info'
+        ]);
+        TriggerRefresh::dispatch($this->game);
+        $this->refreshData();
     }
 
     public function toggleFracture()

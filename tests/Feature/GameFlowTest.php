@@ -730,3 +730,58 @@ test('without the argent flight voting opens after the after step', function () 
 
     expect($agenda->fresh()->isVotingOpen())->toBeTrue();
 });
+
+test('representative government passing for gives every player 1 vote', function () {
+    [$game, $speaker, $other] = makeGame();
+    $agenda = makeAgenda($game);
+    $agenda->update(['title' => 'Representative Government']);
+    Vote::create(['agenda_id' => $agenda->id, 'player_id' => $speaker->id, 'option' => 'For', 'influence_spent' => 5]);
+    Vote::create(['agenda_id' => $agenda->id, 'player_id' => $other->id, 'option' => 'Against', 'influence_spent' => 3]);
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->call('endVoting')
+        ->assertDispatched('flashMessage');
+
+    expect($game->fresh()->representative_government)->toBeTrue();
+
+    // The next agenda counts 1 vote per player, whatever influence is entered
+    makeAgenda($game);
+    Livewire::test(GameDashboard::class, ['game' => $game->fresh(), 'player' => $other])
+        ->assertSee('your vote counts as 1 vote')
+        ->assertDontSee('Influence to spend')
+        ->set('selectedOption', 'For')
+        ->set('influenceSpent', 12)
+        ->call('submitVote')
+        ->assertHasNoErrors();
+
+    expect(Vote::where('player_id', $other->id)->latest('id')->first()->influence_spent)->toBe(1);
+});
+
+test('representative government voted against or tied is not put in effect', function (int $for, int $against) {
+    [$game, $speaker, $other] = makeGame();
+    $agenda = makeAgenda($game);
+    $agenda->update(['title' => 'Representative Government']);
+    Vote::create(['agenda_id' => $agenda->id, 'player_id' => $speaker->id, 'option' => 'For', 'influence_spent' => $for]);
+    Vote::create(['agenda_id' => $agenda->id, 'player_id' => $other->id, 'option' => 'Against', 'influence_spent' => $against]);
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])->call('endVoting');
+
+    expect($game->fresh()->representative_government)->toBeFalse();
+})->with([[2, 6], [4, 4]]);
+
+test('only the speaker can turn representative government on or off', function () {
+    [$game, $speaker, $other] = makeGame();
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $other])
+        ->assertDontSee('Representative Government is in effect')
+        ->call('toggleRepresentativeGovernment');
+    expect($game->fresh()->representative_government)->toBeFalse();
+
+    $speakerView = Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->call('toggleRepresentativeGovernment');
+    expect($game->fresh()->representative_government)->toBeTrue();
+
+    // Removed again, e.g. by Repeal Law
+    $speakerView->call('toggleRepresentativeGovernment');
+    expect($game->fresh()->representative_government)->toBeFalse();
+});

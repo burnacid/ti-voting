@@ -19,6 +19,9 @@
                             Thunder's Edge{{ $game->fracture_in_play ? ' · Fracture in play' : '' }}
                         </span>
                     @endif
+                    @if($game->representative_government)
+                        <span class="px-2 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">Representative Government</span>
+                    @endif
                 </div>
             </div>
             <div class="flex flex-col sm:flex-row gap-2 shrink-0">

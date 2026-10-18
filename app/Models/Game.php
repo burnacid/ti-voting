@@ -21,6 +21,7 @@ class Game extends Model
         'milty_draft_id',
         'milty_draft_data',
         'fracture_in_play',
+        'representative_government',
         'status',
     ];
 
@@ -28,6 +29,7 @@ class Game extends Model
         'status' => 'string',
         'milty_draft_data' => 'array',
         'fracture_in_play' => 'boolean',
+        'representative_government' => 'boolean',
     ];
 
     public function players(): HasMany
@@ -49,6 +51,9 @@ class Game extends Model
     {
         return $this->agendas()->where('status', 'voting')->first();
     }
+
+    // Law that, when voted "For", lets each player cast only 1 vote on each agenda
+    public const REPRESENTATIVE_GOVERNMENT = 'Representative Government';
 
     public static function retentionDays(): int
     {

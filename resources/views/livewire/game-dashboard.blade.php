@@ -69,6 +69,20 @@
                 </label>
             @endif
 
+            <!-- Law: Representative Government -->
+            <label class="flex items-center justify-between gap-4 bg-white/70 dark:bg-gray-800/60 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3 cursor-pointer">
+                <span>
+                    <span class="block font-medium text-gray-900 dark:text-white">Representative Government is in effect</span>
+                    <span class="block text-sm text-gray-600 dark:text-gray-400">
+                        Each player casts 1 vote on each agenda instead of spending influence. Turned on when the law passes For.
+                    </span>
+                </span>
+                <input type="checkbox"
+                       wire:click="toggleRepresentativeGovernment"
+                       @checked($game->representative_government)
+                       class="h-6 w-6 shrink-0 text-blue-600 rounded">
+            </label>
+
             <!-- Action card checks before voting opens -->
             @if($currentAgenda?->status === 'voting' && $currentAgenda->reveal_step)
                 @php($steps = $currentAgenda->revealSteps())
@@ -399,7 +413,13 @@
                         @error('selectedOption') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
                     </div>
 
-                    @if($selectedOption !== 'Abstain')
+                    @if($game->representative_government)
+                        <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                            <p class="text-sm text-blue-800 dark:text-blue-200">
+                                Representative Government is in effect: your vote counts as 1 vote.
+                            </p>
+                        </div>
+                    @elseif($selectedOption !== 'Abstain')
                     <div>
                         <label for="influenceSpent" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                             Influence to spend (1-99):
