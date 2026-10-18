@@ -15,6 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Creating games is limited to 10 per hour and joining to 30 attempts per 10 minutes per IP address.
 
 ### Changed
+- The preset agenda picker is a searchable dropdown: type to filter by name or effect text, use the arrow keys and Enter, or open the full list with the arrow button.
 - The nightly cleanup deletes games that have had no activity for the retention period, instead of games created before it, so long games are no longer deleted while being played.
 - The Twilight Imperium Features block is removed from the homepage.
 

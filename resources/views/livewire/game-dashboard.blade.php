@@ -141,16 +141,7 @@
                                 Preset agenda <span class="font-normal text-gray-500 dark:text-gray-400">(optional)</span>
                             </label>
                             <div class="flex gap-2">
-                                <select id="selectedPresetAgenda"
-                                        wire:model.live="selectedPresetAgenda"
-                                        class="{{ $inputClass }} min-w-0 flex-1">
-                                    <option value="">-- Create Custom Agenda --</option>
-                                    @foreach($availableAgendas as $agenda)
-                                        <option value="{{ $agenda['Name'] }}">
-                                            {{ $agenda['Name'] }} ({{ ucfirst($agenda['Type']) }})
-                                        </option>
-                                    @endforeach
-                                </select>
+                                <x-agenda-search :agendas="$availableAgendas" :input-class="$inputClass" />
                                 @if($selectedPresetAgenda)
                                     <button type="button"
                                             wire:click="clearPresetSelection"
@@ -160,7 +151,7 @@
                                 @endif
                             </div>
                             <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                Pick a preset to fill in the form, or create a custom one from scratch.
+                                Search by name or effect to fill in the form, or leave it empty to create a custom agenda.
                             </p>
                         </div>
 

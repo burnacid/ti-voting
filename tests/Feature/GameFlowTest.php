@@ -785,3 +785,16 @@ test('only the speaker can turn representative government on or off', function (
     $speakerView->call('toggleRepresentativeGovernment');
     expect($game->fresh()->representative_government)->toBeFalse();
 });
+
+test('the preset agenda search lists every preset and fills in the form', function () {
+    [$game, $speaker] = makeGame();
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->call('toggleCreateAgenda')
+        ->assertSee('Search agendas')
+        ->assertSee('role="combobox"', false)
+        ->assertSee('Representative Government')
+        ->set('selectedPresetAgenda', 'Mutiny')
+        ->assertSet('newAgendaTitle', 'Mutiny')
+        ->assertSet('newAgendaCardType', 'directive');
+});
