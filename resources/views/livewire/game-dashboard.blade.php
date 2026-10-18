@@ -1,58 +1,91 @@
 <div class="space-y-6">
     <!-- Speaker Controls -->
     @if($player->is_speaker)
-        <div class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-6">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-xl font-bold text-yellow-800 dark:text-yellow-200">Speaker Controls</h2>
-                <div class="flex space-x-2">
-                    @if($currentAgenda?->status !== 'voting')
-                        <button wire:click="toggleCreateAgenda"
-                                class="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-md transition-colors">
-                            {{ $showCreateAgenda ? 'Cancel' : 'Create New Agenda' }}
-                        </button>
-                    @elseif($currentAgenda->reveal_step)
-                        <button wire:click="discardAgenda"
-                                wire:confirm="Discard this agenda, for example because it was vetoed? You can then reveal the next agenda."
-                                class="bg-gray-600 hover:bg-gray-700 text-white font-medium py-2 px-4 rounded-md transition-colors">
-                            Discard Agenda
-                        </button>
-                    @else
-                        <button wire:click="endVoting"
-                                wire:confirm="Are you sure you want to end voting? The results will only be visible to you."
-                                class="bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-md transition-colors">
-                            End Voting
-                        </button>
-                    @endif
+        @php
+            $hasMilty = $game->milty_draft_data !== null;
+            $inputClass = 'w-full px-3 py-2.5 text-base sm:text-sm border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white';
+            $votingTypes = [
+                'for_against' => ['label' => 'For / Against', 'planet' => false, 'hint' => null],
+                'elect_player' => ['label' => 'Elect a Player', 'planet' => false, 'hint' => 'Players will be able to vote for any player currently in the game.'],
+                'elect_planet_any' => ['label' => 'Elect a Planet', 'planet' => true, 'hint' => 'Players will be able to vote for any planet in the game.'],
+                'elect_planet_industrial' => ['label' => 'Elect an Industrial Planet', 'planet' => true, 'hint' => 'Players will be able to vote for any industrial planet in the game.'],
+                'elect_planet_hazardous' => ['label' => 'Elect a Hazardous Planet', 'planet' => true, 'hint' => 'Players will be able to vote for any hazardous planet in the game.'],
+                'elect_planet_cultural' => ['label' => 'Elect a Cultural Planet', 'planet' => true, 'hint' => 'Players will be able to vote for any cultural planet in the game.'],
+                'elect_planet_non_home' => ['label' => 'Elect a Non-Home Planet other than Mecatol Rex', 'planet' => true, 'hint' => 'Players will be able to vote for any non-home planet in the game except Mecatol Rex.'],
+                'custom' => ['label' => 'Custom Options', 'planet' => false, 'hint' => null],
+            ];
+        @endphp
+        <div class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-xl p-4 sm:p-6 space-y-4">
+            <!-- Header -->
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                    <h2 class="text-lg sm:text-xl font-bold text-yellow-800 dark:text-yellow-200">Speaker Controls</h2>
+                    <p class="text-sm text-yellow-700 dark:text-yellow-300">
+                        @if($currentAgenda?->status === 'voting' && $currentAgenda->reveal_step)
+                            Resolve action cards before voting opens.
+                        @elseif($currentAgenda?->status === 'voting')
+                            Voting is open.
+                        @else
+                            Reveal the next agenda when you are ready.
+                        @endif
+                    </p>
                 </div>
+
+                @if($currentAgenda?->status !== 'voting')
+                    @unless($showCreateAgenda)
+                        <button wire:click="toggleCreateAgenda"
+                                class="w-full sm:w-auto bg-green-600 hover:bg-green-700 active:bg-green-800 text-white font-semibold py-3 sm:py-2 px-4 rounded-lg transition-colors">
+                            Create New Agenda
+                        </button>
+                    @endunless
+                @elseif($currentAgenda->reveal_step)
+                    <button wire:click="discardAgenda"
+                            wire:confirm="Discard this agenda, for example because it was vetoed? You can then reveal the next agenda."
+                            class="w-full sm:w-auto bg-gray-600 hover:bg-gray-700 active:bg-gray-800 text-white font-semibold py-3 sm:py-2 px-4 rounded-lg transition-colors">
+                        Discard Agenda
+                    </button>
+                @else
+                    <button wire:click="endVoting"
+                            wire:confirm="Are you sure you want to end voting? The results will only be visible to you."
+                            class="w-full sm:w-auto bg-red-600 hover:bg-red-700 active:bg-red-800 text-white font-semibold py-3 sm:py-2 px-4 rounded-lg transition-colors">
+                        End Voting
+                    </button>
+                @endif
             </div>
 
             <!-- Thunder's Edge: The Fracture -->
             @if($game->isThundersEdgeGame())
-                <label class="flex items-start gap-3 mb-4 cursor-pointer">
-                    <input type="checkbox"
-                           wire:click="toggleFracture"
-                           @checked($game->fracture_in_play)
-                           class="mt-1 h-4 w-4 text-blue-600 rounded">
+                <label class="flex items-center justify-between gap-4 bg-white/70 dark:bg-gray-800/60 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3 cursor-pointer">
                     <span>
-                        <span class="block font-medium text-yellow-800 dark:text-yellow-200">The Fracture is in play</span>
-                        <span class="block text-sm text-yellow-700 dark:text-yellow-300">
+                        <span class="block font-medium text-gray-900 dark:text-white">The Fracture is in play</span>
+                        <span class="block text-sm text-gray-600 dark:text-gray-400">
                             Adds Cocytus, Lethe, Phlegethon and Styx to planet agendas.
                         </span>
                     </span>
+                    <input type="checkbox"
+                           wire:click="toggleFracture"
+                           @checked($game->fracture_in_play)
+                           class="h-6 w-6 shrink-0 text-blue-600 rounded">
                 </label>
             @endif
 
             <!-- Action card checks before voting opens -->
             @if($currentAgenda?->status === 'voting' && $currentAgenda->reveal_step)
                 @php($isWhenStep = $currentAgenda->reveal_step === \App\Models\Agenda::STEP_WHEN_REVEALED)
-                <div class="bg-white dark:bg-gray-800 rounded-lg p-6 border">
-                    <p class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">
-                        Step {{ $isWhenStep ? 1 : 2 }} of 2 before voting
-                    </p>
+                <div class="bg-white dark:bg-gray-800 rounded-lg p-4 sm:p-6 border border-gray-200 dark:border-gray-700">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="flex flex-1 gap-1.5" aria-hidden="true">
+                            <span class="h-1.5 flex-1 rounded-full bg-blue-600"></span>
+                            <span class="h-1.5 flex-1 rounded-full {{ $isWhenStep ? 'bg-gray-200 dark:bg-gray-700' : 'bg-blue-600' }}"></span>
+                        </div>
+                        <p class="text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                            Step {{ $isWhenStep ? 1 : 2 }} of 2
+                        </p>
+                    </div>
                     <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">
                         &ldquo;{{ $currentAgenda->reveal_step_label }}&rdquo; cards
                     </h3>
-                    <p class="text-gray-700 dark:text-gray-300 mb-4">
+                    <p class="text-sm text-gray-700 dark:text-gray-300 mb-4">
                         @if($isWhenStep)
                             Ask the players if anyone wants to play a card with &ldquo;When an agenda is revealed&rdquo;, such as Veto. Resolve those cards before continuing. If the agenda is discarded, use Discard Agenda and reveal the next one.
                         @else
@@ -60,7 +93,7 @@
                         @endif
                     </p>
                     <button wire:click="completeRevealStep"
-                            class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition-colors">
+                            class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold py-3 sm:py-2 px-4 rounded-lg transition-colors">
                         {{ $isWhenStep ? 'Done, continue to "After" cards' : 'Done, start voting' }}
                     </button>
                 </div>
@@ -68,19 +101,19 @@
 
             <!-- Create Agenda Form -->
             @if($showCreateAgenda && $currentAgenda?->status !== 'voting')
-                <div class="bg-white dark:bg-gray-800 rounded-lg p-6 border">
+                <div class="bg-white dark:bg-gray-800 rounded-lg p-4 sm:p-6 border border-gray-200 dark:border-gray-700">
                     <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Create New Agenda</h3>
 
-                    <form wire:submit="createAgenda" class="space-y-4">
+                    <form wire:submit="createAgenda" class="space-y-5">
                         <!-- Preset Agenda Selection -->
                         <div>
-                            <label for="selectedPresetAgenda" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                Select Preset Agenda (Optional)
+                            <label for="selectedPresetAgenda" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                                Preset agenda <span class="font-normal text-gray-500 dark:text-gray-400">(optional)</span>
                             </label>
-                            <div class="flex space-x-2">
+                            <div class="flex gap-2">
                                 <select id="selectedPresetAgenda"
                                         wire:model.live="selectedPresetAgenda"
-                                        class="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white">
+                                        class="{{ $inputClass }} min-w-0 flex-1">
                                     <option value="">-- Create Custom Agenda --</option>
                                     @foreach($availableAgendas as $agenda)
                                         <option value="{{ $agenda['Name'] }}">
@@ -91,220 +124,130 @@
                                 @if($selectedPresetAgenda)
                                     <button type="button"
                                             wire:click="clearPresetSelection"
-                                            class="px-3 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-md transition-colors">
+                                            class="shrink-0 px-4 bg-gray-500 hover:bg-gray-600 text-white rounded-lg transition-colors">
                                         Clear
                                     </button>
                                 @endif
                             </div>
                             <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                Select a preset agenda to auto-fill the form, or create a custom one from scratch
+                                Pick a preset to fill in the form, or create a custom one from scratch.
                             </p>
                         </div>
 
                         <div>
-                            <label for="newAgendaTitle" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            <label for="newAgendaTitle" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                                 Agenda Title
                             </label>
                             <input type="text"
                                    id="newAgendaTitle"
                                    wire:model="newAgendaTitle"
                                    placeholder="e.g., Elect New Speaker, Trade Agreement"
-                                   class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white">
+                                   class="{{ $inputClass }}">
                             @error('newAgendaTitle') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
                         </div>
 
                         <div>
-                            <label for="newAgendaDescription" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            <label for="newAgendaDescription" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                                 Description
                             </label>
                             <textarea id="newAgendaDescription"
                                       wire:model="newAgendaDescription"
                                       rows="3"
                                       placeholder="Describe what this agenda is about..."
-                                      class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"></textarea>
+                                      class="{{ $inputClass }}"></textarea>
                             @error('newAgendaDescription') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
                         </div>
 
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        <fieldset>
+                            <legend class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                                 Agenda Type
-                            </label>
-                            <div class="flex gap-6">
-                                <label class="flex items-center">
-                                    <input type="radio"
-                                           wire:model="newAgendaCardType"
-                                           value="law"
-                                           class="mr-2 text-blue-600">
-                                    <span class="text-gray-900 dark:text-white">Law</span>
-                                </label>
-                                <label class="flex items-center">
-                                    <input type="radio"
-                                           wire:model="newAgendaCardType"
-                                           value="directive"
-                                           class="mr-2 text-blue-600">
-                                    <span class="text-gray-900 dark:text-white">Directive</span>
-                                </label>
+                            </legend>
+                            <div class="grid grid-cols-2 gap-2">
+                                @foreach(['law' => 'Law', 'directive' => 'Directive'] as $value => $label)
+                                    <label class="flex items-center justify-center px-3 py-3 border border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer text-gray-900 dark:text-white has-checked:border-blue-600 has-checked:bg-blue-50 dark:has-checked:bg-blue-900/30 has-checked:font-semibold has-focus-visible:ring-2 has-focus-visible:ring-blue-500">
+                                        <input type="radio"
+                                               wire:model="newAgendaCardType"
+                                               value="{{ $value }}"
+                                               class="sr-only">
+                                        {{ $label }}
+                                    </label>
+                                @endforeach
                             </div>
                             @error('newAgendaCardType') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
-                        </div>
+                        </fieldset>
 
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        <fieldset>
+                            <legend class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                                 Voting Type
-                            </label>
+                            </legend>
                             <div class="space-y-2">
-                                <label class="flex items-center">
-                                    <input type="radio"
-                                           wire:model.live="agendaType"
-                                           value="for_against"
-                                           class="mr-2 text-blue-600">
-                                    <span class="text-gray-900 dark:text-white">For / Against</span>
-                                </label>
-                                <label class="flex items-center">
-                                    <input type="radio"
-                                           wire:model.live="agendaType"
-                                           value="elect_player"
-                                           class="mr-2 text-blue-600">
-                                    <span class="text-gray-900 dark:text-white">Elect a Player</span>
-                                </label>
-                                <label class="flex items-center">
-                                    <input type="radio"
-                                           wire:model.live="agendaType"
-                                           value="elect_planet_any"
-                                           class="mr-2 text-blue-600" @if($game->milty_draft_data == null) disabled @endif>
-                                    <span class="@if($game->milty_draft_data == null) text-red-800 @else text-gray-900 dark:text-white @endif">Elect a Planet</span>
-                                </label>
-                                <label class="flex items-center">
-                                    <input type="radio"
-                                           wire:model.live="agendaType"
-                                           value="elect_planet_industrial"
-                                           class="mr-2 text-blue-600" @if($game->milty_draft_data == null) disabled @endif>
-                                    <span class="@if($game->milty_draft_data == null) text-red-800 @else text-gray-900 dark:text-white @endif">Elect an Industrial Planet</span>
-                                </label>
-                                <label class="flex items-center">
-                                    <input type="radio"
-                                           wire:model.live="agendaType"
-                                           value="elect_planet_hazardous"
-                                           class="mr-2 text-blue-600" @if($game->milty_draft_data == null) disabled @endif>
-                                    <span class="@if($game->milty_draft_data == null) text-red-800 @else text-gray-900 dark:text-white @endif">Elect a Hazardous Planet</span>
-                                </label>
-                                <label class="flex items-center">
-                                    <input type="radio"
-                                           wire:model.live="agendaType"
-                                           value="elect_planet_cultural"
-                                           class="mr-2 text-blue-600" @if($game->milty_draft_data == null) disabled @endif>
-                                    <span class="@if($game->milty_draft_data == null) text-red-800 @else text-gray-900 dark:text-white @endif">Elect a Cultural Planet</span>
-                                </label>
-                                <label class="flex items-center">
-                                    <input type="radio"
-                                           wire:model.live="agendaType"
-                                           value="elect_planet_non_home"
-                                           class="mr-2 text-blue-600" @if($game->milty_draft_data == null) disabled @endif>
-                                    <span class="@if($game->milty_draft_data == null) text-red-800 @else text-gray-900 dark:text-white @endif">Elect a Non-Home Planet other than Mecatol Rex</span>
-                                </label>
-                                <label class="flex items-center">
-                                    <input type="radio"
-                                           wire:model.live="agendaType"
-                                           value="custom"
-                                           class="mr-2 text-blue-600">
-                                    <span class="text-gray-900 dark:text-white">Custom Options</span>
-                                </label>
+                                @foreach($votingTypes as $value => $type)
+                                    @php($disabled = $type['planet'] && ! $hasMilty)
+                                    <label class="flex items-center gap-3 px-3 py-3 border border-gray-300 dark:border-gray-600 rounded-lg has-checked:border-blue-600 has-checked:bg-blue-50 dark:has-checked:bg-blue-900/30 {{ $disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer' }}">
+                                        <input type="radio"
+                                               wire:model.live="agendaType"
+                                               value="{{ $value }}"
+                                               @disabled($disabled)
+                                               class="h-5 w-5 shrink-0 text-blue-600">
+                                        <span class="text-sm text-gray-900 dark:text-white">{{ $type['label'] }}</span>
+                                    </label>
+                                @endforeach
                             </div>
                             @error('agendaType') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
-                        </div>
+
+                            @unless($hasMilty)
+                                <p class="mt-2 text-xs text-red-600 dark:text-red-400">
+                                    Not all options are available as this game was not created with Milty's Draft Tool. To use all agenda types, create a new game using the draft tool and import your players and factions from this game.
+                                </p>
+                            @endunless
+                        </fieldset>
+
+                        @if($votingTypes[$agendaType]['hint'] ?? null)
+                            <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                                <p class="text-sm text-blue-800 dark:text-blue-200">
+                                    {{ $votingTypes[$agendaType]['hint'] }}
+                                </p>
+                            </div>
+                        @endif
 
                         @if($agendaType === 'custom')
                             <div>
-                                <label for="customOptions" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                <label for="customOptions" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                                     Custom Options (comma separated)
                                 </label>
                                 <input type="text"
                                        id="customOptions"
                                        wire:model="customOptions"
                                        placeholder="Option 1, Option 2, Option 3"
-                                       class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white">
+                                       class="{{ $inputClass }}">
                                 @error('customOptions') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
-                            </div>
-                        @endif
-
-                        @if($agendaType === 'elect_player')
-                            <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
-                                <p class="text-sm text-blue-800 dark:text-blue-200">
-                                    Players will be able to vote for any player currently in the game.
-                                </p>
-                            </div>
-                        @endif
-
-                        @if($agendaType === 'elect_planet_any')
-                            <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
-                                <p class="text-sm text-blue-800 dark:text-blue-200">
-                                    Players will be able to vote for any planet in the game.
-                                </p>
-                            </div>
-                        @endif
-
-                        @if($agendaType === 'elect_planet_industrial')
-                            <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
-                                <p class="text-sm text-blue-800 dark:text-blue-200">
-                                    Players will be able to vote for any industrial planet in the game.
-                                </p>
-                            </div>
-                        @endif
-
-                        @if($agendaType === 'elect_planet_hazardous')
-                            <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
-                                <p class="text-sm text-blue-800 dark:text-blue-200">
-                                    Players will be able to vote for any hazardous planet in the game.
-                                </p>
-                            </div>
-                        @endif
-
-                        @if($agendaType === 'elect_planet_cultural')
-                            <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
-                                <p class="text-sm text-blue-800 dark:text-blue-200">
-                                    Players will be able to vote for any cultural planet in the game.
-                                </p>
-                            </div>
-                        @endif
-
-                        @if($agendaType === 'elect_planet_non_home')
-                            <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
-                                <p class="text-sm text-blue-800 dark:text-blue-200">
-                                    Players will be able to vote for any non-home planet in the game except Mecatol Rex.
-                                </p>
                             </div>
                         @endif
 
                         @if(str_starts_with($agendaType, 'elect_planet_'))
                             <div>
-                                <label for="customTileNumbers" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                    Additional Tile Numbers (comma separated, optional)
+                                <label for="customTileNumbers" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                                    Additional Tile Numbers <span class="font-normal text-gray-500 dark:text-gray-400">(optional)</span>
                                 </label>
                                 <input type="text"
                                        id="customTileNumbers"
                                        wire:model="customTileNumbers"
                                        placeholder="18, 25, 32"
-                                       class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white">
+                                       class="{{ $inputClass }}">
                                 <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                    Add specific tile numbers to include their planets in the voting options
+                                    Comma separated. Adds the planets on these tiles to the voting options.
                                 </p>
                             </div>
                         @endif
 
-                        @if($game->milty_draft_data == null)
-                            <p class="text-sm text-red-500">
-                                Not all options are available as this game was not created with Milty's Draft Tool. To use all agenda types, create a new game using the draft tool and import your players and factions from this game.
-                            </p>
-                        @endif
-
-                        <div class="flex space-x-3">
+                        <div class="flex flex-col gap-2 pt-1 sm:flex-row">
                             <button type="submit"
-                                    class="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-md transition-colors">
+                                    class="w-full sm:w-auto bg-green-600 hover:bg-green-700 active:bg-green-800 text-white font-semibold py-3 sm:py-2 px-4 rounded-lg transition-colors">
                                 Create Agenda
                             </button>
                             <button type="button"
                                     wire:click="toggleCreateAgenda"
-                                    class="bg-gray-500 hover:bg-gray-600 text-white font-medium py-2 px-4 rounded-md transition-colors">
+                                    class="w-full sm:w-auto bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-100 font-semibold py-3 sm:py-2 px-4 rounded-lg transition-colors">
                                 Cancel
                             </button>
                         </div>
@@ -328,14 +271,21 @@
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            @php($canBlockVotes = $player->is_speaker && $currentAgenda?->status === 'voting' && $currentAgenda->reveal_step)
             @foreach($players as $gamePlayer)
-                <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                    <div>
-                        <div class="font-semibold text-gray-900 dark:text-white">
-                            {{ $gamePlayer->name }}
+                @php($isBlocked = $currentAgenda?->status === 'voting' && $currentAgenda->isPlayerBlocked($gamePlayer))
+                <div class="flex flex-col gap-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                    <div class="min-w-0">
+                        <div class="flex flex-wrap items-center gap-2 font-semibold text-gray-900 dark:text-white">
+                            <span class="truncate">{{ $gamePlayer->name }}</span>
                             @if($gamePlayer->is_speaker)
-                                <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
                                     Speaker
+                                </span>
+                            @endif
+                            @if($isBlocked)
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
+                                    Cannot vote
                                 </span>
                             @endif
                         </div>
@@ -347,12 +297,27 @@
                         @endif
                     </div>
 
-                    @if($player->is_speaker && $gamePlayer->id !== $player->id)
-                        <button wire:click="transferSpeaker('{{ $gamePlayer->id }}')"
-                                wire:confirm="Are you sure you want to transfer the Speaker token to {{ $gamePlayer->name }}?"
-                                class="text-xs bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded transition-colors">
-                            Make Speaker
-                        </button>
+                    @if($player->is_speaker)
+                        <div class="flex flex-wrap gap-2">
+                            @if($canBlockVotes)
+                                <button wire:click="toggleVotingBlock('{{ $gamePlayer->id }}')"
+                                        class="text-xs font-medium px-3 py-2 rounded-md transition-colors {{ $isBlocked ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-orange-500 hover:bg-orange-600 text-white' }}">
+                                    {{ $isBlocked ? 'Allow vote' : 'Block vote' }}
+                                </button>
+                            @endif
+                            @if($gamePlayer->id !== $player->id)
+                                <button wire:click="transferSpeaker('{{ $gamePlayer->id }}')"
+                                        wire:confirm="Are you sure you want to transfer the Speaker token to {{ $gamePlayer->name }}?"
+                                        class="text-xs font-medium bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-md transition-colors">
+                                    Make Speaker
+                                </button>
+                                <button wire:click="removePlayer('{{ $gamePlayer->id }}')"
+                                        wire:confirm="Remove {{ $gamePlayer->name }} from the game? Their votes are deleted too."
+                                        class="text-xs font-medium bg-gray-200 hover:bg-red-600 hover:text-white dark:bg-gray-600 text-gray-800 dark:text-gray-100 px-3 py-2 rounded-md transition-colors">
+                                    Remove
+                                </button>
+                            @endif
+                        </div>
                     @endif
                 </div>
             @endforeach
@@ -381,6 +346,10 @@
                     <p class="text-sm text-yellow-800 dark:text-yellow-200 mt-1">
                         The Speaker is asking for &ldquo;{{ $currentAgenda->reveal_step_label }}&rdquo; action cards. Voting opens when the Speaker is done.
                     </p>
+                </div>
+            @elseif($currentAgenda->status === 'voting' && $currentAgenda->isPlayerBlocked($player))
+                <div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+                    <p class="text-red-800 dark:text-red-200 font-medium">You cannot vote on this agenda</p>
                 </div>
             @elseif($currentAgenda->isVotingOpen() && !$hasVoted)
                 <!-- Voting Form -->
@@ -434,16 +403,18 @@
             @endif
 
             <!-- Vote Progress -->
+            @php($voteCount = $currentAgenda->votes()->count())
+            @php($eligibleCount = $currentAgenda->eligiblePlayerCount())
             <div class="border-t pt-4 mt-4">
                 <div class="flex justify-between items-center mb-2">
                     <span class="text-sm text-gray-600 dark:text-gray-300">Voting Progress</span>
                     <span class="text-sm text-gray-600 dark:text-gray-300">
-                        {{ $currentAgenda->votes()->count() }} / {{ $players->count() }} players voted
+                        {{ $voteCount }} / {{ $eligibleCount }} players voted
                     </span>
                 </div>
                 <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                     <div class="bg-blue-600 h-2 rounded-full"
-                         style="width: {{ $players->count() > 0 ? ($currentAgenda->votes()->count() / $players->count()) * 100 : 0 }}%"></div>
+                         style="width: {{ $eligibleCount > 0 ? ($voteCount / $eligibleCount) * 100 : 0 }}%"></div>
                 </div>
             </div>
 

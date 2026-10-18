@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use App\Events\TriggerRefresh;
 use App\Services\PlanetService;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use App\Models\Game;
@@ -18,7 +19,11 @@ use Illuminate\Validation\Rule;
 class GameDashboard extends Component
 {
     public Game $game;
-    public Player $player;
+
+    // Kept as an id and loaded on every request, as the Speaker can remove the player mid-game
+    #[Locked]
+    public string $playerId;
+    protected ?Player $player = null;
     public $selectedOption = '';
     public $influenceSpent = 0;
 
@@ -38,6 +43,7 @@ class GameDashboard extends Component
     public function mount(Game $game, Player $player)
     {
         $this->game = $game;
+        $this->playerId = $player->id;
         $this->player = $player;
         $this->loadAvailableAgendas();
 
@@ -46,6 +52,29 @@ class GameDashboard extends Component
         $this->js('window.Echo.channel("games.' . $this->game->id . '").listen("TriggerRefresh", () => {
             Livewire.dispatch("triggerRefresh");
         })');
+    }
+
+    public function hydrate()
+    {
+        $this->player = Player::find($this->playerId);
+
+        if (!$this->player) {
+            $this->leaveRemovedGame();
+        }
+    }
+
+    public function exception($e, $stopPropagation)
+    {
+        // Actions of a removed player fail on the missing player, they are sent away instead
+        if (!$this->player) {
+            $stopPropagation();
+        }
+    }
+
+    private function leaveRemovedGame()
+    {
+        session()->flash('error', 'You were removed from this game.');
+        $this->redirectRoute('join-group', $this->game->code);
     }
 
     private function loadAvailableAgendas()
@@ -166,7 +195,11 @@ class GameDashboard extends Component
     {
         // Refresh the game and player data from the database
         $this->game = $this->game->fresh();
-        $this->player = $this->player->fresh();
+        $this->player = Player::find($this->playerId);
+
+        if (!$this->player) {
+            $this->leaveRemovedGame();
+        }
 
 //        $this->dispatch('flashMessage', [
 //            'Data refreshed successfully!',
@@ -441,6 +474,70 @@ class GameDashboard extends Component
         }
     }
 
+    public function removePlayer($playerId)
+    {
+        if (!$this->player->is_speaker) {
+            $this->dispatch('flashMessage', [
+                'Only the Speaker can remove players.',
+                'error'
+            ]);
+            return;
+        }
+
+        $removedPlayer = $this->game->players()->find($playerId);
+        if (!$removedPlayer || $removedPlayer->id === $this->player->id) {
+            return;
+        }
+
+        // Their votes are deleted with them
+        $removedPlayer->delete();
+
+        $this->dispatch('flashMessage', [
+            "{$removedPlayer->name} was removed from the game.",
+            'info'
+        ]);
+        TriggerRefresh::dispatch($this->game);
+        $this->refreshData();
+    }
+
+    public function toggleVotingBlock($playerId)
+    {
+        if (!$this->player->is_speaker) {
+            $this->dispatch('flashMessage', [
+                'Only the Speaker can decide who may vote.',
+                'error'
+            ]);
+            return;
+        }
+
+        // Only while checking "When" and "After" action cards, before anyone can vote
+        $currentAgenda = $this->game->currentAgenda();
+        if (!$currentAgenda || $currentAgenda->reveal_step === null) {
+            return;
+        }
+
+        $blockedPlayer = $this->game->players()->find($playerId);
+        if (!$blockedPlayer) {
+            return;
+        }
+
+        $blockedIds = collect($currentAgenda->blocked_player_ids ?? []);
+
+        if ($blockedIds->contains($blockedPlayer->id)) {
+            $blockedIds = $blockedIds->reject(fn ($id) => $id === $blockedPlayer->id);
+            $message = "{$blockedPlayer->name} can vote on this agenda again.";
+        } else {
+            $blockedIds->push($blockedPlayer->id);
+            $message = "{$blockedPlayer->name} cannot vote on this agenda.";
+        }
+
+        $currentAgenda->update(['blocked_player_ids' => $blockedIds->values()->all()]);
+
+        $this->dispatch('flashMessage', [$message, 'info']);
+        TriggerRefresh::dispatch($this->game);
+        $this->refreshData();
+    }
+
     public function submitVote()
     {
         $currentAgenda = $this->game->currentAgenda();
@@ -464,6 +561,14 @@ class GameDashboard extends Component
         if ($this->player->hasVotedOn($currentAgenda)) {
             $this->dispatch('flashMessage', [
                 'You have already voted on this agenda.',
+                'error'
+            ]);
+            return;
+        }
+
+        if ($currentAgenda->isPlayerBlocked($this->player)) {
+            $this->dispatch('flashMessage', [
+                'You cannot vote on this agenda.',
                 'error'
             ]);
             return;
@@ -656,6 +761,10 @@ class GameDashboard extends Component
 
     public function render()
     {
+        if (!$this->player) {
+            return '<div></div>';
+        }
+
         $currentAgenda = $this->game->currentAgenda();
 
         // Results of the last ended agenda remain visible to the Speaker only
@@ -668,7 +777,7 @@ class GameDashboard extends Component
         $allVoted = $currentAgenda ? $currentAgenda->allPlayersVoted() : false;
 
         if($currentAgenda) {
-            if ($currentAgenda->votes()->count() === $players->count() && $this->player->is_speaker) {
+            if ($allVoted && $this->player->is_speaker) {
                 $this->speakerViewResults = true;
             }else{
                 $this->speakerViewResults = false;
@@ -687,6 +796,7 @@ class GameDashboard extends Component
         $voteResults = $showResults ? $currentAgenda->getVoteResults() : null;
 
         return view('livewire.game-dashboard', [
+            'player' => $this->player,
             'currentAgenda' => $currentAgenda,
             'players' => $players,
             'hasVoted' => $hasVoted,
