@@ -1,5 +1,5 @@
 <div class="space-y-6">
-    {{-- For the Speaker Controls tab. Keep this block above the one-line php directives, Blade mixes them up otherwise --}}
+    {{-- For the tabs. Keep this block above the one-line php directives, Blade mixes them up otherwise --}}
     @php
         $hasMilty = $game->milty_draft_data !== null;
         $inputClass = 'w-full px-3 py-2.5 text-base sm:text-sm border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white';
@@ -12,6 +12,21 @@
             'elect_planet_cultural' => ['label' => 'Elect a Cultural Planet', 'planet' => true, 'hint' => 'Players will be able to vote for any cultural planet in the game.'],
             'elect_planet_non_home' => ['label' => 'Elect a Non-Home Planet other than Mecatol Rex', 'planet' => true, 'hint' => 'Players will be able to vote for any non-home planet in the game except Mecatol Rex.'],
             'custom' => ['label' => 'Custom Options', 'planet' => false, 'hint' => null],
+        ];
+        // Avatar colours in the player list, picked from the player's name
+        $avatarColors = [
+            'bg-blue-100 text-blue-800 dark:bg-blue-900/60 dark:text-blue-200',
+            'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-200',
+            'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-200',
+            'bg-rose-100 text-rose-800 dark:bg-rose-900/60 dark:text-rose-200',
+            'bg-violet-100 text-violet-800 dark:bg-violet-900/60 dark:text-violet-200',
+            'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/60 dark:text-cyan-200',
+        ];
+        // Outline icons for the tabs (24x24, stroked)
+        $tabIcons = [
+            'speaker' => ['M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z', 'M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z'],
+            'players' => ['M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z'],
+            'star-chart' => ['M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456ZM16.894 20.567 16.5 21.75l-.394-1.183a2.25 2.25 0 0 0-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 0 0 1.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 0 0 1.423 1.423l1.183.394-1.183.394a2.25 2.25 0 0 0-1.423 1.423Z'],
         ];
     @endphp
 
@@ -486,7 +501,7 @@
     @endif
 
     <!-- Speaker Controls, Players and Star Chart, one at a time -->
-    @php($tabs = array_filter(['speaker' => $player->is_speaker ? 'Speaker' : null, 'players' => 'Players', 'star-chart' => $game->milty_draft_data ? 'Star Chart' : null]))
+    @php($tabs = array_filter(['speaker' => $player->is_speaker ? 'Speaker Settings' : null, 'players' => 'Players', 'star-chart' => $game->milty_draft_data ? 'Star Chart' : null]))
     @php($defaultTab = $player->is_speaker ? 'speaker' : 'players')
     {{-- Keyed on the tabs, so a new Speaker or a map added later starts on a tab that exists --}}
     <div wire:key="tabs-{{ implode('-', array_keys($tabs)) }}"
@@ -509,11 +524,18 @@
                             x-on:click="tab = '{{ $key }}'"
                             x-bind:aria-selected="tab === '{{ $key }}'"
                             x-bind:class="tab === '{{ $key }}' ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'"
-                            class="flex-1 min-w-0 px-3 py-2.5 sm:py-2 rounded-lg text-sm font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
-                        {{ $label }}
-                        @if($key === 'players')
-                            <span class="ml-1 text-xs font-medium text-gray-500 dark:text-gray-400">{{ $players->count() }}</span>
-                        @endif
+                            class="flex-1 min-w-0 flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-2 sm:px-3 py-2 rounded-lg text-xs sm:text-sm font-semibold leading-tight transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
+                        <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+                            @foreach($tabIcons[$key] as $path)
+                                <path stroke-linecap="round" stroke-linejoin="round" d="{{ $path }}"></path>
+                            @endforeach
+                        </svg>
+                        <span class="text-center">
+                            {{ $label }}
+                            @if($key === 'players')
+                                <span class="ml-0.5 font-medium text-gray-500 dark:text-gray-400">{{ $players->count() }}</span>
+                            @endif
+                        </span>
                     </button>
                 @endforeach
             </div>
@@ -587,75 +609,115 @@
              {{ $defaultTab !== 'players' ? 'x-cloak' : '' }}
              x-show="tab === 'players'">
             <!-- Players List -->
-            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-xl font-bold text-gray-900 dark:text-white">Players</h2>
-                    <button wire:click="refreshData"
-                            class="inline-flex items-center px-3 py-2 border border-gray-300 dark:border-gray-600 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
-                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+            @php($canBlockVotes = $player->is_speaker && $currentAgenda?->status === 'voting' && $currentAgenda->reveal_step)
+            @php($votingOpen = $currentAgenda?->isVotingOpen() ?? false)
+            <section class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 sm:p-6">
+                <div class="flex items-center justify-between gap-3 mb-4">
+                    <div>
+                        <h2 class="text-xl font-bold text-gray-900 dark:text-white">Players</h2>
+                        <p class="text-sm text-gray-600 dark:text-gray-400">
+                            @if($votingOpen)
+                                {{ $currentAgenda->votes()->count() }} of {{ $currentAgenda->eligiblePlayerCount() }} voted
+                            @elseif($canBlockVotes)
+                                Block players who cannot vote on this agenda.
+                            @else
+                                {{ $players->count() }} {{ Str::plural('player', $players->count()) }} in this game
+                            @endif
+                        </p>
+                    </div>
+                    <button wire:click="refreshData" title="Refresh" aria-label="Refresh"
+                            class="shrink-0 p-2.5 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 transition-colors">
+                        <svg class="w-5 h-5" wire:loading.class="animate-spin" wire:target="refreshData" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99"></path>
                         </svg>
-                        Refresh
                     </button>
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    @php($canBlockVotes = $player->is_speaker && $currentAgenda?->status === 'voting' && $currentAgenda->reveal_step)
+                <ul role="list" class="grid grid-cols-1 gap-2 md:grid-cols-2">
                     @foreach($players as $gamePlayer)
                         @php($isBlocked = $currentAgenda?->status === 'voting' && $currentAgenda->isPlayerBlocked($gamePlayer))
-                        <div class="flex flex-col gap-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                            <div class="min-w-0">
-                                <div class="flex flex-wrap items-center gap-2 font-semibold text-gray-900 dark:text-white">
-                                    <span class="truncate">{{ $gamePlayer->name }}</span>
+                        @php($hasVotedHere = $currentAgenda && $gamePlayer->hasVotedOn($currentAgenda))
+                        @php($isMe = $gamePlayer->id === $player->id)
+                        <li wire:key="player-{{ $gamePlayer->id }}"
+                            class="min-w-0 flex items-center gap-3 p-3 rounded-lg border {{ $isMe ? 'border-blue-200 bg-blue-50/60 dark:border-blue-900 dark:bg-blue-950/30' : 'border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-900/30' }}">
+                            <span class="shrink-0 w-10 h-10 rounded-full grid place-items-center text-sm font-bold {{ $avatarColors[crc32($gamePlayer->name) % count($avatarColors)] }}" aria-hidden="true">
+                                {{ $gamePlayer->initials }}
+                            </span>
+
+                            <div class="min-w-0 flex-1">
+                                <div class="flex items-center gap-1.5 min-w-0">
+                                    <span class="font-semibold text-gray-900 dark:text-white truncate">{{ $gamePlayer->name }}</span>
                                     @if($gamePlayer->is_speaker)
-                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
-                                            Speaker
-                                        </span>
+                                        <span class="shrink-0 px-1.5 py-0.5 rounded text-[11px] font-semibold uppercase tracking-wide bg-yellow-100 text-yellow-800 dark:bg-yellow-900/60 dark:text-yellow-200">Speaker</span>
                                     @endif
-                                    @if($isBlocked)
-                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
-                                            Cannot vote
-                                        </span>
+                                    @if($isMe)
+                                        <span class="shrink-0 px-1.5 py-0.5 rounded text-[11px] font-semibold uppercase tracking-wide bg-blue-100 text-blue-800 dark:bg-blue-900/60 dark:text-blue-200">You</span>
                                     @endif
                                 </div>
                                 @if($gamePlayer->faction)
-                                    <div class="text-sm text-gray-600 dark:text-gray-300">{{ $gamePlayer->faction }}</div>
+                                    <p class="text-sm text-gray-600 dark:text-gray-400 truncate">{{ $gamePlayer->faction }}</p>
                                 @endif
-                                @if($currentAgenda && $gamePlayer->hasVotedOn($currentAgenda))
-                                    <div class="text-xs text-green-600 dark:text-green-400">✓ Voted</div>
+                                @if($canBlockVotes && $isBlocked)
+                                    <p class="text-xs font-semibold text-red-700 dark:text-red-400">Cannot vote</p>
                                 @endif
                             </div>
 
-                            @if($player->is_speaker)
-                                <div class="flex flex-wrap gap-2">
-                                    @if($canBlockVotes)
-                                        <button wire:click="toggleVotingBlock('{{ $gamePlayer->id }}')"
-                                                class="text-xs font-medium px-3 py-2 rounded-md transition-colors {{ $isBlocked ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-orange-500 hover:bg-orange-600 text-white' }}">
-                                            {{ $isBlocked ? 'Allow vote' : 'Block vote' }}
-                                        </button>
-                                    @endif
-                                    @if($gamePlayer->id !== $player->id)
-                                        <button wire:click="transferSpeaker('{{ $gamePlayer->id }}')"
+                            <!-- Vote status, or blocking votes while the Speaker checks action cards -->
+                            @if($canBlockVotes)
+                                <button wire:click="toggleVotingBlock('{{ $gamePlayer->id }}')"
+                                        class="shrink-0 text-xs font-semibold px-3 py-2 rounded-lg transition-colors {{ $isBlocked ? 'bg-red-100 text-red-800 hover:bg-red-200 dark:bg-red-900/50 dark:text-red-200' : 'bg-orange-500 hover:bg-orange-600 text-white' }}">
+                                    {{ $isBlocked ? 'Allow vote' : 'Block vote' }}
+                                </button>
+                            @elseif($isBlocked)
+                                <span class="shrink-0 px-2 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-200">Cannot vote</span>
+                            @elseif($hasVotedHere)
+                                <span class="shrink-0 inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"></path>
+                                    </svg>
+                                    Voted
+                                </span>
+                            @elseif($votingOpen)
+                                <span class="shrink-0 px-2 py-1 rounded-full text-xs font-semibold bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300">Waiting</span>
+                            @endif
+
+                            <!-- Speaker actions for other players -->
+                            @if($player->is_speaker && !$isMe)
+                                <div x-data="{ open: false }" x-on:click.outside="open = false" x-on:keydown.escape.window="open = false" class="relative shrink-0">
+                                    <button type="button" x-on:click="open = !open" x-bind:aria-expanded="open" aria-haspopup="menu"
+                                            aria-label="Actions for {{ $gamePlayer->name }}"
+                                            class="p-2 -mr-1 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
+                                        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                            <circle cx="12" cy="5" r="1.75"></circle><circle cx="12" cy="12" r="1.75"></circle><circle cx="12" cy="19" r="1.75"></circle>
+                                        </svg>
+                                    </button>
+                                    <div x-show="open" x-cloak x-transition.origin.top.right role="menu"
+                                         class="absolute right-0 top-full mt-1 z-20 w-48 py-1 bg-white dark:bg-gray-800 rounded-lg shadow-lg ring-1 ring-black/10 dark:ring-white/10">
+                                        <button type="button" role="menuitem"
+                                                wire:click="transferSpeaker('{{ $gamePlayer->id }}')"
                                                 wire:confirm="Are you sure you want to transfer the Speaker token to {{ $gamePlayer->name }}?"
-                                                class="text-xs font-medium bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-md transition-colors">
+                                                x-on:click="open = false"
+                                                class="w-full text-left px-3 py-2.5 text-sm text-gray-800 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700">
                                             Make Speaker
                                         </button>
-                                        <button wire:click="removePlayer('{{ $gamePlayer->id }}')"
+                                        <button type="button" role="menuitem"
+                                                wire:click="removePlayer('{{ $gamePlayer->id }}')"
                                                 wire:confirm="Remove {{ $gamePlayer->name }} from the game? Their votes are deleted too."
-                                                class="text-xs font-medium bg-gray-200 hover:bg-red-600 hover:text-white dark:bg-gray-600 text-gray-800 dark:text-gray-100 px-3 py-2 rounded-md transition-colors">
-                                            Remove
+                                                x-on:click="open = false"
+                                                class="w-full text-left px-3 py-2.5 text-sm text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30">
+                                            Remove from game
                                         </button>
-                                    @endif
+                                    </div>
                                 </div>
                             @endif
-                        </div>
+                        </li>
                     @endforeach
-                </div>
+                </ul>
 
                 <div class="mt-4">
                     <x-rejoin-link :game="$game" />
                 </div>
-            </div>
+            </section>
         </div>
 
         <div id="tab-panel-star-chart" role="tabpanel" aria-labelledby="tab-star-chart"
