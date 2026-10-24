@@ -85,6 +85,11 @@ Route::prefix(config('app.admin_path'))->name('admin.')->group(function () {
         Route::view('/games', 'admin.games')->name('games');
         Route::get('/games/{game}', fn (Game $game) => view('admin.game', ['game' => $game]))->name('games.show');
         Route::view('/logs', 'admin.logs')->name('logs');
+        Route::get('/feedback', function () {
+            abort_unless(config('app.feedback'), 404);
+
+            return view('admin.feedback');
+        })->name('feedback');
 
         Route::post('/logout', function () {
             Auth::logout();

@@ -112,5 +112,37 @@
                 <a href="{{ route('admin.games') }}" class="text-blue-600 dark:text-blue-400 hover:underline">Manage games</a>
             </div>
         </section>
+
+        @if($feedbackEnabled)
+        <!-- Recent feedback -->
+        <section class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-4 sm:p-6 lg:col-span-2">
+            <div class="flex items-baseline justify-between gap-3 mb-3">
+                <h2 class="text-lg font-bold">
+                    Recent feedback
+                    @if($unreadFeedback)
+                        <span class="ml-1 text-sm font-normal text-blue-600 dark:text-blue-400">{{ $unreadFeedback }} unread</span>
+                    @endif
+                </h2>
+                <a href="{{ route('admin.feedback', $unreadFeedback ? ['status' => 'unread'] : []) }}" class="text-sm text-blue-600 dark:text-blue-400 hover:underline">All feedback</a>
+            </div>
+            @forelse($recentFeedback as $feedback)
+                <div class="py-2 border-b border-gray-100 dark:border-gray-700 last:border-0">
+                    <div class="flex flex-wrap items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                        <span class="font-semibold uppercase">{{ $feedback->typeLabel() }}</span>
+                        @unless($feedback->read_at)
+                            <span class="px-1.5 rounded font-semibold bg-blue-600 text-white">New</span>
+                        @endunless
+                        <span class="font-mono">{{ $feedback->created_at->format('Y-m-d H:i') }}</span>
+                        @if($feedback->name)
+                            <span class="break-all">{{ $feedback->name }}</span>
+                        @endif
+                    </div>
+                    <p class="text-sm break-words line-clamp-2">{{ $feedback->message }}</p>
+                </div>
+            @empty
+                <p class="text-sm text-gray-500 dark:text-gray-400">No feedback yet.</p>
+            @endforelse
+        </section>
+        @endif
     </div>
 </x-admin-layout>

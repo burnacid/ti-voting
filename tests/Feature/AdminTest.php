@@ -39,7 +39,7 @@ function makeAdminGame(string $name = 'Admin Test Game', ?string $createdAt = nu
 
 test('admin pages require a login', function (string $route) {
     $this->get(route($route))->assertRedirect(route('admin.login'));
-})->with(['admin.dashboard', 'admin.games', 'admin.logs']);
+})->with(['admin.dashboard', 'admin.games', 'admin.feedback', 'admin.logs']);
 
 test('the admin path can be set in the environment', function () {
     putenv('ADMIN_PATH=/secret-panel/');
