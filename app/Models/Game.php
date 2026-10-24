@@ -27,6 +27,7 @@ class Game extends Model
         'milty_draft_data',
         'fracture_in_play',
         'representative_government',
+        'absol_agendas',
         'star_chart_tiles',
         'status',
     ];
@@ -36,6 +37,7 @@ class Game extends Model
         'milty_draft_data' => 'array',
         'fracture_in_play' => 'boolean',
         'representative_government' => 'boolean',
+        'absol_agendas' => 'boolean',
         'star_chart_tiles' => 'array',
     ];
 

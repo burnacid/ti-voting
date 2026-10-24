@@ -36,6 +36,7 @@ class Agenda extends Model
         'law' => 'Elect Law',
         'strategy card' => 'Elect Strategy Card',
         'secret_objective' => 'Elect Scored Secret Objective',
+        'unit_upgrade' => 'Elect Owned Non-Faction Unit Upgrade Technology',
     ];
 
     // Elect value for agendas created without a preset, keyed by the agenda type picked in the form

@@ -104,7 +104,12 @@ class GameDashboard extends Component
         $jsonPath = resource_path('data/agendas.json');
         if (file_exists($jsonPath)) {
             $agendas = json_decode(file_get_contents($jsonPath), true);
-            $this->availableAgendas = collect($agendas)->sortBy('Name')->values()->all();
+            // Absol's Lab agendas replace the official agenda deck
+            $this->availableAgendas = collect($agendas)
+                ->filter(fn ($agenda) => ($agenda['Absol'] ?? false) === (bool) $this->game->absol_agendas)
+                ->sortBy('Name')
+                ->values()
+                ->all();
         }
     }
 
@@ -131,10 +136,15 @@ class GameDashboard extends Component
 
         $agendaType = array_search($electType, Agenda::ELECT_BY_AGENDA_TYPE, true) ?: 'for_against';
 
-        if (in_array($electType, ['law', 'secret_objective'])) {
+        if (in_array($electType, ['law', 'secret_objective', 'unit_upgrade'])) {
             // These are special cases that might need custom handling
             $this->agendaType = 'custom';
-            $this->customOptions = $electType === 'law' ? 'Law 1, Law 2, Law 3' : 'Secret Objective 1, Secret Objective 2';
+            $this->customOptions = match ($electType) {
+                'law' => 'Law 1, Law 2, Law 3',
+                'secret_objective' => 'Secret Objective 1, Secret Objective 2',
+                // Only the ones a player owns can be elected, the Speaker removes the others
+                'unit_upgrade' => 'Carrier II, Cruiser II, Destroyer II, Dreadnought II, Fighter II, Infantry II, PDS II, Space Dock II, War Sun',
+            };
         } elseif (array_key_exists($agendaType, self::PLANET_AGENDA_TYPES) && $this->game->milty_draft_data == null) {
             // Planets come from the Milty draft
             $this->agendaType = 'custom';
@@ -818,6 +828,28 @@ class GameDashboard extends Component
 
         $this->game->removeStarChartTile((string) $tile);
         Log::info('Star Chart tile removed', ['tile' => (string) $tile]);
+        TriggerRefresh::dispatch($this->game);
+        $this->refreshData();
+    }
+
+    public function toggleAbsolAgendas()
+    {
+        if (!$this->player->is_speaker) {
+            return;
+        }
+
+        $this->game->update(['absol_agendas' => !$this->game->absol_agendas]);
+        Log::info($this->game->absol_agendas ? "Absol's agendas turned on" : "Absol's agendas turned off");
+
+        $this->clearPresetSelection();
+        $this->loadAvailableAgendas();
+
+        $this->dispatch('flashMessage', [
+            $this->game->absol_agendas
+                ? "The agenda list now shows the agendas of Absol's Lab."
+                : 'The agenda list now shows the official agendas.',
+            'info',
+        ]);
         TriggerRefresh::dispatch($this->game);
         $this->refreshData();
     }

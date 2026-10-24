@@ -56,7 +56,7 @@
         },
      }"
      x-on:click.outside="close()"
-     class="relative min-w-0 flex-1">
+     {{ $attributes->merge(['class' => 'relative min-w-0 flex-1']) }}>
     <input type="text"
            id="selectedPresetAgenda"
            x-ref="input"

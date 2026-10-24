@@ -98,7 +98,8 @@
                             Preset agenda <span class="font-normal text-gray-500 dark:text-gray-400">(optional)</span>
                         </label>
                         <div class="flex gap-2">
-                            <x-agenda-search :agendas="$availableAgendas" :input-class="$inputClass" />
+                            {{-- Keyed on the agenda deck, so the list is rebuilt when the Speaker switches decks --}}
+                            <x-agenda-search :agendas="$availableAgendas" :input-class="$inputClass" wire:key="agenda-search-{{ $game->absol_agendas ? 'absol' : 'official' }}" />
                             @if($selectedPresetAgenda)
                                 <button type="button"
                                         wire:click="clearPresetSelection"
@@ -622,6 +623,20 @@
                                    class="h-6 w-6 shrink-0 text-blue-600 rounded">
                         </label>
                     @endif
+
+                    <!-- Agenda deck: Absol's Lab agendas replace the official ones -->
+                    <label class="flex items-center justify-between gap-4 bg-white/70 dark:bg-gray-800/60 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3 cursor-pointer">
+                        <span>
+                            <span class="block font-medium text-gray-900 dark:text-white">Play with Absol's agendas</span>
+                            <span class="block text-sm text-gray-600 dark:text-gray-400">
+                                The agenda list shows the agendas of Absol's Lab instead of the official agendas.
+                            </span>
+                        </span>
+                        <input type="checkbox"
+                               wire:click="toggleAbsolAgendas"
+                               @checked($game->absol_agendas)
+                               class="h-6 w-6 shrink-0 text-blue-600 rounded">
+                    </label>
 
                     <!-- Law: Representative Government -->
                     <label class="flex items-center justify-between gap-4 bg-white/70 dark:bg-gray-800/60 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3 cursor-pointer">

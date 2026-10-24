@@ -1628,3 +1628,49 @@ test('riders do not show who voted', function () {
         ->assertSee('Correct')
         ->assertDontSee('Voted For:');
 });
+
+test('the speaker can switch the agenda list to absol\'s agendas', function () {
+    [$game, $speaker] = makeGame();
+
+    $component = Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker]);
+    $official = collect($component->get('availableAgendas'));
+    expect($official->pluck('Name'))->toContain('Core Mining')
+        ->and($official->where('Absol', true))->toBeEmpty();
+
+    $component->call('toggleAbsolAgendas');
+    $absol = collect($component->get('availableAgendas'));
+
+    // Absol's agendas replace the official ones
+    expect($game->fresh()->absol_agendas)->toBeTrue()
+        ->and($absol)->not->toBeEmpty()
+        ->and($absol->every(fn ($agenda) => $agenda['Absol'] ?? false))->toBeTrue()
+        ->and($absol->pluck('Name'))->toContain('Affirmation of Divine Right')
+        ->and($absol->pluck('Name'))->not->toContain('Core Mining');
+
+    $component->set('selectedPresetAgenda', 'Mutiny')
+        ->assertSet('newAgendaDescription', $absol->firstWhere('Name', 'Mutiny')['Effect'])
+        ->call('createAgenda');
+
+    expect($game->currentAgenda()->title)->toBe('Mutiny');
+});
+
+test('only the speaker can switch to absol\'s agendas', function () {
+    [$game, $speaker, $other] = makeGame();
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $other])
+        ->call('toggleAbsolAgendas');
+
+    expect($game->fresh()->absol_agendas)->toBeFalse();
+});
+
+test('absol\'s publicize weapon schematics elects a unit upgrade', function () {
+    [$game, $speaker] = makeGame(['absol_agendas' => true]);
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->set('selectedPresetAgenda', 'Publicize Weapon Schematics')
+        ->assertSet('agendaType', 'custom')
+        ->call('createAgenda')
+        ->assertSeeHtml('<p class="agenda-card-elect">Elect Owned Non-Faction Unit Upgrade Technology</p>');
+
+    expect($game->currentAgenda()->options)->toContain('War Sun', 'Abstain');
+});
