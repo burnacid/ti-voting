@@ -12,6 +12,7 @@ use Livewire\Component;
 use App\Models\Game;
 use App\Models\Player;
 use App\Models\Agenda;
+use App\Models\Prediction;
 use App\Models\Vote;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Collection;
@@ -41,6 +42,11 @@ class GameDashboard extends Component
     // Faction picked in the prompt shown when the game has a Milty draft and this player has no drafted faction yet
     public $chosenFaction = '';
     public $influenceSpent = 0;
+
+    // A prediction made aloud after the agenda is revealed, e.g. with a Rider. The Speaker can record one for another player
+    public $predictionSource = '';
+    public $predictionOption = '';
+    public $predictionPlayerId = '';
 
     // Speaker-only properties for creating agendas
     public $newAgendaTitle = '';
@@ -164,6 +170,7 @@ class GameDashboard extends Component
 
     #[On('triggerRefresh')]
     #[On('miltyUrlUpdated')]
+    #[On('influence-saved')]
     public function listenForRefresh(){
         $this->refreshData();
     }
@@ -499,6 +506,83 @@ class GameDashboard extends Component
         $currentAgenda->update(['blocked_player_ids' => $blockedIds->values()->all()]);
 
         $this->dispatch('flashMessage', [$message, 'info']);
+        TriggerRefresh::dispatch($this->game);
+        $this->refreshData();
+    }
+
+    public function makePrediction()
+    {
+        // Only while checking "When" and "After" action cards, before anyone can vote
+        $currentAgenda = $this->game->currentAgenda();
+        if (!$currentAgenda || $currentAgenda->reveal_step === null) {
+            $this->dispatch('flashMessage', [
+                'Predictions can only be made before voting opens.',
+                'error'
+            ]);
+            return;
+        }
+
+        $this->validate([
+            'predictionSource' => ['required', Rule::in(array_keys(Prediction::SOURCES))],
+            'predictionOption' => ['required', 'string', Rule::in(array_diff($currentAgenda->options, ['Abstain']))],
+        ], [
+            'predictionSource.required' => 'Choose the card or ability you predict with.',
+            'predictionOption.required' => 'Choose the outcome you predict.',
+        ]);
+
+        // The Speaker can record a prediction for another player, everyone else only for themselves
+        $predictor = $this->player->is_speaker && $this->predictionPlayerId
+            ? $this->game->players()->find($this->predictionPlayerId)
+            : $this->player;
+
+        if (!$predictor) {
+            return;
+        }
+
+        try {
+            Prediction::create([
+                'agenda_id' => $currentAgenda->id,
+                'player_id' => $predictor->id,
+                'source' => $this->predictionSource,
+                'option' => $this->predictionOption,
+            ]);
+        } catch (UniqueConstraintViolationException) {
+            $this->dispatch('flashMessage', [
+                "{$predictor->name} already predicted with this card on this agenda.",
+                'error'
+            ]);
+            return;
+        }
+
+        $sourceLabel = Prediction::SOURCES[$this->predictionSource]['label'];
+        Log::info('Prediction made', ['agenda' => $currentAgenda->title, 'player' => $predictor->name, 'source' => $sourceLabel, 'option' => $this->predictionOption]);
+
+        $this->dispatch('flashMessage', [
+            "{$predictor->name} predicts {$this->predictionOption} with {$sourceLabel}, and cannot vote on this agenda.",
+            'success'
+        ]);
+        $this->reset(['predictionSource', 'predictionOption', 'predictionPlayerId']);
+
+        TriggerRefresh::dispatch($this->game);
+        $this->refreshData();
+    }
+
+    // A prediction recorded by mistake can be removed by its player or the Speaker, until voting opens
+    public function removePrediction($predictionId)
+    {
+        $currentAgenda = $this->game->currentAgenda();
+        if (!$currentAgenda || $currentAgenda->reveal_step === null) {
+            return;
+        }
+
+        $prediction = $currentAgenda->predictions()->with('player')->find($predictionId);
+        if (!$prediction || (!$this->player->is_speaker && $prediction->player_id !== $this->player->id)) {
+            return;
+        }
+
+        $prediction->delete();
+        Log::info('Prediction removed', ['agenda' => $currentAgenda->title, 'player' => $prediction->player->name, 'source' => $prediction->source_label]);
+
         TriggerRefresh::dispatch($this->game);
         $this->refreshData();
     }
@@ -854,6 +938,29 @@ class GameDashboard extends Component
         $this->refreshData();
     }
 
+    /**
+     * This player's correct predictions on the agenda that just ended whose reward depends on who voted for the outcome,
+     * e.g. The Nekro Virus taking a technology. Shown until the next agenda is revealed.
+     */
+    private function correctVoterPredictions(): Collection
+    {
+        if ($this->game->currentAgenda()) {
+            return collect();
+        }
+
+        $agenda = $this->game->lastCompletedAgenda();
+
+        return $agenda
+            ? $agenda->predictions()->with('agenda')->where('player_id', $this->player->id)->get()
+                ->filter(fn ($prediction) => $prediction->showsVoters() && $prediction->isCorrect())
+                ->map(fn ($prediction) => [
+                    'prediction' => $prediction,
+                    'voters' => $agenda->playersWhoVoted($prediction->option),
+                ])
+                ->values()
+            : collect();
+    }
+
     public function refreshComponent()
     {
         $this->refreshData();
@@ -913,6 +1020,8 @@ class GameDashboard extends Component
             'allVoted' => $allVoted,
             'showResults' => $showResults,
             'voteResults' => $voteResults,
+            'predictions' => $currentAgenda ? $currentAgenda->predictions()->with('player')->oldest()->get() : collect(),
+            'correctVoterPredictions' => $this->correctVoterPredictions(),
         ]);
     }
 }

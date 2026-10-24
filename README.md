@@ -10,6 +10,7 @@ A secret voting system for **Twilight Imperium 4th Edition (TI4)** agenda phase 
 - **Speaker controls** — only the speaker can create agendas and reveal results
 - **Milty integration** — paste a Milty draft URL to auto-load faction and planet data for all players
 - **Preset agendas** — choose from a library of TI4 agenda cards
+- **Predictions** — Riders and The Nekro Virus's predictions are shown to everyone, and the Speaker sees which came true
 - **Who is affected** — for agendas like Mutiny, the Speaker sees which players voted the way the outcome names
 - **Invite with a QR code** — other players scan it with their phone camera to join
 - **Star Chart** — draw a random unused system tile, from the expansions in your Milty draft

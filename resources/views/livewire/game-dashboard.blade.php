@@ -239,6 +239,31 @@
         @endif
     @endif
 
+    <!-- A correct prediction whose reward depends on who voted for the outcome, e.g. The Nekro Virus. Only this player sees it -->
+    @foreach($correctVoterPredictions as ['prediction' => $prediction, 'voters' => $voters])
+        <div wire:key="voter-prediction-{{ $prediction->id }}" class="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-xl p-4">
+            <p class="font-semibold text-purple-900 dark:text-purple-100">Your prediction came true: {{ $prediction->option }} won</p>
+            <p class="text-sm text-purple-800 dark:text-purple-200 mt-1">
+                <strong>{{ $prediction->source_label }}:</strong> {{ $prediction->reward }}
+            </p>
+            @if($voters->isEmpty())
+                <p class="text-sm text-gray-700 dark:text-gray-300 mt-3">Nobody voted {{ $prediction->option }}, so there is no player to take a technology from.</p>
+            @else
+                <p class="text-sm font-medium text-gray-900 dark:text-white mt-3">Players who voted {{ $prediction->option }}</p>
+                <ul role="list" class="mt-1 flex flex-wrap gap-2">
+                    @foreach($voters as $voter)
+                        <li class="px-2.5 py-1 rounded-md text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-purple-200 dark:border-purple-800">
+                            <span class="font-medium">{{ $voter->name }}</span>
+                            @if($voter->faction)
+                                <span class="text-gray-600 dark:text-gray-400">· {{ $voter->faction }}</span>
+                            @endif
+                        </li>
+                    @endforeach
+                </ul>
+            @endif
+        </div>
+    @endforeach
+
     <!-- Current Agenda -->
     @if($currentAgenda)
         <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
@@ -285,7 +310,7 @@
                         @elseif($isArgentStep)
                             {{ $game->argentFlightPlayerName() ?? 'The Argent Flight player' }} votes before everyone else and announces their votes publicly. Ask them to say which outcome they vote for and how many votes they cast. They still enter their vote in the app once voting opens.
                         @else
-                            Ask the players if anyone wants to play a card with &ldquo;After an agenda is revealed&rdquo;, such as a Rider or Assassinate Representative. Resolve those cards before continuing. To stop a player from voting, use Block vote in the Players tab.
+                            Ask the players if anyone wants to play a card with &ldquo;After an agenda is revealed&rdquo;, such as a Rider or Assassinate Representative. Resolve those cards before continuing. Record Riders and other predictions below, so everyone sees them. To stop a player from voting, use Block vote in the Players tab.
                         @endif
                     </p>
                     <div class="flex flex-col sm:flex-row gap-2">
@@ -324,6 +349,9 @@
             @elseif($currentAgenda->status === 'voting' && $currentAgenda->isPlayerBlocked($player))
                 <div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
                     <p class="text-red-800 dark:text-red-200 font-medium">You cannot vote on this agenda</p>
+                    @if($predictions->contains('player_id', $player->id))
+                        <p class="text-sm text-red-800 dark:text-red-200 mt-1">You predicted an outcome.</p>
+                    @endif
                 </div>
             @elseif($currentAgenda->isVotingOpen() && !$hasVoted)
                 <!-- Voting Form -->
@@ -359,6 +387,9 @@
                         <label for="influenceSpent" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                             Influence to spend (1-99):
                         </label>
+                        @if($player->influence !== null)
+                            <p class="text-sm text-gray-600 dark:text-gray-400 mb-2">You have {{ $player->influence }} influence available.</p>
+                        @endif
                         <input type="number"
                                id="influenceSpent"
                                wire:model="influenceSpent"
@@ -380,6 +411,13 @@
                         <span class="text-green-800 dark:text-green-200 font-medium">You have voted on this agenda</span>
                     </div>
                 </div>
+            @endif
+
+            @php($canPredict = $currentAgenda->status === 'voting' && $currentAgenda->reveal_step !== null)
+            @if($canPredict || $predictions->isNotEmpty())
+                <x-agenda-predictions :agenda="$currentAgenda" :predictions="$predictions" :player="$player" :players="$players"
+                                      :can-predict="$canPredict"
+                                      :outcome="$currentAgenda->status === 'completed' ? $currentAgenda->outcome() : null" />
             @endif
 
             <!-- Vote Progress -->
@@ -427,14 +465,19 @@
                         @endforeach
                     </div>
 
-                    <!-- Outcomes like 'Each player who voted "For"': the Speaker shows who they apply to -->
-                    @if($player->is_speaker && $currentAgenda->status === 'completed' && $currentAgenda->affectsVoters())
+                    <!-- Outcomes like 'Each player who voted "For"': the Speaker shows who they apply to. Predictions also need the winner -->
+                    @php($affectsVoters = $currentAgenda->affectsVoters())
+                    @if($player->is_speaker && $currentAgenda->status === 'completed' && ($affectsVoters || $predictions->isNotEmpty()))
                         @php($outcome = $currentAgenda->outcome())
                         <div class="mt-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
                             @if($outcome === null)
                                 <p class="font-semibold text-blue-900 dark:text-blue-100">The vote is tied</p>
                                 <p class="text-sm text-blue-800 dark:text-blue-200 mt-1">
-                                    This agenda affects players by how they voted. As Speaker you break the tie first, then you can see who is affected.
+                                    @if($affectsVoters)
+                                        This agenda affects players by how they voted. As Speaker you break the tie first, then you can see who is affected.
+                                    @else
+                                        As Speaker you break the tie first, then you can see which predictions are correct.
+                                    @endif
                                 </p>
                                 <div class="mt-3 flex flex-col sm:flex-row gap-2">
                                     @foreach($currentAgenda->leadingOptions() as $option)
@@ -450,13 +493,15 @@
                                     <p class="font-semibold text-blue-900 dark:text-blue-100">
                                         {{ $outcome }} wins{{ $currentAgenda->tiebreak_option ? ' (tie broken by the Speaker)' : '' }}
                                     </p>
-                                    <button wire:click="toggleAffectedPlayers"
-                                            class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold py-3 sm:py-2 px-4 rounded-lg transition-colors">
-                                        {{ $showAffectedPlayers ? 'Hide who is affected' : 'Show who is affected' }}
-                                    </button>
+                                    @if($affectsVoters)
+                                        <button wire:click="toggleAffectedPlayers"
+                                                class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold py-3 sm:py-2 px-4 rounded-lg transition-colors">
+                                            {{ $showAffectedPlayers ? 'Hide who is affected' : 'Show who is affected' }}
+                                        </button>
+                                    @endif
                                 </div>
 
-                                @if($showAffectedPlayers)
+                                @if($affectsVoters && $showAffectedPlayers)
                                     @php($effect = $currentAgenda->outcomeEffect($outcome))
                                     @php($affected = $currentAgenda->playersAffectedBy($outcome))
                                     <div class="mt-3 space-y-3">
@@ -639,8 +684,10 @@
                     </button>
                 </div>
 
+
                 <ul role="list" class="grid grid-cols-1 gap-2 md:grid-cols-2">
                     @foreach($players as $gamePlayer)
+                        @php($hasPredicted = $currentAgenda?->status === 'voting' && $predictions->contains('player_id', $gamePlayer->id))
                         @php($isBlocked = $currentAgenda?->status === 'voting' && $currentAgenda->isPlayerBlocked($gamePlayer))
                         @php($hasVotedHere = $currentAgenda && $gamePlayer->hasVotedOn($currentAgenda))
                         @php($isMe = $gamePlayer->id === $player->id)
@@ -661,13 +708,26 @@
                                 @if($gamePlayer->faction)
                                     <p class="text-sm text-gray-600 dark:text-gray-400 truncate">{{ $gamePlayer->faction }}</p>
                                 @endif
-                                @if($canBlockVotes && $isBlocked)
+                                @if($canBlockVotes && $isBlocked && !$hasPredicted)
                                     <p class="text-xs font-semibold text-red-700 dark:text-red-400">Cannot vote</p>
                                 @endif
                             </div>
 
-                            <!-- Vote status, or blocking votes while the Speaker checks action cards -->
-                            @if($canBlockVotes)
+                            <!-- Available influence, as the blue influence value on a TI4 planet card -->
+                            @if($gamePlayer->influence !== null)
+                                <span class="shrink-0 relative w-9 h-9 grid place-items-center text-sm font-bold tabular-nums text-gray-900 dark:text-white"
+                                      title="{{ $gamePlayer->influence }} influence">
+                                    <svg class="absolute inset-0 w-full h-full text-blue-600 dark:text-blue-400" viewBox="0 0 36 36" fill="none" aria-hidden="true">
+                                        <polygon points="18,2.5 31.4,10.25 31.4,25.75 18,33.5 4.6,25.75 4.6,10.25" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"></polygon>
+                                    </svg>
+                                    <span class="relative">{{ $gamePlayer->influence }}<span class="sr-only"> influence</span></span>
+                                </span>
+                            @endif
+
+                            <!-- Vote status, or blocking votes while the Speaker checks action cards. Players who predicted cannot vote -->
+                            @if($hasPredicted)
+                                <span class="shrink-0 px-2 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-200">Predicted</span>
+                            @elseif($canBlockVotes)
                                 <button wire:click="toggleVotingBlock('{{ $gamePlayer->id }}')"
                                         class="shrink-0 text-xs font-semibold px-3 py-2 rounded-lg transition-colors {{ $isBlocked ? 'bg-red-100 text-red-800 hover:bg-red-200 dark:bg-red-900/50 dark:text-red-200' : 'bg-orange-500 hover:bg-orange-600 text-white' }}">
                                     {{ $isBlocked ? 'Allow vote' : 'Block vote' }}

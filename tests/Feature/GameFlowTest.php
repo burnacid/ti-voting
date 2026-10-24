@@ -4,10 +4,12 @@ use App\Events\TriggerRefresh;
 use App\Livewire\CreateGame;
 use App\Livewire\GameDashboard;
 use App\Livewire\JoinGameForm;
+use App\Livewire\PlayerInfluence;
 use App\Livewire\UpdateMiltyUrl;
 use App\Models\Agenda;
 use App\Models\Game;
 use App\Models\Player;
+use App\Models\Prediction;
 use App\Models\Vote;
 use App\Support\PlayerGames;
 use Illuminate\Support\Facades\Cookie;
@@ -1385,4 +1387,244 @@ test('star chart needs a milty draft', function () {
         ->call('drawStarChart');
 
     expect($game->fresh()->star_chart_tiles)->toBeNull();
+});
+
+test('a player can predict an outcome before voting and everyone sees it', function () {
+    [$game, $speaker, $other] = makeGame();
+    $agenda = makeAgenda($game);
+    $agenda->update(['reveal_step' => Agenda::STEP_AFTER_REVEALED]);
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $other])
+        ->assertSee('Predictions')
+        ->assertDontSeeHtml('id="predictionPlayerId"')
+        ->set('predictionSource', 'leadership_rider')
+        ->set('predictionOption', 'Against')
+        ->call('makePrediction')
+        ->assertHasNoErrors();
+
+    $prediction = Prediction::sole();
+    expect($prediction->player_id)->toBe($other->id)
+        ->and($prediction->option)->toBe('Against')
+        ->and($agenda->fresh()->isPlayerBlocked($other))->toBeTrue()
+        ->and($agenda->fresh()->eligiblePlayerCount())->toBe(1);
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->assertSeeInOrder(['Other', 'predicts', 'Against', 'Leadership Rider', 'Gain 3 command tokens.'])
+        ->assertSee('Predicted');
+
+    // The player who predicted cannot vote once voting opens, and does not keep voting open
+    $agenda->update(['reveal_step' => null]);
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $other])
+        ->assertSee('You cannot vote on this agenda')
+        ->assertSee('You predicted an outcome.')
+        ->assertSee('Leadership Rider')
+        ->assertDontSee('Submit Vote');
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->set('selectedOption', 'For')
+        ->set('influenceSpent', 3)
+        ->call('submitVote');
+    expect($agenda->fresh()->status)->toBe('completed');
+});
+
+test('predictions need a known card and an outcome other than abstain, before voting opens', function () {
+    [$game, , $other] = makeGame();
+    $agenda = makeAgenda($game);
+    $agenda->update(['reveal_step' => Agenda::STEP_AFTER_REVEALED]);
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $other])
+        ->set('predictionSource', 'made_up_rider')
+        ->set('predictionOption', 'Abstain')
+        ->call('makePrediction')
+        ->assertHasErrors(['predictionSource', 'predictionOption']);
+
+    $agenda->update(['reveal_step' => null]);
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $other])
+        ->assertDontSee('Predictions')
+        ->set('predictionSource', 'trade_rider')
+        ->set('predictionOption', 'For')
+        ->call('makePrediction');
+
+    expect(Prediction::count())->toBe(0);
+});
+
+test('a player cannot predict twice with the same card on one agenda', function () {
+    [$game, , $other] = makeGame();
+    $agenda = makeAgenda($game);
+    $agenda->update(['reveal_step' => Agenda::STEP_AFTER_REVEALED]);
+
+    $view = Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $other]);
+    foreach (['For', 'Against'] as $option) {
+        $view->set('predictionSource', 'nekro_galactic_threat')->set('predictionOption', $option)->call('makePrediction');
+    }
+
+    expect(Prediction::count())->toBe(1);
+});
+
+test('the speaker can record a prediction for another player, other players only for themselves', function () {
+    [$game, $speaker, $other] = makeGame();
+    $agenda = makeAgenda($game);
+    $agenda->update(['reveal_step' => Agenda::STEP_AFTER_REVEALED]);
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->set('predictionPlayerId', $other->id)
+        ->set('predictionSource', 'imperial_rider')
+        ->set('predictionOption', 'For')
+        ->call('makePrediction');
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $other])
+        ->set('predictionPlayerId', $speaker->id)
+        ->set('predictionSource', 'trade_rider')
+        ->set('predictionOption', 'For')
+        ->call('makePrediction');
+
+    expect(Prediction::pluck('player_id')->unique()->values()->all())->toBe([$other->id])
+        ->and(Prediction::count())->toBe(2);
+});
+
+test('only the player who predicted or the speaker can remove a prediction, until voting opens', function () {
+    [$game, $speaker, $other] = makeGame();
+    $third = Player::create(['game_id' => $game->id, 'name' => 'Third', 'session_token' => Player::generateSessionToken()]);
+    $agenda = makeAgenda($game);
+    $agenda->update(['reveal_step' => Agenda::STEP_AFTER_REVEALED]);
+    $prediction = Prediction::create(['agenda_id' => $agenda->id, 'player_id' => $other->id, 'source' => 'warfare_rider', 'option' => 'For']);
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $third])->call('removePrediction', $prediction->id);
+    expect(Prediction::count())->toBe(1);
+
+    $agenda->update(['reveal_step' => null]);
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])->call('removePrediction', $prediction->id);
+    expect(Prediction::count())->toBe(1);
+
+    $agenda->update(['reveal_step' => Agenda::STEP_AFTER_REVEALED]);
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $other])->call('removePrediction', $prediction->id);
+    expect(Prediction::count())->toBe(0)
+        ->and($agenda->fresh()->isPlayerBlocked($other))->toBeFalse();
+});
+
+test('after voting the speaker sees which predictions are correct, after breaking a tie', function () {
+    [$game, $speaker, $other] = makeGame();
+    $third = Player::create(['game_id' => $game->id, 'name' => 'Third', 'session_token' => Player::generateSessionToken()]);
+    $agenda = makeAgenda($game);
+    Prediction::create(['agenda_id' => $agenda->id, 'player_id' => $third->id, 'source' => 'politics_rider', 'option' => 'For']);
+    Vote::create(['agenda_id' => $agenda->id, 'player_id' => $speaker->id, 'option' => 'For', 'influence_spent' => 3]);
+    Vote::create(['agenda_id' => $agenda->id, 'player_id' => $other->id, 'option' => 'Against', 'influence_spent' => 3]);
+
+    $view = Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->call('endVoting')
+        ->assertSee('The vote is tied')
+        ->assertSee('which predictions are correct')
+        ->assertDontSee('Show who is affected')
+        ->assertDontSee('Correct');
+
+    $view->call('breakTie', 'Against')
+        ->assertSee('Against wins (tie broken by the Speaker)')
+        ->assertSeeInOrder(['Third', 'predicts', 'For', 'Politics Rider', 'Wrong']);
+});
+
+test('every player can enter their available influence at the top and everyone sees it', function () {
+    [$game, $speaker, $other] = makeGame();
+
+    $this->withCookie(PlayerGames::COOKIE, json_encode([$game->code => $other->session_token]))
+        ->get(route('game.show', $game->code))
+        ->assertOk()
+        ->assertSeeInOrder(['Playing as', 'Other', 'Your influence: not entered', 'Your available influence']);
+
+    Livewire::test(PlayerInfluence::class, ['game' => $game, 'player' => $other])
+        ->set('influence', '7')
+        ->call('save')
+        ->assertHasNoErrors()
+        ->assertDispatched('influence-saved')
+        ->assertSee('Your influence: 7');
+
+    expect($other->fresh()->influence)->toBe(7);
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->assertDontSee('Your available influence')
+        ->assertSeeInOrder(['Other', 'title="7 influence"', '7', 'influence'], false);
+
+    // The player is reminded of it when voting
+    makeAgenda($game);
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $other->fresh()])
+        ->assertSee('You have 7 influence available.');
+});
+
+test('available influence must be a whole number from 0 to 99 and can be cleared', function () {
+    [$game, , $other] = makeGame();
+    $other->update(['influence' => 5]);
+
+    $view = Livewire::test(PlayerInfluence::class, ['game' => $game, 'player' => $other])
+        ->assertSet('influence', 5);
+    foreach (['-1', '100', 'lots'] as $invalid) {
+        $view->set('influence', $invalid)->call('save')->assertHasErrors('influence');
+    }
+    expect($other->fresh()->influence)->toBe(5);
+
+    $view->set('influence', '')->call('save')->assertHasNoErrors();
+    expect($other->fresh()->influence)->toBeNull();
+});
+
+test('the nekro virus sees who voted for the outcome they predicted correctly', function () {
+    [$game, $speaker, $other] = makeGame();
+    $other->update(['faction' => 'The Barony of Letnev']);
+    $nekro = Player::create(['game_id' => $game->id, 'name' => 'Nekro', 'faction' => 'The Nekro Virus', 'session_token' => Player::generateSessionToken()]);
+    $agenda = makeAgenda($game);
+    Prediction::create(['agenda_id' => $agenda->id, 'player_id' => $nekro->id, 'source' => 'nekro_galactic_threat', 'option' => 'Against']);
+    Vote::create(['agenda_id' => $agenda->id, 'player_id' => $speaker->id, 'option' => 'For', 'influence_spent' => 2]);
+    Vote::create(['agenda_id' => $agenda->id, 'player_id' => $other->id, 'option' => 'Against', 'influence_spent' => 5]);
+    $agenda->update(['status' => 'completed', 'voting_ended_at' => now()]);
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $nekro])
+        ->assertSee('Your prediction came true: Against won')
+        ->assertSee('Gain 1 technology that is owned by a player who voted how you predicted.')
+        ->assertSeeInOrder(['Players who voted Against', 'Other', 'The Barony of Letnev'])
+        ->assertDontSee('Speaker ·');
+
+    // The Speaker sees it with the prediction, other players do not see it
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->assertSeeInOrder(['Nekro', 'predicts', 'Against', 'Voted Against:', 'Other', 'Correct'])
+        ->assertDontSee('Your prediction came true');
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $other])
+        ->assertDontSee('Your prediction came true');
+
+    // Gone once the next agenda is revealed
+    makeAgenda($game);
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $nekro])
+        ->assertDontSee('Your prediction came true');
+});
+
+test('the nekro virus does not see the voters after a wrong prediction or before a tie is broken', function () {
+    [$game, $speaker, $other] = makeGame();
+    $nekro = Player::create(['game_id' => $game->id, 'name' => 'Nekro', 'faction' => 'The Nekro Virus', 'session_token' => Player::generateSessionToken()]);
+    $agenda = makeAgenda($game);
+    Prediction::create(['agenda_id' => $agenda->id, 'player_id' => $nekro->id, 'source' => 'nekro_galactic_threat', 'option' => 'For']);
+    Vote::create(['agenda_id' => $agenda->id, 'player_id' => $speaker->id, 'option' => 'For', 'influence_spent' => 3]);
+    Vote::create(['agenda_id' => $agenda->id, 'player_id' => $other->id, 'option' => 'Against', 'influence_spent' => 3]);
+    $agenda->update(['status' => 'completed', 'voting_ended_at' => now()]);
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $nekro])
+        ->assertDontSee('Your prediction came true');
+
+    $agenda->update(['tiebreak_option' => 'Against']);
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $nekro])
+        ->assertDontSee('Your prediction came true');
+
+    $agenda->update(['tiebreak_option' => 'For']);
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $nekro])
+        ->assertSee('Your prediction came true: For won')
+        ->assertSeeInOrder(['Players who voted For', 'Speaker']);
+});
+
+test('riders do not show who voted', function () {
+    [$game, $speaker, $other] = makeGame();
+    $agenda = makeAgenda($game);
+    Prediction::create(['agenda_id' => $agenda->id, 'player_id' => $other->id, 'source' => 'trade_rider', 'option' => 'For']);
+    Vote::create(['agenda_id' => $agenda->id, 'player_id' => $speaker->id, 'option' => 'For', 'influence_spent' => 3]);
+    $agenda->update(['status' => 'completed', 'voting_ended_at' => now()]);
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $other])
+        ->assertDontSee('Your prediction came true');
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->assertSee('Correct')
+        ->assertDontSee('Voted For:');
 });

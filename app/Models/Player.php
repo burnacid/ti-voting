@@ -18,6 +18,7 @@ class Player extends Model
         'name',
         'session_token',
         'faction',
+        'influence',
         'is_speaker',
         'rejoin_request_token',
         'rejoin_requested_at',
@@ -31,6 +32,7 @@ class Player extends Model
 
     protected $casts = [
         'is_speaker' => 'boolean',
+        'influence' => 'integer',
         'rejoin_requested_at' => 'datetime',
         'rejoin_approved_at' => 'datetime',
     ];

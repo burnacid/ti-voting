@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Collection;
 
 class Agenda extends Model
 {
@@ -77,6 +78,11 @@ class Agenda extends Model
     public function votes(): HasMany
     {
         return $this->hasMany(Vote::class);
+    }
+
+    public function predictions(): HasMany
+    {
+        return $this->hasMany(Prediction::class);
     }
 
     public function getVoteResults(): array
@@ -164,20 +170,37 @@ class Agenda extends Model
             ->all();
     }
 
+    /**
+     * The players who voted for an option, e.g. for The Nekro Virus to take a technology from after a correct prediction.
+     */
+    public function playersWhoVoted(string $option): Collection
+    {
+        return $this->votes()->with('player')->where('option', $option)->get()->pluck('player')->filter()->sortBy('name')->values();
+    }
+
     public function allPlayersVoted(): bool
     {
         return $this->votes()->count() >= $this->eligiblePlayerCount();
     }
 
+    // Blocked by the Speaker, e.g. by Assassinate Representative, or by predicting an outcome
     public function isPlayerBlocked(Player $player): bool
     {
-        return in_array($player->id, $this->blocked_player_ids ?? [], true);
+        return in_array($player->id, $this->blocked_player_ids ?? [], true) || $this->hasPredicted($player);
     }
 
-    // Players who may vote on this agenda, i.e. everyone the Speaker did not block
+    // A player who predicts an outcome, e.g. with a Rider, cannot vote on this agenda
+    public function hasPredicted(Player $player): bool
+    {
+        return $this->predictions()->where('player_id', $player->id)->exists();
+    }
+
+    // Players who may vote on this agenda, i.e. everyone the Speaker did not block and who did not predict
     public function eligiblePlayerCount(): int
     {
-        return $this->game->players()->whereNotIn('id', $this->blocked_player_ids ?? [])->count();
+        $ineligibleIds = [...($this->blocked_player_ids ?? []), ...$this->predictions()->pluck('player_id')];
+
+        return $this->game->players()->whereNotIn('id', $ineligibleIds)->count();
     }
 
     public function isVotingOpen(): bool

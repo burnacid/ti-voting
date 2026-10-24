@@ -80,6 +80,7 @@
                                 <p class="text-sm text-gray-600 dark:text-gray-400 truncate">{{ $player->faction }}</p>
                             @endif
                         </div>
+                        <livewire:player-influence :game="$game" :player="$player" />
                     </div>
                 </div>
 

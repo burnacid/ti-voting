@@ -4,6 +4,15 @@ All notable changes to TI Voting are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.0] - 2026-10-24
+
+### Added
+- Predictions: before voting opens, a player who predicts an outcome aloud, with a Rider (Construction, Diplomacy, Imperial, Leadership, Politics, Technology, Trade or Warfare) or The Nekro Virus's Galactic Threat ability, records it in the app. Every player sees who predicted which outcome, with which card and what they get if they are right. The Speaker can record a prediction for another player, and a prediction made by mistake can be removed until voting opens.
+- A player who predicted cannot vote on that agenda, as the cards say, and does not keep voting open. The player list shows them as Predicted.
+- After voting, the Speaker sees which predictions are correct. On a tie the Speaker breaks the tie first.
+- When The Nekro Virus predicted correctly, the Nekro player sees which players voted for that outcome, with their factions, to take a technology from. The Speaker sees them with the prediction too. It is shown until the next agenda is revealed.
+- Available influence: every player enters how much influence they have by tapping the blue hexagon next to their name at the top of the game page, and it is shown to them as a reminder when voting. Every player sees it on each player's card in the Players tab, as a blue hexagon like the influence value on a TI4 planet card.
+
 ## [1.8.0] - 2026-10-18
 
 ### Added
@@ -152,6 +161,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Milty draft integration to load factions and planets.
 - Planet agendas (any, industrial, cultural, hazardous, non-home), with extra tiles that can be added by tile number.
 
+[1.9.0]: https://github.com/burnacid/ti-voting/compare/v1.8.0...v1.9.0
 [1.8.0]: https://github.com/burnacid/ti-voting/compare/v1.7.0...v1.8.0
 [1.7.0]: https://github.com/burnacid/ti-voting/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/burnacid/ti-voting/compare/v1.5.0...v1.6.0
