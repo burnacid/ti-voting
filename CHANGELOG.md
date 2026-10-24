@@ -4,7 +4,7 @@ All notable changes to TI Voting are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.9.0] - 2026-10-24
 
 ### Added
 - Predictions: before voting opens, a player who predicts an outcome aloud, with a Rider (Construction, Diplomacy, Imperial, Leadership, Politics, Technology, Trade or Warfare) or The Nekro Virus's Galactic Threat ability, records it in the app. Every player sees who predicted which outcome, with which card and what they get if they are right. The Speaker can record a prediction for another player, and a prediction made by mistake can be removed until voting opens.
@@ -161,6 +161,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Milty draft integration to load factions and planets.
 - Planet agendas (any, industrial, cultural, hazardous, non-home), with extra tiles that can be added by tile number.
 
+[1.9.0]: https://github.com/burnacid/ti-voting/compare/v1.8.0...v1.9.0
 [1.8.0]: https://github.com/burnacid/ti-voting/compare/v1.7.0...v1.8.0
 [1.7.0]: https://github.com/burnacid/ti-voting/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/burnacid/ti-voting/compare/v1.5.0...v1.6.0
