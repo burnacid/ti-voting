@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Agenda;
+use App\Models\Feedback;
 use App\Models\Game;
 use App\Models\LogEntry;
 use App\Models\Player;
@@ -44,6 +45,9 @@ class DashboardController extends Controller
                 ->limit(8)
                 ->get(),
             'recentErrors' => LogEntry::whereIn('level', LogEntry::ERROR_LEVELS)->latest('id')->limit(5)->get(),
+            'feedbackEnabled' => config('app.feedback'),
+            'recentFeedback' => config('app.feedback') ? Feedback::latest('id')->limit(5)->get() : collect(),
+            'unreadFeedback' => config('app.feedback') ? Feedback::unread()->count() : 0,
         ]);
     }
 

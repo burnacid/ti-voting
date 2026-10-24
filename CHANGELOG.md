@@ -4,6 +4,12 @@ All notable changes to TI Voting are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Feedback: anyone can send an idea, a bug or other feedback with the Feedback link in the footer, optionally with a name or contact for a reply. Feedback sent from a game remembers the game. It can be sent five times an hour. Feedback is only on the public site: self-hosted installs don't have it unless `FEEDBACK_ENABLED=true` is set.
+- The admin panel has a Feedback page with the feedback, which can be filtered, marked as read or unread and deleted. The menu shows how many are unread, and the dashboard shows the most recent feedback.
+
 ## [1.9.0] - 2026-10-24
 
 ### Added

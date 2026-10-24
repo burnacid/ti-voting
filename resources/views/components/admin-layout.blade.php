@@ -15,14 +15,18 @@
         <nav class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
             <div class="max-w-6xl mx-auto px-4 flex flex-wrap items-center gap-x-4 gap-y-2 py-3">
                 <a href="{{ route('admin.dashboard') }}" class="font-bold mr-auto">TI4 Admin</a>
-                @foreach(['admin.dashboard' => 'Dashboard', 'admin.games' => 'Games', 'admin.logs' => 'Logs'] as $route => $label)
+                @php($unreadFeedback = config('app.feedback') ? \App\Models\Feedback::unread()->count() : 0)
+                @foreach(array_filter(['admin.dashboard' => 'Dashboard', 'admin.games' => 'Games', 'admin.feedback' => config('app.feedback') ? 'Feedback' : null, 'admin.logs' => 'Logs']) as $route => $label)
                     <a href="{{ route($route) }}"
                        @class([
-                           'text-sm font-medium px-2 py-1 rounded-md',
+                           'inline-flex items-center gap-1.5 text-sm font-medium px-2 py-1 rounded-md',
                            'bg-gray-100 dark:bg-gray-700' => request()->routeIs($route . '*'),
                            'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white' => !request()->routeIs($route . '*'),
                        ])>
                         {{ $label }}
+                        @if($route === 'admin.feedback' && $unreadFeedback)
+                            <span class="min-w-5 px-1.5 rounded-full bg-blue-600 text-white text-xs text-center tabular-nums" title="{{ $unreadFeedback }} unread">{{ $unreadFeedback }}</span>
+                        @endif
                     </a>
                 @endforeach
                 <form method="POST" action="{{ route('admin.logout') }}">

@@ -41,6 +41,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Feedback
+    |--------------------------------------------------------------------------
+    |
+    | Shows the Feedback link in the footer and the Feedback page in the admin
+    | panel. Only enabled on the public site, so feedback reaches the
+    | maintainer and not whoever self-hosts the app.
+    |
+    */
+
+    'feedback' => (bool) env('FEEDBACK_ENABLED', false),
+
+    /*
+    |--------------------------------------------------------------------------
     | Game Retention
     |--------------------------------------------------------------------------
     |
