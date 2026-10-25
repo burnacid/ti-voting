@@ -1649,9 +1649,36 @@ test('the speaker can switch the agenda list to absol\'s agendas', function () {
 
     $component->set('selectedPresetAgenda', 'Mutiny')
         ->assertSet('newAgendaDescription', $absol->firstWhere('Name', 'Mutiny')['Effect'])
-        ->call('createAgenda');
+        ->call('createAgenda')
+        ->assertSeeHtml('agenda-card-absol')
+        ->assertSeeHtml('<p class="agenda-card-source">Absol’s Lab</p>');
 
-    expect($game->currentAgenda()->title)->toBe('Mutiny');
+    expect($game->currentAgenda()->title)->toBe('Mutiny')
+        ->and($game->currentAgenda()->source)->toBe(Agenda::SOURCE_ABSOL);
+});
+
+test('official agendas keep the official card style', function () {
+    [$game, $speaker] = makeGame();
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->set('selectedPresetAgenda', 'Mutiny')
+        ->call('createAgenda')
+        ->assertDontSeeHtml('agenda-card-absol')
+        ->assertDontSeeHtml('agenda-card-source');
+
+    expect($game->currentAgenda()->source)->toBeNull();
+});
+
+test('prophecy of kings agendas are tagged on the card', function () {
+    [$game, $speaker] = makeGame();
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->set('selectedPresetAgenda', 'Articles of War')
+        ->call('createAgenda')
+        ->assertSeeHtml('<p class="agenda-card-source">Prophecy of Kings</p>')
+        ->assertDontSeeHtml('agenda-card-absol');
+
+    expect($game->currentAgenda()->source)->toBe(Agenda::SOURCE_POK);
 });
 
 test('only the speaker can switch to absol\'s agendas', function () {

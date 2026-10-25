@@ -108,3 +108,69 @@
     font-weight: 600;
     letter-spacing: 0.02em;
 }
+
+/* Agenda of Absol's Lab, styled after its cards: black header, light blue title, glowing white body */
+/* Absol's cards have more text: the card grows with it instead of cutting it off */
+.agenda-card-absol {
+    aspect-ratio: auto;
+    min-height: 28rem;
+    background: linear-gradient(180deg, #000 0%, #05080d 30%, #0a2a4a 70%, #6fb6ef 100%);
+    box-shadow:
+        0 0 0 1px #9fd4ff,
+        0 0 0 4px #000,
+        0 0 22px rgba(140, 205, 255, 0.6),
+        0 12px 28px rgba(0, 0, 0, 0.45);
+}
+
+.agenda-card-absol .agenda-card-title {
+    color: #8cc4ff;
+    letter-spacing: 0.04em;
+    text-shadow: 0 0 10px rgba(110, 180, 255, 0.45);
+}
+
+.agenda-card-absol .agenda-card-type {
+    border-block: 1px solid #c9a24a;
+    background: #000;
+}
+
+.agenda-card-absol .agenda-card-type span {
+    background: none;
+    color: #e2a86a;
+    letter-spacing: 0.12em;
+}
+
+.agenda-card-absol.agenda-card-directive .agenda-card-type span {
+    color: #f5e61c;
+}
+
+.agenda-card-absol .agenda-card-body {
+    background: radial-gradient(ellipse at 50% 45%, #fff 0%, #fbfdff 60%, #e3f1fc 100%);
+    box-shadow:
+        inset 0 0 0 2px #fff,
+        inset 0 0 18px rgba(120, 195, 255, 0.55),
+        0 0 14px rgba(160, 215, 255, 0.8);
+    overflow: visible;
+    color: #111;
+    font-size: 0.9375rem;
+    text-align: center;
+}
+
+/* For and Against paragraphs read left-aligned, like on the printed cards */
+.agenda-card-absol .agenda-card-body p:has(.agenda-card-outcome) {
+    text-align: left;
+}
+
+.agenda-card-source {
+    align-self: flex-end;
+    margin-top: 0.5rem;
+    padding: 0.125rem 0.5rem;
+    border: 1px solid rgba(140, 196, 255, 0.5);
+    border-radius: 9999px;
+    background: #0b1a2e;
+    color: #8cc4ff;
+    font-family: 'Saira Semi Condensed', ui-sans-serif, system-ui, sans-serif;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}

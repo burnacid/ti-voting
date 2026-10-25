@@ -3,7 +3,8 @@
 @php
     $options = collect($agendas)->map(fn ($agenda) => [
         'name' => $agenda['Name'],
-        'type' => ucfirst($agenda['Type'] ?? ''),
+        // e.g. "Law · Prophecy of Kings", so the Speaker sees which deck an agenda is from
+        'type' => collect([ucfirst($agenda['Type'] ?? ''), \App\Models\Agenda::SOURCE_LABELS[\App\Models\Agenda::sourceOf($agenda)] ?? null])->filter()->implode(' · '),
         'effect' => $agenda['Effect'] ?? '',
     ])->values();
 @endphp

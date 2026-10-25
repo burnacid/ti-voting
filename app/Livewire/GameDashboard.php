@@ -53,6 +53,7 @@ class GameDashboard extends Component
     public $newAgendaDescription = '';
     public $newAgendaCardType = null; // law or directive when created from a preset agenda
     public $newAgendaElect = null; // Elect value of the preset agenda, e.g. planet or law
+    public $newAgendaSource = null; // Deck of the preset agenda, e.g. pok or absol
     public $agendaType = 'for_against';
     public $customOptions = '';
     public $customTileNumbers = '';
@@ -133,6 +134,7 @@ class GameDashboard extends Component
         // Determine agenda type based on Elect field
         $electType = strtolower($agenda['Elect'] ?? '');
         $this->newAgendaElect = $electType ?: null;
+        $this->newAgendaSource = Agenda::sourceOf($agenda);
 
         $agendaType = array_search($electType, Agenda::ELECT_BY_AGENDA_TYPE, true) ?: 'for_against';
 
@@ -161,7 +163,7 @@ class GameDashboard extends Component
     public function clearPresetSelection()
     {
         $this->selectedPresetAgenda = '';
-        $this->reset(['newAgendaTitle', 'newAgendaDescription', 'newAgendaCardType', 'newAgendaElect', 'agendaType', 'customOptions', 'customTileNumbers']);
+        $this->reset(['newAgendaTitle', 'newAgendaDescription', 'newAgendaCardType', 'newAgendaElect', 'newAgendaSource', 'agendaType', 'customOptions', 'customTileNumbers']);
     }
 
     public function rules()
@@ -214,7 +216,7 @@ class GameDashboard extends Component
         $this->showCreateAgenda = !$this->showCreateAgenda;
 
         if (!$this->showCreateAgenda) {
-            $this->reset(['newAgendaTitle', 'newAgendaDescription', 'newAgendaCardType', 'newAgendaElect', 'agendaType', 'customOptions', 'customTileNumbers']);
+            $this->reset(['newAgendaTitle', 'newAgendaDescription', 'newAgendaCardType', 'newAgendaElect', 'newAgendaSource', 'agendaType', 'customOptions', 'customTileNumbers']);
         }
     }
 
@@ -275,6 +277,7 @@ class GameDashboard extends Component
             'description' => $this->newAgendaDescription,
             'type' => $this->newAgendaCardType,
             'elect' => $this->resolveAgendaElect(),
+            'source' => $this->newAgendaSource,
             'options' => $options,
             'status' => 'voting',
             'reveal_step' => Agenda::STEP_WHEN_REVEALED,
@@ -283,7 +286,7 @@ class GameDashboard extends Component
 
         Log::info('Agenda revealed', ['agenda' => $agenda->title, 'options' => count($options)]);
 
-        $this->reset(['newAgendaTitle', 'newAgendaDescription', 'newAgendaCardType', 'newAgendaElect', 'agendaType', 'customOptions', 'showCreateAgenda', 'showAffectedPlayers']);
+        $this->reset(['newAgendaTitle', 'newAgendaDescription', 'newAgendaCardType', 'newAgendaElect', 'newAgendaSource', 'agendaType', 'customOptions', 'showCreateAgenda', 'showAffectedPlayers']);
         $this->dispatch('flashMessage', [
             'New agenda revealed. Ask the players for "When an agenda is revealed" action cards.',
             'success'
