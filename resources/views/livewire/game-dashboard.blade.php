@@ -41,6 +41,33 @@
         </div>
     @endforeach
 
+    <!-- Managed influence: the Speaker started the agenda phase, every player enters their influence -->
+    {{-- A modal that cannot be closed: it stays until the player saved their influence --}}
+    @if($needsPhaseInfluence)
+        <div wire:key="phase-influence-modal" class="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
+            <form wire:submit="savePhaseInfluence" role="dialog" aria-modal="true"
+                  aria-labelledby="phase-influence-title" aria-describedby="phase-influence-description"
+                  x-data x-trap.noscroll="true"
+                  class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 w-full max-w-md">
+                <h2 id="phase-influence-title" class="text-xl font-bold text-gray-900 dark:text-white mb-2">The agenda phase has started</h2>
+                <p id="phase-influence-description" class="text-sm text-gray-600 dark:text-gray-300 mb-4">
+                    Enter the influence you have available. Your votes are taken from it.
+                </p>
+
+                <label for="phaseInfluence" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Your available influence</label>
+                <div class="flex gap-2">
+                    <input type="number" id="phaseInfluence" wire:model="phaseInfluence" min="0" max="99" inputmode="numeric" placeholder="0" autofocus
+                           class="w-24 px-3 py-2.5 text-base sm:text-sm border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white">
+                    <button type="submit"
+                            class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 sm:py-2 px-4 rounded-lg transition-colors">
+                        Save
+                    </button>
+                </div>
+                @error('phaseInfluence') <p class="mt-1 text-red-500 text-sm">{{ $message }}</p> @enderror
+            </form>
+        </div>
+    @endif
+
     <!-- Pick a drafted faction, e.g. after the Speaker added the Milty draft -->
     @if($factionChoices->isNotEmpty())
         <form wire:submit="chooseFaction" class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4">
@@ -233,10 +260,51 @@
                 </form>
             </div>
         @else
-            <button wire:click="toggleCreateAgenda"
-                    class="w-full sm:w-auto bg-green-600 hover:bg-green-700 active:bg-green-800 text-white font-semibold py-3 sm:py-2 px-4 rounded-lg transition-colors">
-                Create New Agenda
-            </button>
+            <div class="flex flex-col sm:flex-row gap-2">
+                @if($game->managed_influence)
+                    {{-- Confirmed in a modal, as it clears every player's influence --}}
+                    <div x-data="{ confirming: false }" x-on:keydown.escape.window="confirming = false" class="contents">
+                        <button type="button" x-on:click="confirming = true"
+                                class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold py-3 sm:py-2 px-4 rounded-lg transition-colors">
+                            Start New Agenda Phase
+                        </button>
+
+                        <template x-teleport="body">
+                            <div x-show="confirming" x-cloak x-transition.opacity
+                                 class="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50"
+                                 x-on:click.self="confirming = false">
+                                <div role="dialog" aria-modal="true" aria-labelledby="start-phase-title" aria-describedby="start-phase-description"
+                                     x-trap.noscroll="confirming"
+                                     class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 w-full max-w-md">
+                                    <h2 id="start-phase-title" class="text-xl font-bold text-gray-900 dark:text-white mb-2">Start New Agenda Phase</h2>
+                                    <p id="start-phase-description" class="text-sm text-gray-600 dark:text-gray-300 mb-6">
+                                        Every player's influence is cleared, and every player is asked to enter the influence they have for this agenda phase.
+                                    </p>
+                                    <div class="flex flex-col-reverse sm:flex-row gap-3 sm:justify-end">
+                                        <button type="button" x-on:click="confirming = false"
+                                                class="px-4 py-2.5 sm:py-2 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700">
+                                            Cancel
+                                        </button>
+                                        <button type="button" x-on:click="confirming = false; $wire.startAgendaPhase()"
+                                                class="px-4 py-2.5 sm:py-2 bg-blue-600 text-white font-semibold rounded-md hover:bg-blue-700">
+                                            Start New Agenda Phase
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                @endif
+                <button wire:click="toggleCreateAgenda"
+                        class="w-full sm:w-auto bg-green-600 hover:bg-green-700 active:bg-green-800 text-white font-semibold py-3 sm:py-2 px-4 rounded-lg transition-colors">
+                    Create New Agenda
+                </button>
+            </div>
+        @endif
+        @if($missingInfluence->isNotEmpty())
+            <p class="text-sm text-gray-600 dark:text-gray-400">
+                Waiting for influence from {{ $missingInfluence->pluck('name')->sort()->implode(', ') }}.
+            </p>
         @endif
     @endif
 
@@ -366,13 +434,21 @@
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                             Choose your option:
                         </label>
+                        @if($noInfluence)
+                            <p class="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                                {{ $onlyAbstain ? 'You have no influence left, so you abstain.' : 'You have 0 influence, so Abstain is selected.' }}
+                            </p>
+                        @endif
                         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
                             @foreach($currentAgenda->options as $option)
+                                @php($optionDisabled = $onlyAbstain && $option !== 'Abstain')
                                 <label class="flex items-center p-2 rounded-md
                                     {{ $option === 'Abstain' ? 'bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/30 border border-red-200 dark:border-red-800' : 'hover:bg-gray-50 dark:hover:bg-gray-700' }}
+                                    {{ $optionDisabled ? 'opacity-50 cursor-not-allowed' : '' }}
                                     transition-colors">
                                     <input type="radio"
                                            wire:model.live="selectedOption"
+                                           @disabled($optionDisabled)
                                            value="{{ $option }}"
                                            class="{{ $option === 'Abstain' ? 'text-red-600' : 'text-blue-600' }} mr-2">
                                     <span class="{{ $option === 'Abstain' ? 'text-red-800 dark:text-red-200' : 'text-gray-900 dark:text-white' }}">{{ $option }}</span>
@@ -390,17 +466,20 @@
                         </div>
                     @elseif($selectedOption !== 'Abstain')
                     <div>
+                        @php($managedMax = $game->managed_influence && $player->influence !== null ? min(99, $player->influence) : null)
                         <label for="influenceSpent" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Influence to spend (1-99):
+                            Influence to spend (1-{{ $managedMax ?? 99 }}):
                         </label>
                         @if($player->influence !== null)
-                            <p class="text-sm text-gray-600 dark:text-gray-400 mb-2">You have {{ $player->influence }} influence available.</p>
+                            <p class="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                                You have {{ $player->influence }} influence available.{{ $managedMax !== null ? ' It goes down by the influence you spend.' : '' }}
+                            </p>
                         @endif
                         <input type="number"
                                id="influenceSpent"
                                wire:model="influenceSpent"
                                min="1"
-                               max="99"
+                               max="{{ $managedMax ?? 99 }}"
                                class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white">
                         @error('influenceSpent') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
                     </div>
@@ -787,6 +866,13 @@
                                               label="Hidden Agenda"
                                               :description="'Votes are secret: only the totals are revealed. Off: every player sees how each player votes. '
                                                   . ($agendaOpen ? 'Can be changed after this agenda.' : 'Applies from the next agenda.')" />
+
+                            {{-- Players enter their influence when the agenda phase starts, votes are taken from it --}}
+                            <x-setting-switch action="toggleManagedInfluence" :on="$game->managed_influence" :disabled="$agendaOpen"
+                                              label="Managed influence"
+                                              :warning="$game->hidden_agenda ? 'Hidden Agenda is on, but every player sees the influence of the others go down when they vote. This can show how much someone voted with, and hint at who voted for what.' : null"
+                                              :description="'Start the agenda phase to ask every player for their influence. Their votes are taken from it automatically. '
+                                                  . ($agendaOpen ? 'Can be changed after this agenda.' : '')" />
 
                             {{-- Off: the Speaker announces the results --}}
                             <x-setting-switch action="toggleShowResults" :on="$game->show_results"

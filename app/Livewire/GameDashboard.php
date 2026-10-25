@@ -16,6 +16,7 @@ use App\Models\Prediction;
 use App\Models\Vote;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 
@@ -42,6 +43,8 @@ class GameDashboard extends Component
     // Faction picked in the prompt shown when the game has a Milty draft and this player has no drafted faction yet
     public $chosenFaction = '';
     public $influenceSpent = 0;
+    // Asked when the Speaker starts the agenda phase with managed influence
+    public $phaseInfluence = '';
 
     // A prediction made aloud after the agenda is revealed, e.g. with a Rider. The Speaker can record one for another player
     public $predictionSource = '';
@@ -626,11 +629,29 @@ class GameDashboard extends Component
             return;
         }
 
+        if ($this->game->needsInfluenceFrom($this->player)) {
+            $this->dispatch('flashMessage', [
+                'Enter your influence for this agenda phase first.',
+                'error'
+            ]);
+            return;
+        }
+
         $oneVoteEach = $this->game->representative_government;
+        // With managed influence the votes are taken from the player's influence. Abstaining and Representative Government cost nothing
+        $spendsInfluence = $this->game->managed_influence && !$oneVoteEach && $this->selectedOption !== 'Abstain' && $this->player->influence !== null;
+        $maxVotes = $spendsInfluence ? min(99, $this->player->influence) : 99;
+
+        if ($spendsInfluence && $maxVotes < 1) {
+            $this->addError('influenceSpent', 'You have no influence left. Abstain instead.');
+            return;
+        }
 
         $this->validate([
             'selectedOption' => ['required', 'string', Rule::in($currentAgenda->options)],
-            'influenceSpent' => $this->selectedOption === 'Abstain' || $oneVoteEach ? 'nullable' : 'required|integer|min:1|max:99',
+            'influenceSpent' => $this->selectedOption === 'Abstain' || $oneVoteEach ? 'nullable' : "required|integer|min:1|max:{$maxVotes}",
+        ], [
+            'influenceSpent.max' => "You have {$maxVotes} influence available.",
         ]);
 
         // Force influence to 0 when abstaining, and to 1 vote under Representative Government
@@ -641,18 +662,40 @@ class GameDashboard extends Component
         }
 
         try {
-            Vote::create([
+            $castVote = fn () => Vote::create([
                 'agenda_id' => $currentAgenda->id,
                 'player_id' => $this->player->id,
                 'option' => $this->selectedOption,
                 'influence_spent' => $this->influenceSpent,
             ]);
+
+            if ($spendsInfluence) {
+                // The vote only counts when the influence is still there, e.g. not lowered in another tab in the meantime
+                DB::transaction(function () use ($castVote) {
+                    $castVote();
+
+                    if (!Player::whereKey($this->player->id)->where('influence', '>=', (int) $this->influenceSpent)->decrement('influence', (int) $this->influenceSpent)) {
+                        throw new \RuntimeException('Not enough influence');
+                    }
+                });
+            } else {
+                $castVote();
+            }
         } catch (UniqueConstraintViolationException) {
             $this->dispatch('flashMessage', [
                 'You have already voted on this agenda.',
                 'error'
             ]);
             return;
+        } catch (\RuntimeException) {
+            $this->addError('influenceSpent', 'Your influence changed. Check it and vote again.');
+            $this->refreshData();
+            return;
+        }
+
+        if ($spendsInfluence) {
+            // Updates the influence in the game header
+            $this->dispatch('influence-changed');
         }
 
         Log::info('Vote cast', ['agenda' => $currentAgenda->title, 'option' => $this->selectedOption, 'influence' => (int) $this->influenceSpent]);
@@ -857,6 +900,86 @@ class GameDashboard extends Component
                 : 'Hidden Agenda is off: every player sees how each player votes on the next agenda.',
             'info',
         ]);
+        TriggerRefresh::dispatch($this->game);
+        $this->refreshData();
+    }
+
+    // Managed influence: the Speaker starts the agenda phase, players enter their influence and votes are taken from it
+    public function toggleManagedInfluence()
+    {
+        if (!$this->player->is_speaker) {
+            return;
+        }
+
+        if ($this->game->currentAgenda()) {
+            $this->dispatch('flashMessage', [
+                'Managed influence can only be changed between agendas.',
+                'error'
+            ]);
+            return;
+        }
+
+        $on = !$this->game->managed_influence;
+        $this->game->update(['managed_influence' => $on, 'agenda_phase_started_at' => null]);
+        Log::info($on ? 'Managed influence turned on' : 'Managed influence turned off');
+
+        $this->dispatch('flashMessage', [
+            $on
+                ? 'Managed influence is on. Start the agenda phase to ask every player for their influence.'
+                : 'Managed influence is off. Players keep track of their own influence.',
+            'info',
+        ]);
+        TriggerRefresh::dispatch($this->game);
+        $this->refreshData();
+    }
+
+    public function startAgendaPhase()
+    {
+        if (!$this->player->is_speaker || !$this->game->managed_influence) {
+            return;
+        }
+
+        if ($this->game->currentAgenda()) {
+            $this->dispatch('flashMessage', [
+                'Finish the current agenda first.',
+                'error'
+            ]);
+            return;
+        }
+
+        // Everyone enters the influence they have for this agenda phase
+        DB::transaction(function () {
+            $this->game->players()->update(['influence' => null]);
+            $this->game->update(['agenda_phase_started_at' => now()]);
+        });
+        Log::info('Agenda phase started');
+
+        $this->dispatch('flashMessage', [
+            'Agenda phase started. Every player is asked for their influence.',
+            'success',
+        ]);
+        $this->dispatch('influence-changed');
+        TriggerRefresh::dispatch($this->game);
+        $this->refreshData();
+    }
+
+    public function savePhaseInfluence()
+    {
+        $this->validate(
+            ['phaseInfluence' => 'required|integer|min:0|max:99'],
+            [
+                'phaseInfluence.required' => 'Enter your influence.',
+                'phaseInfluence.integer' => 'Enter a whole number.',
+                'phaseInfluence.min' => 'Influence cannot be negative.',
+                'phaseInfluence.max' => 'Influence can be at most 99.',
+            ]
+        );
+
+        $this->player->update(['influence' => (int) $this->phaseInfluence]);
+        Log::info('Influence entered for the agenda phase', ['influence' => (int) $this->phaseInfluence]);
+
+        $this->reset('phaseInfluence');
+        $this->dispatch('influence-changed');
         TriggerRefresh::dispatch($this->game);
         $this->refreshData();
     }
@@ -1082,6 +1205,15 @@ class GameDashboard extends Component
 
         $voteResults = $showResults ? $currentAgenda->getVoteResults() : null;
 
+        // A player without influence abstains, unless Representative Government gives everyone 1 vote.
+        // With managed influence it is the only choice, as the votes are taken from their influence
+        $noInfluence = $this->player->influence === 0 && !$this->game->representative_government;
+        $onlyAbstain = $noInfluence && $this->game->managed_influence;
+        if ($noInfluence && $currentAgenda?->isVotingOpen() && !$hasVoted
+            && ($this->selectedOption === '' || ($onlyAbstain && $this->selectedOption !== 'Abstain'))) {
+            $this->selectedOption = 'Abstain';
+        }
+
         return view('livewire.game-dashboard', [
             'player' => $this->player,
             // Asked when the game has a Milty draft and this player's faction is not one of the drafted factions
@@ -1096,6 +1228,11 @@ class GameDashboard extends Component
             'rejoinRequests' => $players->filter(fn ($gamePlayer) => $gamePlayer->id !== $this->player->id && $gamePlayer->hasPendingRejoinRequest()),
             'currentAgenda' => $currentAgenda,
             'players' => $players,
+            'noInfluence' => $noInfluence,
+            'onlyAbstain' => $onlyAbstain,
+            'needsPhaseInfluence' => $this->game->needsInfluenceFrom($this->player),
+            // For the Speaker: who did not enter their influence for this agenda phase yet
+            'missingInfluence' => $players->filter(fn ($gamePlayer) => $this->game->needsInfluenceFrom($gamePlayer))->values(),
             // Without Hidden Agenda every player sees how each player voted, keyed by player id
             'openVotes' => $currentAgenda && !$currentAgenda->secret_votes ? $currentAgenda->votes()->get()->keyBy('player_id') : collect(),
             'hasVoted' => $hasVoted,

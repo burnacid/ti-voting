@@ -30,6 +30,8 @@ class Game extends Model
         'absol_agendas',
         'show_results',
         'hidden_agenda',
+        'managed_influence',
+        'agenda_phase_started_at',
         'star_chart_tiles',
         'status',
     ];
@@ -47,6 +49,8 @@ class Game extends Model
         'absol_agendas' => 'boolean',
         'show_results' => 'boolean',
         'hidden_agenda' => 'boolean',
+        'managed_influence' => 'boolean',
+        'agenda_phase_started_at' => 'datetime',
         'star_chart_tiles' => 'array',
     ];
 
@@ -99,6 +103,12 @@ class Game extends Model
     public function rejoinUrl(): string
     {
         return route('game.rejoin', $this->code);
+    }
+
+    // With managed influence, players enter their influence after the Speaker starts the agenda phase
+    public function needsInfluenceFrom(Player $player): bool
+    {
+        return $this->managed_influence && $this->agenda_phase_started_at !== null && $player->influence === null;
     }
 
     public static function retentionDays(): int

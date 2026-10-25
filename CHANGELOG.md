@@ -13,10 +13,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Agenda cards show the deck they come from, e.g. Prophecy of Kings or Absol's Lab.
 - Show results to all players: with this Speaker setting on, every player sees the results once voting ends, instead of the Speaker announcing them. Breaking a tie and showing who is affected stay with the Speaker. It is off by default.
 - Hidden Agenda, as the event card: votes are secret and only the totals are revealed. It is on by default. With it off, every player sees how each player voted, in the player list and the results, and players are told their vote is public. The Speaker can only change it between agendas, and it only applies to agendas revealed after the change, so it cannot be used to see how players voted on an open or ended agenda.
+- Managed influence: with this Speaker setting on, the Speaker has a Start New Agenda Phase button, confirmed in a dialog, that asks every player for their available influence in a dialog they cannot skip. A vote can't spend more influence than the player has, and the votes are taken from it automatically. Abstaining and votes under Representative Government cost nothing. A player with no influence left can only abstain. The Speaker sees who still has to enter their influence, and the setting can only be changed between agendas. With Hidden Agenda on, the setting warns that players seeing each other's influence go down can hint at who voted for what. It is off by default.
 
 ### Changed
 - Speaker Settings is split into Voting, Agendas and Map sections, and its settings are on/off switches instead of checkboxes. It no longer has a yellow background.
 - Speaker Settings is the last tab, and everyone, also the Speaker, starts on the Players tab.
+- A player with 0 influence has Abstain selected when voting opens, except under Representative Government.
 
 ### Removed
 - The Speaker's unused option to view results during voting.
