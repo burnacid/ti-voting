@@ -17,11 +17,17 @@ class MiltyService
     public function extractDraftId(string $url): ?string
     {
         // Extract draft ID from URL like https://milty.shenanigans.be/d/688cc17676088
-        if (preg_match('/\/d\/([a-zA-Z0-9_]+)/', $url, $matches)) {
-            return $matches[1];
+        // Anchored to the Milty host, so the stored URL cannot be e.g. a javascript: link
+        if (preg_match('~^https?://(www\.)?milty\.shenanigans\.be/d/([a-zA-Z0-9_]+)~', $url, $matches)) {
+            return $matches[2];
         }
 
         return null;
+    }
+
+    public static function draftUrl(string $draftId): string
+    {
+        return "https://milty.shenanigans.be/d/{$draftId}";
     }
 
     /**
@@ -47,7 +53,7 @@ class MiltyService
             Log::error('Failed to fetch Milty draft data', [
                 'draft_id' => $draftId,
                 'status' => $response->status(),
-                'response' => $response->body()
+                'response' => \Illuminate\Support\Str::limit($response->body(), 500)
             ]);
 
             return null;

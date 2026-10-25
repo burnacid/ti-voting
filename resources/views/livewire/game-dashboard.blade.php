@@ -537,9 +537,9 @@
         </div>
     @endif
 
-    <!-- Speaker Controls, Players and Star Chart, one at a time -->
-    @php($tabs = array_filter(['speaker' => $player->is_speaker ? 'Speaker Settings' : null, 'players' => 'Players', 'star-chart' => $game->milty_draft_data ? 'Star Chart' : null]))
-    @php($defaultTab = $player->is_speaker ? 'speaker' : 'players')
+    <!-- Players, Star Chart and Speaker Controls, one at a time -->
+    @php($tabs = array_filter(['players' => 'Players', 'star-chart' => $game->milty_draft_data ? 'Star Chart' : null, 'speaker' => $player->is_speaker ? 'Speaker Settings' : null]))
+    @php($defaultTab = 'players')
     {{-- Keyed on the tabs, so a new Speaker or a map added later starts on a tab that exists --}}
     <div wire:key="tabs-{{ implode('-', array_keys($tabs)) }}"
          x-data="{
@@ -577,99 +577,6 @@
                 @endforeach
             </div>
         @endif
-
-        <div id="tab-panel-speaker" role="tabpanel" aria-labelledby="tab-speaker"
-             {{ $defaultTab !== 'speaker' ? 'x-cloak' : '' }}
-             x-show="tab === 'speaker'">
-            <!-- Speaker Controls -->
-            @if($player->is_speaker)
-                <div class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-xl p-4 sm:p-6 space-y-4">
-                    <!-- Header -->
-                    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                            <h2 class="text-lg sm:text-xl font-bold text-yellow-800 dark:text-yellow-200">Speaker Settings</h2>
-                            <p class="text-sm text-yellow-700 dark:text-yellow-300">
-                                @if($currentAgenda?->status === 'voting' && $currentAgenda->reveal_step)
-                                    Resolve action cards with the agenda below before voting opens.
-                                @elseif($currentAgenda?->status === 'voting')
-                                    Voting is open.
-                                @else
-                                    Reveal the next agenda when you are ready.
-                                @endif
-                            </p>
-                        </div>
-
-                        @if($currentAgenda?->status === 'voting' && !$currentAgenda->reveal_step)
-                            <button wire:click="endVoting"
-                                    wire:confirm="Are you sure you want to end voting? The results will only be visible to you."
-                                    class="w-full sm:w-auto bg-red-600 hover:bg-red-700 active:bg-red-800 text-white font-semibold py-3 sm:py-2 px-4 rounded-lg transition-colors">
-                                End Voting
-                            </button>
-                        @endif
-                    </div>
-
-                    <!-- Thunder's Edge: The Fracture -->
-                    @if($game->isThundersEdgeGame())
-                        <label class="flex items-center justify-between gap-4 bg-white/70 dark:bg-gray-800/60 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3 cursor-pointer">
-                            <span>
-                                <span class="block font-medium text-gray-900 dark:text-white">The Fracture is in play</span>
-                                <span class="block text-sm text-gray-600 dark:text-gray-400">
-                                    Adds Cocytus, Lethe, Phlegethon and Styx to planet agendas.
-                                </span>
-                            </span>
-                            <input type="checkbox"
-                                   wire:click="toggleFracture"
-                                   @checked($game->fracture_in_play)
-                                   class="h-6 w-6 shrink-0 text-blue-600 rounded">
-                        </label>
-                    @endif
-
-                    <!-- Agenda deck: Absol's Lab agendas replace the official ones -->
-                    <label class="flex items-center justify-between gap-4 bg-white/70 dark:bg-gray-800/60 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3 cursor-pointer">
-                        <span>
-                            <span class="block font-medium text-gray-900 dark:text-white">Play with Absol's agendas</span>
-                            <span class="block text-sm text-gray-600 dark:text-gray-400">
-                                The agenda list shows the agendas of Absol's Lab instead of the official agendas.
-                            </span>
-                        </span>
-                        <input type="checkbox"
-                               wire:click="toggleAbsolAgendas"
-                               @checked($game->absol_agendas)
-                               class="h-6 w-6 shrink-0 text-blue-600 rounded">
-                    </label>
-
-                    <!-- Law: Representative Government -->
-                    <label class="flex items-center justify-between gap-4 bg-white/70 dark:bg-gray-800/60 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3 cursor-pointer">
-                        <span>
-                            <span class="block font-medium text-gray-900 dark:text-white">Representative Government is in effect</span>
-                            <span class="block text-sm text-gray-600 dark:text-gray-400">
-                                Each player casts 1 vote on each agenda instead of spending influence. Turned on when the law passes For.
-                            </span>
-                        </span>
-                        <input type="checkbox"
-                               wire:click="toggleRepresentativeGovernment"
-                               @checked($game->representative_government)
-                               class="h-6 w-6 shrink-0 text-blue-600 rounded">
-                    </label>
-
-                    <!-- Map data: Milty or TI4 Lab draft URL, or a map string -->
-                    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-white/70 dark:bg-gray-800/60 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
-                        <span>
-                            <span class="block font-medium text-gray-900 dark:text-white">Map data</span>
-                            <span class="block text-sm text-gray-600 dark:text-gray-400">
-                                @if($game->milty_draft_data)
-                                    Used for planet agendas, faction choices and Star Chart.
-                                @else
-                                    No map yet. Add a draft URL or map string to use planet agendas, factions and Star Chart.
-                                @endif
-                            </span>
-                        </span>
-                        <livewire:update-milty-url :game="$game" :player="$player" :key="'map-' . $game->id" />
-                    </div>
-
-                </div>
-            @endif
-        </div>
 
         <div id="tab-panel-players" role="tabpanel" aria-labelledby="tab-players"
              {{ $defaultTab !== 'players' ? 'x-cloak' : '' }}
@@ -805,6 +712,92 @@
             <!-- Star Chart: random system tiles that are not on the map yet -->
             @if($game->milty_draft_data)
                 <x-star-chart :draws="$starChartDraws" :pool-size="$starChartPoolSize" :is-speaker="$player->is_speaker" />
+            @endif
+        </div>
+
+        <div id="tab-panel-speaker" role="tabpanel" aria-labelledby="tab-speaker"
+             {{ $defaultTab !== 'speaker' ? 'x-cloak' : '' }}
+             x-show="tab === 'speaker'">
+            <!-- Speaker Controls -->
+            @if($player->is_speaker)
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 sm:p-6 space-y-4">
+                    <!-- Header -->
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                            <h2 class="text-xl font-bold text-gray-900 dark:text-white">Speaker Settings</h2>
+                            <p class="text-sm text-gray-600 dark:text-gray-400">
+                                @if($currentAgenda?->status === 'voting' && $currentAgenda->reveal_step)
+                                    Resolve action cards with the agenda below before voting opens.
+                                @elseif($currentAgenda?->status === 'voting')
+                                    Voting is open.
+                                @else
+                                    Reveal the next agenda when you are ready.
+                                @endif
+                            </p>
+                        </div>
+
+                        @if($currentAgenda?->status === 'voting' && !$currentAgenda->reveal_step)
+                            <button wire:click="endVoting"
+                                    wire:confirm="Are you sure you want to end voting? The results will only be visible to you."
+                                    class="w-full sm:w-auto bg-red-600 hover:bg-red-700 active:bg-red-800 text-white font-semibold py-3 sm:py-2 px-4 rounded-lg transition-colors">
+                                End Voting
+                            </button>
+                        @endif
+                    </div>
+
+                    @php($sectionHeading = 'text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2')
+                    @php($sectionPanel = 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg divide-y divide-gray-200 dark:divide-gray-700 overflow-hidden')
+
+                    <!-- Voting rules -->
+                    <section aria-labelledby="speaker-voting">
+                        <h3 id="speaker-voting" class="{{ $sectionHeading }}">Voting</h3>
+                        <div class="{{ $sectionPanel }}">
+                            {{-- Law: Representative Government --}}
+                            <x-setting-switch action="toggleRepresentativeGovernment" :on="$game->representative_government"
+                                              label="Representative Government is in effect"
+                                              description="Each player casts 1 vote on each agenda instead of spending influence. Turned on when the law passes For." />
+                        </div>
+                    </section>
+
+                    <!-- Agenda deck -->
+                    <section aria-labelledby="speaker-agendas">
+                        <h3 id="speaker-agendas" class="{{ $sectionHeading }}">Agendas</h3>
+                        <div class="{{ $sectionPanel }}">
+                            {{-- Absol's Lab agendas replace the official ones --}}
+                            <x-setting-switch action="toggleAbsolAgendas" :on="$game->absol_agendas"
+                                              label="Play with Absol's agendas"
+                                              description="The agenda list shows the agendas of Absol's Lab instead of the official agendas." />
+                        </div>
+                    </section>
+
+                    <!-- Map -->
+                    <section aria-labelledby="speaker-map">
+                        <h3 id="speaker-map" class="{{ $sectionHeading }}">Map</h3>
+                        <div class="{{ $sectionPanel }}">
+                            {{-- Milty or TI4 Lab draft URL, or a map string --}}
+                            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-3 sm:px-4">
+                                <span>
+                                    <span class="block font-medium text-gray-900 dark:text-white">Map data</span>
+                                    <span class="block text-sm text-gray-600 dark:text-gray-400">
+                                        @if($game->milty_draft_data)
+                                            Used for planet agendas, faction choices and Star Chart.
+                                        @else
+                                            No map yet. Add a draft URL or map string to use planet agendas, factions and Star Chart.
+                                        @endif
+                                    </span>
+                                </span>
+                                <livewire:update-milty-url :game="$game" :player="$player" :key="'map-' . $game->id" />
+                            </div>
+
+                            {{-- Thunder's Edge: The Fracture --}}
+                            @if($game->isThundersEdgeGame())
+                                <x-setting-switch action="toggleFracture" :on="$game->fracture_in_play"
+                                                  label="The Fracture is in play"
+                                                  description="Adds Cocytus, Lethe, Phlegethon and Styx to planet agendas." />
+                            @endif
+                        </div>
+                    </section>
+                </div>
             @endif
         </div>
     </div>

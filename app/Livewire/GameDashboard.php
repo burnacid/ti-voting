@@ -220,19 +220,6 @@ class GameDashboard extends Component
         }
     }
 
-    public function toggleSpeakerResults()
-    {
-        if (!$this->player->is_speaker) {
-            $this->dispatch('flashMessage', [
-                'Only the Speaker can view results during voting.',
-                'error'
-            ]);
-            return;
-        }
-
-        $this->speakerViewResults = !$this->speakerViewResults;
-    }
-
     public function createAgenda()
     {
         if (!$this->player->is_speaker) {
@@ -257,6 +244,7 @@ class GameDashboard extends Component
             'newAgendaTitle' => 'required|string|max:255',
             'newAgendaDescription' => 'required|string|max:1000',
             'newAgendaCardType' => 'required|in:law,directive',
+            'newAgendaSource' => ['nullable', Rule::in(array_keys(Agenda::SOURCE_LABELS))],
             'agendaType' => 'required|in:for_against,elect_player,elect_planet_any,elect_planet_industrial,elect_planet_cultural,elect_planet_hazardous,elect_planet_non_home,custom'
         ]);
 
@@ -407,7 +395,7 @@ class GameDashboard extends Component
         } catch (\Exception $e) {
             report($e);
             $this->dispatch('flashMessage', [
-                'Failed to transfer speaker token: ' . $e->getMessage(),
+                'Failed to transfer the Speaker token. Please try again.',
                 'error'
             ]);
         }
@@ -718,10 +706,15 @@ class GameDashboard extends Component
     // Ends voting, by the Speaker or by itself once every player who may vote has voted
     private function completeAgenda(Agenda $agenda): void
     {
-        $agenda->update([
+        // Only ends it once when the last two votes come in at the same time
+        $ended = Agenda::whereKey($agenda->id)->where('status', 'voting')->update([
             'status' => 'completed',
             'voting_ended_at' => now(),
         ]);
+        if (!$ended) {
+            return;
+        }
+        $agenda->refresh();
         Log::info('Voting ended', ['agenda' => $agenda->title, 'votes' => $agenda->votes()->count()]);
 
         $this->applyRepresentativeGovernment($agenda);

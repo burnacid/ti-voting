@@ -80,6 +80,12 @@ class Game extends Model
         return preg_replace('/^<\?xml[^>]*>\s*/', '', $svg);
     }
 
+    // The draft URL to show as a link, only when it is a https URL, so a stored javascript: URL is never linked
+    public function getSafeMiltyUrlAttribute(): ?string
+    {
+        return is_string($this->milty_url) && str_starts_with($this->milty_url, 'https://') ? $this->milty_url : null;
+    }
+
     // Page where players who lost their session ask to rejoin, another player has to confirm it
     public function rejoinUrl(): string
     {

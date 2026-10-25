@@ -1287,13 +1287,13 @@ test('players, speaker controls and star chart are tabs below the agenda', funct
     [$game, $speaker, $other] = makeGame(['milty_draft_data' => starChartDraft()]);
     makeAgenda($game);
 
-    // The Speaker starts on the Speaker tab, the agenda stays visible above the tabs
+    // Everyone starts on the Players tab, the Speaker tab comes last, the agenda stays visible above the tabs
     Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
         ->assertSeeHtml('id="tab-players"')
         ->assertSeeHtml('id="tab-speaker"')
         ->assertSeeHtml('id="tab-star-chart"')
-        ->assertSeeHtml("tab: 'speaker'")
-        ->assertSeeInOrder(['Test Agenda', 'id="tab-speaker"', 'id="tab-players"', 'id="tab-star-chart"', 'Speaker Settings', 'Draw a system tile'], false);
+        ->assertSeeHtml("tab: 'players'")
+        ->assertSeeInOrder(['Test Agenda', 'id="tab-players"', 'id="tab-star-chart"', 'id="tab-speaker"', 'Draw a system tile', 'Speaker Settings'], false);
 
     Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $other])
         ->assertSeeHtml('id="tab-players"')

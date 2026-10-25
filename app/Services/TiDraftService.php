@@ -31,6 +31,11 @@ class TiDraftService
         return null;
     }
 
+    public static function draftUrl(string $draftId): string
+    {
+        return "https://tidraft.com/draft/{$draftId}";
+    }
+
     public function fetchDraftData(string $draftId): ?array
     {
         try {
