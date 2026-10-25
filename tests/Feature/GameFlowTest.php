@@ -1701,3 +1701,45 @@ test('absol\'s publicize weapon schematics elects a unit upgrade', function () {
 
     expect($game->currentAgenda()->options)->toContain('War Sun', 'Abstain');
 });
+
+test('results are shown to the speaker only by default', function () {
+    [$game, $speaker, $other] = makeGame();
+    $agenda = makeAgenda($game);
+    Vote::create(['agenda_id' => $agenda->id, 'player_id' => $other->id, 'option' => 'For', 'influence_spent' => 3]);
+    $agenda->update(['status' => 'completed', 'voting_ended_at' => now()]);
+
+    expect($game->fresh()->show_results)->toBeFalse();
+
+    Livewire::test(GameDashboard::class, ['game' => $game->fresh(), 'player' => $speaker])
+        ->assertSee('Voting Results');
+    Livewire::test(GameDashboard::class, ['game' => $game->fresh(), 'player' => $other])
+        ->assertDontSee('Voting Results');
+});
+
+test('the speaker can show the results to all players', function () {
+    [$game, $speaker, $other] = makeGame();
+    $agenda = makeAgenda($game);
+    Vote::create(['agenda_id' => $agenda->id, 'player_id' => $other->id, 'option' => 'For', 'influence_spent' => 3]);
+    $agenda->update(['status' => 'completed', 'voting_ended_at' => now()]);
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->assertSee('Show results to all players')
+        ->call('toggleShowResults');
+
+    expect($game->fresh()->show_results)->toBeTrue();
+
+    // Other players see the results, but the tie-break and affected players stay with the Speaker
+    Livewire::test(GameDashboard::class, ['game' => $game->fresh(), 'player' => $other])
+        ->assertSee('Voting Results')
+        ->assertSee('3 influence')
+        ->assertDontSee('Show results to all players');
+});
+
+test('only the speaker can show the results to all players', function () {
+    [$game, , $other] = makeGame();
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $other])
+        ->call('toggleShowResults');
+
+    expect($game->fresh()->show_results)->toBeFalse();
+});

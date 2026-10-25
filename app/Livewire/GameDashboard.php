@@ -695,7 +695,9 @@ class GameDashboard extends Component
         if ($currentAgenda) {
             $this->completeAgenda($currentAgenda);
             $this->dispatch('flashMessage', [
-                'Voting has ended. Please announce the results to the other players.',
+                $this->game->show_results
+                    ? 'Voting has ended. Every player can see the results.'
+                    : 'Voting has ended. Please announce the results to the other players.',
                 'info'
             ]);
             $this->refreshData();
@@ -824,6 +826,25 @@ class GameDashboard extends Component
 
         $this->game->removeStarChartTile((string) $tile);
         Log::info('Star Chart tile removed', ['tile' => (string) $tile]);
+        TriggerRefresh::dispatch($this->game);
+        $this->refreshData();
+    }
+
+    public function toggleShowResults()
+    {
+        if (!$this->player->is_speaker) {
+            return;
+        }
+
+        $this->game->update(['show_results' => !$this->game->show_results]);
+        Log::info($this->game->show_results ? 'Results shown to all players' : 'Results shown to the Speaker only');
+
+        $this->dispatch('flashMessage', [
+            $this->game->show_results
+                ? 'Every player now sees the results when voting ends.'
+                : 'Only you see the results when voting ends.',
+            'info',
+        ]);
         TriggerRefresh::dispatch($this->game);
         $this->refreshData();
     }
@@ -1002,8 +1023,8 @@ class GameDashboard extends Component
 
         $currentAgenda = $this->game->currentAgenda();
 
-        // Results of the last ended agenda remain visible to the Speaker only
-        if (!$currentAgenda && $this->player->is_speaker) {
+        // Results of the last ended agenda remain visible to the Speaker, and to everyone when the Speaker shows them
+        if (!$currentAgenda && ($this->player->is_speaker || $this->game->show_results)) {
             $currentAgenda = $this->game->lastCompletedAgenda();
         }
 

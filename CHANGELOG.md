@@ -9,6 +9,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Added
 - Feedback: anyone can send an idea, a bug or other feedback with the Feedback link in the footer, optionally with a name or contact for a reply. Feedback sent from a game remembers the game. It can be sent five times an hour. Feedback is only on the public site: self-hosted installs don't have it unless `FEEDBACK_ENABLED=true` is set.
 - The admin panel has a Feedback page with the feedback, which can be filtered, marked as read or unread and deleted. The menu shows how many are unread, and the dashboard shows the most recent feedback.
+- Absol's agendas: the Speaker can switch the agenda list to the agendas of Absol's Lab, which replace the official agendas. Absol's agendas have their own card style, so players see the difference.
+- Agenda cards show the deck they come from, e.g. Prophecy of Kings or Absol's Lab.
+- Show results to all players: with this Speaker setting on, every player sees the results once voting ends, instead of the Speaker announcing them. Breaking a tie and showing who is affected stay with the Speaker. It is off by default.
+
+### Changed
+- Speaker Settings is split into Voting, Agendas and Map sections, and its settings are on/off switches instead of checkboxes. It no longer has a yellow background.
+- Speaker Settings is the last tab, and everyone, also the Speaker, starts on the Players tab.
+
+### Removed
+- The Speaker's unused option to view results during voting.
+
+### Security
+- A map draft URL is only accepted from milty.shenanigans.be or tidraft.com, and the game stores a clean link made from the draft id. Before, a crafted URL could run a script for anyone who opened the map draft link, the admin included. Existing games only show the link when it is a https URL.
+- The draft data of a new game can no longer be changed from the browser, and an agenda's deck must be a known deck.
+- Loading a draft is limited to 20 times per 10 minutes per visitor, so the draft sites cannot be flooded through the app.
+- A failed Speaker transfer no longer shows the technical error to the player.
+
+### Fixed
+- When the last two votes come in at the same moment, voting ends once instead of twice.
 
 ## [1.9.0] - 2026-10-24
 

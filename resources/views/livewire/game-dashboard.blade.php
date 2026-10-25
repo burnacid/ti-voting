@@ -738,7 +738,7 @@
 
                         @if($currentAgenda?->status === 'voting' && !$currentAgenda->reveal_step)
                             <button wire:click="endVoting"
-                                    wire:confirm="Are you sure you want to end voting? The results will only be visible to you."
+                                    wire:confirm="Are you sure you want to end voting? {{ $game->show_results ? 'Every player will see the results.' : 'The results will only be visible to you.' }}"
                                     class="w-full sm:w-auto bg-red-600 hover:bg-red-700 active:bg-red-800 text-white font-semibold py-3 sm:py-2 px-4 rounded-lg transition-colors">
                                 End Voting
                             </button>
@@ -756,6 +756,11 @@
                             <x-setting-switch action="toggleRepresentativeGovernment" :on="$game->representative_government"
                                               label="Representative Government is in effect"
                                               description="Each player casts 1 vote on each agenda instead of spending influence. Turned on when the law passes For." />
+
+                            {{-- Off: the Speaker announces the results --}}
+                            <x-setting-switch action="toggleShowResults" :on="$game->show_results"
+                                              label="Show results to all players"
+                                              description="When voting ends, every player sees the results. Off: only you see them and you announce them." />
                         </div>
                     </section>
 

@@ -28,6 +28,7 @@ class Game extends Model
         'fracture_in_play',
         'representative_government',
         'absol_agendas',
+        'show_results',
         'star_chart_tiles',
         'status',
     ];
@@ -38,6 +39,7 @@ class Game extends Model
         'fracture_in_play' => 'boolean',
         'representative_government' => 'boolean',
         'absol_agendas' => 'boolean',
+        'show_results' => 'boolean',
         'star_chart_tiles' => 'array',
     ];
 
