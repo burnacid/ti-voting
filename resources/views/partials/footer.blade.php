@@ -17,6 +17,8 @@
        class="inline-flex items-center hover:text-gray-700 dark:hover:text-gray-200">
         v{{ config('app.version') }}
     </a>
+    <span aria-hidden="true">·</span>
+    <a href="{{ route('privacy') }}" class="hover:text-gray-700 dark:hover:text-gray-200">Privacy</a>
     @if(config('app.feedback') && !request()->routeIs('admin.*'))
         <span aria-hidden="true">·</span>
         <livewire:feedback-form />

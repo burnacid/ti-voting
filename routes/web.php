@@ -26,6 +26,8 @@ Route::post('/my-games/{code}/forget', function (string $code) {
     return redirect()->route('home');
 })->name('my-games.forget');
 
+Route::view('/privacy', 'privacy')->name('privacy');
+
 Route::get('/create-game', function () {
     return view('create-game');
 })->name('create-game');

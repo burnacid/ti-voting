@@ -4,6 +4,17 @@ All notable changes to TI Voting are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- A privacy policy, linked in the footer. It explains what the app stores, for how long, and how to ask about your data. The retention periods it shows come from the app's settings, so self-hosted installs show their own.
+
+### Changed
+- The fonts of the agenda cards are served by the app itself instead of by Google Fonts, so visitors' browsers no longer contact Google.
+
+### Fixed
+- `laravel-echo` and `pusher-js` are listed as dependencies, so a fresh `npm install` builds again.
+
 ## [1.10.0] - 2026-10-25
 
 ### Added
