@@ -16,15 +16,12 @@
                     @elseif($game->milty_draft_data['map_string'] ?? null)
                         <span class="px-2 py-0.5 rounded bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 font-mono" title="Map string">{{ Str::limit($game->milty_draft_data['map_string'], 40) }}</span>
                     @endif
-                    @if($game->isThundersEdgeGame())
-                        <span class="px-2 py-0.5 rounded bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
-                            Thunder's Edge{{ $game->fracture_in_play ? ' · Fracture in play' : '' }}
-                        </span>
-                    @endif
-                    @if($game->representative_government)
-                        <span class="px-2 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">Representative Government</span>
+                    @if($game->mapSource())
+                        <span class="px-2 py-0.5 rounded bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200">{{ \App\Models\Game::MAP_SOURCE_LABELS[$game->mapSource()] }}</span>
                     @endif
                 </div>
+                {{-- The map link is shown above, so the badges leave out the map --}}
+                <x-admin-game-badges :game="$game" :voting="$game->currentAgenda() !== null" :show-map="false" class="mt-2" />
             </div>
             <div class="flex flex-col sm:flex-row gap-2 shrink-0">
                 <a href="{{ route('admin.logs', ['game' => $game->code]) }}"
@@ -62,6 +59,14 @@
                                 Make Speaker
                             </button>
                         @endunless
+                        <form method="POST" action="{{ route('admin.games.impersonate', [$game, $gamePlayer->id]) }}"
+                              onsubmit="return confirm({{ Js::from('Open the game as ' . $gamePlayer->name . '? Everything you do there counts as this player.') }})">
+                            @csrf
+                            <button type="submit"
+                                    class="text-xs font-medium bg-amber-500 hover:bg-amber-600 text-amber-950 px-3 py-2 rounded-md transition-colors">
+                                Open as player
+                            </button>
+                        </form>
                         <button wire:click="removePlayer('{{ $gamePlayer->id }}')"
                                 wire:confirm="Remove {{ $gamePlayer->name }} from the game? Their votes are deleted too."
                                 class="text-xs font-medium bg-gray-200 hover:bg-red-600 hover:text-white dark:bg-gray-600 px-3 py-2 rounded-md transition-colors">

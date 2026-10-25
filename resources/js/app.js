@@ -6,6 +6,18 @@
 
 import './echo';
 
+// Passkeys for the admin login, used by the views of spatie/laravel-passkeys
+import { browserSupportsWebAuthn, startAuthentication, startRegistration } from '@simplewebauthn/browser';
+window.browserSupportsWebAuthn = browserSupportsWebAuthn;
+window.startAuthentication = startAuthentication;
+window.startRegistration = startRegistration;
+
+// Fonts of the agenda cards, served by the app itself so visitors' browsers do not contact Google
+import '@fontsource/source-sans-3/400.css';
+import '@fontsource/source-sans-3/600.css';
+import '@fontsource/source-sans-3/700-italic.css';
+import '@fontsource/saira-semi-condensed/800.css';
+
 // Makes the site installable as a web app on phones, see public/sw.js
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js'));

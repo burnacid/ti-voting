@@ -14,9 +14,12 @@
     @auth
         <nav class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
             <div class="max-w-6xl mx-auto px-4 flex flex-wrap items-center gap-x-4 gap-y-2 py-3">
-                <a href="{{ route('admin.dashboard') }}" class="font-bold mr-auto">TI4 Admin</a>
+                <a href="{{ route('admin.dashboard') }}" class="inline-flex items-center gap-2 font-bold mr-auto">
+                    <img src="/favicon.svg" alt="" class="w-7 h-7">
+                    TI4 Admin
+                </a>
                 @php($unreadFeedback = config('app.feedback') ? \App\Models\Feedback::unread()->count() : 0)
-                @foreach(array_filter(['admin.dashboard' => 'Dashboard', 'admin.games' => 'Games', 'admin.feedback' => config('app.feedback') ? 'Feedback' : null, 'admin.logs' => 'Logs']) as $route => $label)
+                @foreach(array_filter(['admin.dashboard' => 'Dashboard', 'admin.games' => 'Games', 'admin.feedback' => config('app.feedback') ? 'Feedback' : null, 'admin.logs' => 'Logs', 'admin.security' => 'Security']) as $route => $label)
                     <a href="{{ route($route) }}"
                        @class([
                            'inline-flex items-center gap-1.5 text-sm font-medium px-2 py-1 rounded-md',

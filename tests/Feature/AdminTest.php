@@ -39,7 +39,7 @@ function makeAdminGame(string $name = 'Admin Test Game', ?string $createdAt = nu
 
 test('admin pages require a login', function (string $route) {
     $this->get(route($route))->assertRedirect(route('admin.login'));
-})->with(['admin.dashboard', 'admin.games', 'admin.feedback', 'admin.logs']);
+})->with(['admin.dashboard', 'admin.games', 'admin.feedback', 'admin.logs', 'admin.security']);
 
 test('the admin path can be set in the environment', function () {
     putenv('ADMIN_PATH=/secret-panel/');
@@ -289,4 +289,154 @@ test('the admin command creates an account', function () {
         ->assertSuccessful();
 
     expect(User::where('email', 'admin@example.com')->exists())->toBeTrue();
+});
+
+function makeSetupGames(): array
+{
+    $players = fn ($faction) => ['players' => [['name' => 'A', 'faction' => $faction, 'slice' => null]]];
+
+    $milty = makeAdminGame('Milty TE Game');
+    $milty->update([
+        'milty_draft_data' => ['draft' => $players('The Arborec'), 'slices' => [], 'config' => ['include_pok' => true, 'include_te_tiles' => true]],
+        'fracture_in_play' => true,
+        'absol_agendas' => true,
+    ]);
+
+    $tiDraft = makeAdminGame('Lab PoK Game');
+    $tiDraft->update([
+        'milty_draft_data' => ['source' => 'tidraft', 'draft' => $players('The Winnu'), 'slices' => [], 'config' => ['include_pok' => true, 'include_te_tiles' => false]],
+        'managed_influence' => true,
+        'hidden_agenda' => false,
+    ]);
+
+    $mapString = makeAdminGame('String DS Game');
+    $mapString->update([
+        'milty_draft_data' => ['source' => 'map_string', 'map_string' => '19 26', 'draft' => ['players' => []], 'slices' => [], 'config' => ['include_ds_tiles' => true, 'include_te_factions' => false]],
+    ]);
+
+    $plain = makeAdminGame('Plain Game');
+    Player::create(['game_id' => $plain->id, 'name' => 'Bob', 'session_token' => Player::generateSessionToken()]);
+    Agenda::create(['game_id' => $plain->id, 'title' => 'Mutiny', 'description' => 'Test', 'options' => ['For', 'Against', 'Abstain'], 'status' => 'voting']);
+
+    return [$milty, $tiDraft, $mapString, $plain];
+}
+
+test('the games list shows how each game is set up', function () {
+    $this->actingAs(User::factory()->create());
+    makeSetupGames();
+
+    Livewire::test(Games::class)
+        ->assertSee('Milty draft')
+        ->assertSee('TI4 Lab draft')
+        ->assertSee('Map string')
+        ->assertSee('No map')
+        ->assertSee("Thunder's Edge · Fracture in play")
+        ->assertSee('Prophecy of Kings')
+        ->assertSee('Discordant Stars')
+        ->assertSee("Absol's agendas")
+        ->assertSee('Managed influence')
+        ->assertSee('Hidden Agenda off')
+        ->assertSee('Voting now');
+});
+
+test('an admin can filter games by map, expansion and option', function (string $filter, string $value, array $expected) {
+    $this->actingAs(User::factory()->create());
+    makeSetupGames();
+    $all = ['Milty TE Game', 'Lab PoK Game', 'String DS Game', 'Plain Game'];
+
+    $component = Livewire::test(Games::class)->set($filter, $value);
+
+    foreach ($expected as $name) {
+        $component->assertSee($name);
+    }
+    foreach (array_diff($all, $expected) as $name) {
+        $component->assertDontSee($name);
+    }
+})->with([
+    'no map' => ['map', 'none', ['Plain Game']],
+    'milty' => ['map', 'milty', ['Milty TE Game']],
+    'ti4 lab' => ['map', 'tidraft', ['Lab PoK Game']],
+    'map string' => ['map', 'map_string', ['String DS Game']],
+    'thunders edge' => ['expansion', 'te', ['Milty TE Game']],
+    'prophecy of kings' => ['expansion', 'pok', ['Milty TE Game', 'Lab PoK Game']],
+    'discordant stars' => ['expansion', 'ds', ['String DS Game']],
+    'voting now' => ['option', 'voting', ['Plain Game']],
+    'absol' => ['option', 'absol', ['Milty TE Game']],
+    'managed influence' => ['option', 'managed_influence', ['Lab PoK Game']],
+    'hidden agenda off' => ['option', 'open_votes', ['Lab PoK Game']],
+    'fracture' => ['option', 'fracture', ['Milty TE Game']],
+    'unknown value is ignored' => ['map', 'nonsense', ['Milty TE Game', 'Lab PoK Game', 'String DS Game', 'Plain Game']],
+]);
+
+test('an admin can sort games by players and clear the filters', function () {
+    $this->actingAs(User::factory()->create());
+    makeSetupGames();
+
+    Livewire::test(Games::class)
+        ->set('sort', 'players')
+        ->assertSeeInOrder(['Plain Game', 'Milty TE Game'])
+        ->set('map', 'none')
+        ->assertSee('Clear filters')
+        ->call('clearFilters')
+        ->assertSet('map', '')
+        ->assertSet('sort', 'newest')
+        ->assertSee('Milty TE Game');
+});
+
+test('an admin can open a game as a player and stop again', function () {
+    Event::fake([TriggerRefresh::class]);
+    $admin = User::factory()->create();
+    $game = makeAdminGame();
+    $alice = $game->players()->first();
+
+    $this->actingAs($admin)
+        ->get(route('admin.games.show', $game))
+        ->assertSee('Open as player');
+
+    $this->post(route('admin.games.impersonate', [$game, $alice->id]))
+        ->assertRedirect(route('game.show', $game->code));
+
+    $this->get(route('game.show', $game->code))
+        ->assertOk()
+        ->assertSee('You are viewing this game as Alice')
+        // The player's token never ends up in the admin's games cookie
+        ->assertCookieMissing(\App\Support\PlayerGames::COOKIE);
+
+    expect(LogEntry::where('message', 'Admin opened a game as a player')->exists())->toBeTrue();
+
+    $this->post(route('admin.impersonate.stop'))
+        ->assertRedirect(route('admin.games.show', $game));
+
+    $this->get(route('game.show', $game->code))
+        ->assertRedirect(route('join-group', $game->code));
+});
+
+test('impersonating ends when the admin logs out', function () {
+    $game = makeAdminGame();
+    $alice = $game->players()->first();
+
+    $this->actingAs(User::factory()->create())
+        ->post(route('admin.games.impersonate', [$game, $alice->id]));
+
+    $this->post(route('admin.logout'));
+
+    $this->get(route('game.show', $game->code))
+        ->assertRedirect(route('join-group', $game->code));
+});
+
+test('only admins can open a game as a player, and only as one of its players', function () {
+    $game = makeAdminGame();
+    $other = makeAdminGame('Other Game');
+    $alice = $game->players()->first();
+
+    // Guests are sent to the login page and an old impersonation in the session is ignored
+    $this->post(route('admin.games.impersonate', [$game, $alice->id]))
+        ->assertRedirect(route('admin.login'));
+    $this->withSession(['impersonate' => ['game' => $game->code, 'player' => $alice->id]])
+        ->get(route('game.show', $game->code))
+        ->assertRedirect(route('join-group', $game->code));
+
+    $this->actingAs(User::factory()->create())
+        ->post(route('admin.games.impersonate', [$other, $alice->id]))
+        ->assertNotFound();
 });

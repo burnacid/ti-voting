@@ -20,6 +20,8 @@ trait SharesGameLogContext
         Log::shareContext(array_filter([
             'game' => $this->game->code,
             'player' => $this->player?->name,
+            // Actions of an admin who opened the game as this player
+            'impersonated_by' => \App\Support\PlayerGames::impersonated($this->game) ? auth()->user()?->email : null,
         ]));
     }
 }

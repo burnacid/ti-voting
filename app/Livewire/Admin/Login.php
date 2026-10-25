@@ -30,7 +30,8 @@ class Login extends Component
             ]);
         }
 
-        if (!Auth::attempt(['email' => $this->email, 'password' => $this->password], $this->remember)) {
+        // Only checks the password: with TOTP on, the admin is logged in after the code
+        if (!Auth::validate(['email' => $this->email, 'password' => $this->password])) {
             RateLimiter::hit($throttleKey);
             Log::warning('Failed admin login', ['email' => $this->email, 'ip' => request()->ip()]);
 
@@ -40,8 +41,18 @@ class Login extends Component
         }
 
         RateLimiter::clear($throttleKey);
+        $user = Auth::getLastAttempted();
+
+        if ($user->hasTwoFactor()) {
+            session()->regenerate();
+            session(['two_factor_login' => ['id' => $user->id, 'remember' => (bool) $this->remember, 'expires' => now()->addMinutes(5)->timestamp]]);
+
+            return $this->redirectRoute('admin.two-factor');
+        }
+
+        Auth::login($user, (bool) $this->remember);
         session()->regenerate();
-        Log::info('Admin logged in', ['email' => $this->email, 'ip' => request()->ip()]);
+        Log::info('Admin logged in', ['email' => $user->email, 'ip' => request()->ip(), 'method' => 'password']);
 
         return $this->redirectIntended(route('admin.dashboard'));
     }

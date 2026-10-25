@@ -5,12 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ $game->name }} - TI4 Hidden Agenda</title>
     @include('partials.icons')
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Saira+Semi+Condensed:wght@800&family=Source+Sans+3:ital,wght@0,400;0,600;1,700&display=swap" rel="stylesheet">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="bg-gray-100 dark:bg-gray-900 min-h-screen">
+    {{-- An admin opened this game as a player --}}
+    @if(\App\Support\PlayerGames::impersonated($game))
+        <div class="sticky top-0 z-40 bg-amber-500 text-amber-950">
+            <form method="POST" action="{{ route('admin.impersonate.stop') }}"
+                  class="max-w-6xl mx-auto px-4 py-2 flex flex-wrap items-center justify-between gap-2 text-sm font-medium">
+                @csrf
+                <span>You are viewing this game as {{ $player->name }}. Everything you do counts as this player.</span>
+                <button type="submit" class="bg-amber-950 text-white px-3 py-1.5 rounded-md hover:bg-black">Stop</button>
+            </form>
+        </div>
+    @endif
     <div class="container mx-auto px-4 py-8">
         <div class="max-w-6xl mx-auto">
             <!-- Back to the homepage, which lists this phone's games. The installed app has no browser back button -->

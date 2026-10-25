@@ -4,6 +4,30 @@ All notable changes to TI Voting are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.2] - 2026-10-25
+
+### Added
+- The admin games list shows how each game is set up: where its map comes from (Milty draft, TI4 Lab draft, map string or no map), its expansions (Prophecy of Kings, Thunder's Edge with whether the Fracture is in play, Discordant Stars), whether an agenda is being voted on, and the options that are on, such as Absol's agendas, managed influence or Hidden Agenda off. Each game also shows its number of votes. The game's admin page shows the same.
+- The admin games list can be filtered by map, expansion and option, and sorted by newest, last agenda or most players. The filters are kept in the URL.
+- An admin can open a game as one of its players from the game's admin page, for example to help a player or fix a game. A banner shows whose game it is, with a Stop button. It ends when the admin stops or logs out, never lands in the admin's list of games, and is logged with the admin's name, as is everything done meanwhile.
+- The admin pages show the logo.
+- Admin sign-in security, on a new Security page in the admin panel. Both are optional for each admin:
+  - Passkeys: log in with a fingerprint, face or device PIN instead of a password, with "Log in with a passkey" on the login page.
+  - Authenticator app (TOTP): after the password, the login asks for a 6-digit code. Set up with a QR code that the app itself makes, with 8 recovery codes for when the phone is lost. Each code works only once, wrong codes are limited to 5 per 5 minutes, and turning it off or making new recovery codes needs the password. The secret and recovery codes are stored encrypted.
+  - `php artisan admin:reset-2fa {email}` turns off the authenticator app of an admin who lost it, and with `--passkeys` also deletes their passkeys.
+  - Logins log how the admin logged in (password, password and code, recovery code or passkey).
+
+## [1.10.1] - 2026-10-25
+
+### Added
+- A privacy policy, linked in the footer. It explains what the app stores, for how long, and how to ask about your data. The retention periods it shows come from the app's settings, so self-hosted installs show their own.
+
+### Changed
+- The fonts of the agenda cards are served by the app itself instead of by Google Fonts, so visitors' browsers no longer contact Google.
+
+### Fixed
+- `laravel-echo` and `pusher-js` are listed as dependencies, so a fresh `npm install` builds again.
+
 ## [1.10.0] - 2026-10-25
 
 ### Added
@@ -189,6 +213,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Milty draft integration to load factions and planets.
 - Planet agendas (any, industrial, cultural, hazardous, non-home), with extra tiles that can be added by tile number.
 
+[1.10.2]: https://github.com/burnacid/ti-voting/compare/v1.10.1...v1.10.2
+[1.10.1]: https://github.com/burnacid/ti-voting/compare/v1.10.0...v1.10.1
 [1.10.0]: https://github.com/burnacid/ti-voting/compare/v1.9.0...v1.10.0
 [1.9.0]: https://github.com/burnacid/ti-voting/compare/v1.8.0...v1.9.0
 [1.8.0]: https://github.com/burnacid/ti-voting/compare/v1.7.0...v1.8.0

@@ -5,6 +5,7 @@ namespace App\Support;
 use App\Models\Game;
 use App\Models\Player;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cookie;
 
 /**
@@ -50,10 +51,38 @@ class PlayerGames
      */
     public static function playerFor(Game $game): ?Player
     {
+        // An admin opened the game as this player
+        if ($impersonated = self::impersonated($game)) {
+            return $impersonated;
+        }
+
         // Before this cookie existed, the player was only kept in the session
         $token = self::tokens()[$game->code] ?? session('player_token');
 
         return $token ? $game->players()->where('session_token', $token)->first() : null;
+    }
+
+    /**
+     * The player a logged-in admin opened this game as, from the admin panel. Kept in the session only,
+     * never in the games cookie, so it ends when the admin logs out or stops.
+     */
+    public static function impersonated(Game $game): ?Player
+    {
+        if (!Auth::check() || session('impersonate.game') !== $game->code) {
+            return null;
+        }
+
+        return $game->players()->find(session('impersonate.player'));
+    }
+
+    public static function impersonate(Player $player): void
+    {
+        session(['impersonate' => ['game' => $player->game->code, 'player' => $player->id]]);
+    }
+
+    public static function stopImpersonating(): void
+    {
+        session()->forget('impersonate');
     }
 
     /**

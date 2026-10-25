@@ -1,5 +1,11 @@
-<div class="max-w-sm mx-auto mt-8 bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
+<div class="max-w-sm mx-auto mt-8">
+    <img src="/logo.svg" alt="" class="mx-auto mb-6 w-24 h-24 drop-shadow-lg">
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
     <h1 class="text-xl font-bold mb-4">Admin login</h1>
+
+    @if(session('status'))
+        <p class="mb-4 text-sm text-amber-700 dark:text-amber-400">{{ session('status') }}</p>
+    @endif
 
     <form wire:submit="login" class="space-y-4">
         <div>
@@ -26,4 +32,10 @@
             Log in
         </button>
     </form>
+
+    <!-- Log in with a passkey instead of the password -->
+    <div class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+        <x-authenticate-passkey />
+    </div>
+    </div>
 </div>
