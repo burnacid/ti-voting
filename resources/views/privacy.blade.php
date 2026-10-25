@@ -74,6 +74,7 @@
                         The site keeps a log of what happens in games, such as who joined and how they voted, to fix problems.
                         The log is deleted after {{ \App\Models\LogEntry::retentionDays() }} days.
                         Only the admin of this site can see the log and the games, including votes, and only looks at them to fix problems.
+                        To help a player or fix a game, the admin can open a game as one of its players; this is logged.
                     </p>
                 </section>
 

@@ -59,8 +59,10 @@ Route::get('/game/{code}', function (string $code) {
         return redirect()->route('join-group', $code)->with('error', 'You need to join this game first.');
     }
 
-    // Keeps the game at the top of this browser's games and renews the cookie
-    PlayerGames::remember($player);
+    // Keeps the game at the top of this browser's games and renews the cookie. Not for an admin opening it as a player
+    if (!PlayerGames::impersonated($game)) {
+        PlayerGames::remember($player);
+    }
 
     return view('game', ['game' => $game, 'player' => $player]);
 })->name('game.show');
@@ -86,6 +88,23 @@ Route::prefix(config('app.admin_path'))->name('admin.')->group(function () {
         Route::get('/', DashboardController::class)->name('dashboard');
         Route::view('/games', 'admin.games')->name('games');
         Route::get('/games/{game}', fn (Game $game) => view('admin.game', ['game' => $game]))->name('games.show');
+
+        // Open a game as one of its players, e.g. to help a player or fix a game
+        Route::post('/games/{game}/impersonate/{player}', function (Game $game, string $player) {
+            $player = $game->players()->findOrFail($player);
+
+            PlayerGames::impersonate($player);
+            Log::warning('Admin opened a game as a player', ['game' => $game->code, 'player' => $player->name, 'admin' => Auth::user()->email]);
+
+            return redirect()->route('game.show', $game->code);
+        })->name('games.impersonate');
+
+        Route::post('/impersonate/stop', function () {
+            $game = Game::where('code', session('impersonate.game'))->first();
+            PlayerGames::stopImpersonating();
+
+            return $game ? redirect()->route('admin.games.show', $game) : redirect()->route('admin.games');
+        })->name('impersonate.stop');
         Route::view('/logs', 'admin.logs')->name('logs');
         Route::get('/feedback', function () {
             abort_unless(config('app.feedback'), 404);

@@ -59,6 +59,14 @@
                                 Make Speaker
                             </button>
                         @endunless
+                        <form method="POST" action="{{ route('admin.games.impersonate', [$game, $gamePlayer->id]) }}"
+                              onsubmit="return confirm({{ Js::from('Open the game as ' . $gamePlayer->name . '? Everything you do there counts as this player.') }})">
+                            @csrf
+                            <button type="submit"
+                                    class="text-xs font-medium bg-amber-500 hover:bg-amber-600 text-amber-950 px-3 py-2 rounded-md transition-colors">
+                                Open as player
+                            </button>
+                        </form>
                         <button wire:click="removePlayer('{{ $gamePlayer->id }}')"
                                 wire:confirm="Remove {{ $gamePlayer->name }} from the game? Their votes are deleted too."
                                 class="text-xs font-medium bg-gray-200 hover:bg-red-600 hover:text-white dark:bg-gray-600 px-3 py-2 rounded-md transition-colors">

@@ -382,3 +382,61 @@ test('an admin can sort games by players and clear the filters', function () {
         ->assertSet('sort', 'newest')
         ->assertSee('Milty TE Game');
 });
+
+test('an admin can open a game as a player and stop again', function () {
+    Event::fake([TriggerRefresh::class]);
+    $admin = User::factory()->create();
+    $game = makeAdminGame();
+    $alice = $game->players()->first();
+
+    $this->actingAs($admin)
+        ->get(route('admin.games.show', $game))
+        ->assertSee('Open as player');
+
+    $this->post(route('admin.games.impersonate', [$game, $alice->id]))
+        ->assertRedirect(route('game.show', $game->code));
+
+    $this->get(route('game.show', $game->code))
+        ->assertOk()
+        ->assertSee('You are viewing this game as Alice')
+        // The player's token never ends up in the admin's games cookie
+        ->assertCookieMissing(\App\Support\PlayerGames::COOKIE);
+
+    expect(LogEntry::where('message', 'Admin opened a game as a player')->exists())->toBeTrue();
+
+    $this->post(route('admin.impersonate.stop'))
+        ->assertRedirect(route('admin.games.show', $game));
+
+    $this->get(route('game.show', $game->code))
+        ->assertRedirect(route('join-group', $game->code));
+});
+
+test('impersonating ends when the admin logs out', function () {
+    $game = makeAdminGame();
+    $alice = $game->players()->first();
+
+    $this->actingAs(User::factory()->create())
+        ->post(route('admin.games.impersonate', [$game, $alice->id]));
+
+    $this->post(route('admin.logout'));
+
+    $this->get(route('game.show', $game->code))
+        ->assertRedirect(route('join-group', $game->code));
+});
+
+test('only admins can open a game as a player, and only as one of its players', function () {
+    $game = makeAdminGame();
+    $other = makeAdminGame('Other Game');
+    $alice = $game->players()->first();
+
+    // Guests are sent to the login page and an old impersonation in the session is ignored
+    $this->post(route('admin.games.impersonate', [$game, $alice->id]))
+        ->assertRedirect(route('admin.login'));
+    $this->withSession(['impersonate' => ['game' => $game->code, 'player' => $alice->id]])
+        ->get(route('game.show', $game->code))
+        ->assertRedirect(route('join-group', $game->code));
+
+    $this->actingAs(User::factory()->create())
+        ->post(route('admin.games.impersonate', [$other, $alice->id]))
+        ->assertNotFound();
+});
