@@ -227,6 +227,44 @@ class Game extends Model
         return $planetInfo;
     }
 
+    // Where the map of a game comes from, see DraftImporter. Milty drafts have no source
+    public const MAP_SOURCE_LABELS = [
+        'milty' => 'Milty draft',
+        'tidraft' => 'TI4 Lab draft',
+        'map_string' => 'Map string',
+    ];
+
+    // Expansions in the map's config, keyed by filter, with the config settings that turn them on
+    public const EXPANSIONS = [
+        'pok' => ['label' => 'Prophecy of Kings', 'settings' => ['include_pok']],
+        'te' => ['label' => "Thunder's Edge", 'settings' => ['include_te_tiles', 'include_te_factions']],
+        'ds' => ['label' => 'Discordant Stars', 'settings' => ['include_ds_tiles']],
+    ];
+
+    public function mapSource(): ?string
+    {
+        if (!$this->milty_draft_data) {
+            return null;
+        }
+
+        return array_key_exists($this->milty_draft_data['source'] ?? 'milty', self::MAP_SOURCE_LABELS)
+            ? ($this->milty_draft_data['source'] ?? 'milty')
+            : null;
+    }
+
+    /**
+     * The expansions in play according to the map, as filter key => label.
+     */
+    public function expansions(): array
+    {
+        $config = $this->milty_draft_data['config'] ?? [];
+
+        return collect(self::EXPANSIONS)
+            ->filter(fn ($expansion) => collect($expansion['settings'])->contains(fn ($setting) => !empty($config[$setting])))
+            ->map(fn ($expansion) => $expansion['label'])
+            ->all();
+    }
+
     public function isThundersEdgeGame(): bool
     {
         $config = $this->milty_draft_data['config'] ?? [];

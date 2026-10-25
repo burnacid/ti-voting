@@ -28,11 +28,54 @@
 
     <!-- Games -->
     <section class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-4 sm:p-6">
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+        @php($filterClass = 'w-full px-3 py-2.5 text-base sm:text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700')
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
             <h2 class="text-lg font-bold">Games <span class="text-gray-500 dark:text-gray-400 font-normal">({{ $games->total() }})</span></h2>
-            <input type="search" wire:model.live.debounce.300ms="search" placeholder="Search code or name"
-                   class="w-full sm:w-64 px-3 py-2.5 text-base sm:text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700">
+            <input type="search" wire:model.live.debounce.300ms="search" placeholder="Search code or name" aria-label="Search code or name"
+                   class="{{ $filterClass }} sm:w-64">
         </div>
+
+        <!-- Filters -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-2 mb-2">
+            <label class="block">
+                <span class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Map</span>
+                <select wire:model.live="map" class="{{ $filterClass }}">
+                    <option value="">Any map</option>
+                    @foreach($mapFilters as $value => $label)
+                        <option value="{{ $value }}">{{ $label }}</option>
+                    @endforeach
+                </select>
+            </label>
+            <label class="block">
+                <span class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Expansion</span>
+                <select wire:model.live="expansion" class="{{ $filterClass }}">
+                    <option value="">Any expansion</option>
+                    @foreach($expansionFilters as $value => $label)
+                        <option value="{{ $value }}">{{ $label }}</option>
+                    @endforeach
+                </select>
+            </label>
+            <label class="block">
+                <span class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Option</span>
+                <select wire:model.live="option" class="{{ $filterClass }}">
+                    <option value="">Any option</option>
+                    @foreach($optionFilters as $value => $label)
+                        <option value="{{ $value }}">{{ $label }}</option>
+                    @endforeach
+                </select>
+            </label>
+            <label class="block">
+                <span class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Sort</span>
+                <select wire:model.live="sort" class="{{ $filterClass }}">
+                    @foreach($sorts as $value => $label)
+                        <option value="{{ $value }}">{{ $label }}</option>
+                    @endforeach
+                </select>
+            </label>
+        </div>
+        @if($filtered)
+            <button type="button" wire:click="clearFilters" class="text-sm text-blue-600 dark:text-blue-400 hover:underline mb-2">Clear filters</button>
+        @endif
 
         <div class="divide-y divide-gray-200 dark:divide-gray-700">
             @forelse($games as $game)
@@ -43,7 +86,9 @@
                             <span class="font-mono">{{ $game->code }}</span>
                             · {{ $game->players_count }} {{ Str::plural('player', $game->players_count) }}
                             · {{ $game->agendas_count }} {{ Str::plural('agenda', $game->agendas_count) }}
+                            · {{ $game->votes_count }} {{ Str::plural('vote', $game->votes_count) }}
                         </div>
+                        <x-admin-game-badges :game="$game" :voting="$game->voting_agendas_count > 0" class="my-1" />
                         <div class="text-xs text-gray-500 dark:text-gray-400">
                             Created {{ $game->created_at->diffForHumans() }}
                             @if($game->agendas_max_created_at)

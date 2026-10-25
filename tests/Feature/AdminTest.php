@@ -290,3 +290,95 @@ test('the admin command creates an account', function () {
 
     expect(User::where('email', 'admin@example.com')->exists())->toBeTrue();
 });
+
+function makeSetupGames(): array
+{
+    $players = fn ($faction) => ['players' => [['name' => 'A', 'faction' => $faction, 'slice' => null]]];
+
+    $milty = makeAdminGame('Milty TE Game');
+    $milty->update([
+        'milty_draft_data' => ['draft' => $players('The Arborec'), 'slices' => [], 'config' => ['include_pok' => true, 'include_te_tiles' => true]],
+        'fracture_in_play' => true,
+        'absol_agendas' => true,
+    ]);
+
+    $tiDraft = makeAdminGame('Lab PoK Game');
+    $tiDraft->update([
+        'milty_draft_data' => ['source' => 'tidraft', 'draft' => $players('The Winnu'), 'slices' => [], 'config' => ['include_pok' => true, 'include_te_tiles' => false]],
+        'managed_influence' => true,
+        'hidden_agenda' => false,
+    ]);
+
+    $mapString = makeAdminGame('String DS Game');
+    $mapString->update([
+        'milty_draft_data' => ['source' => 'map_string', 'map_string' => '19 26', 'draft' => ['players' => []], 'slices' => [], 'config' => ['include_ds_tiles' => true, 'include_te_factions' => false]],
+    ]);
+
+    $plain = makeAdminGame('Plain Game');
+    Player::create(['game_id' => $plain->id, 'name' => 'Bob', 'session_token' => Player::generateSessionToken()]);
+    Agenda::create(['game_id' => $plain->id, 'title' => 'Mutiny', 'description' => 'Test', 'options' => ['For', 'Against', 'Abstain'], 'status' => 'voting']);
+
+    return [$milty, $tiDraft, $mapString, $plain];
+}
+
+test('the games list shows how each game is set up', function () {
+    $this->actingAs(User::factory()->create());
+    makeSetupGames();
+
+    Livewire::test(Games::class)
+        ->assertSee('Milty draft')
+        ->assertSee('TI4 Lab draft')
+        ->assertSee('Map string')
+        ->assertSee('No map')
+        ->assertSee("Thunder's Edge · Fracture in play")
+        ->assertSee('Prophecy of Kings')
+        ->assertSee('Discordant Stars')
+        ->assertSee("Absol's agendas")
+        ->assertSee('Managed influence')
+        ->assertSee('Hidden Agenda off')
+        ->assertSee('Voting now');
+});
+
+test('an admin can filter games by map, expansion and option', function (string $filter, string $value, array $expected) {
+    $this->actingAs(User::factory()->create());
+    makeSetupGames();
+    $all = ['Milty TE Game', 'Lab PoK Game', 'String DS Game', 'Plain Game'];
+
+    $component = Livewire::test(Games::class)->set($filter, $value);
+
+    foreach ($expected as $name) {
+        $component->assertSee($name);
+    }
+    foreach (array_diff($all, $expected) as $name) {
+        $component->assertDontSee($name);
+    }
+})->with([
+    'no map' => ['map', 'none', ['Plain Game']],
+    'milty' => ['map', 'milty', ['Milty TE Game']],
+    'ti4 lab' => ['map', 'tidraft', ['Lab PoK Game']],
+    'map string' => ['map', 'map_string', ['String DS Game']],
+    'thunders edge' => ['expansion', 'te', ['Milty TE Game']],
+    'prophecy of kings' => ['expansion', 'pok', ['Milty TE Game', 'Lab PoK Game']],
+    'discordant stars' => ['expansion', 'ds', ['String DS Game']],
+    'voting now' => ['option', 'voting', ['Plain Game']],
+    'absol' => ['option', 'absol', ['Milty TE Game']],
+    'managed influence' => ['option', 'managed_influence', ['Lab PoK Game']],
+    'hidden agenda off' => ['option', 'open_votes', ['Lab PoK Game']],
+    'fracture' => ['option', 'fracture', ['Milty TE Game']],
+    'unknown value is ignored' => ['map', 'nonsense', ['Milty TE Game', 'Lab PoK Game', 'String DS Game', 'Plain Game']],
+]);
+
+test('an admin can sort games by players and clear the filters', function () {
+    $this->actingAs(User::factory()->create());
+    makeSetupGames();
+
+    Livewire::test(Games::class)
+        ->set('sort', 'players')
+        ->assertSeeInOrder(['Plain Game', 'Milty TE Game'])
+        ->set('map', 'none')
+        ->assertSee('Clear filters')
+        ->call('clearFilters')
+        ->assertSet('map', '')
+        ->assertSet('sort', 'newest')
+        ->assertSee('Milty TE Game');
+});
