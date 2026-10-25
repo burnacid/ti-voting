@@ -11,6 +11,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - The admin games list can be filtered by map, expansion and option, and sorted by newest, last agenda or most players. The filters are kept in the URL.
 - An admin can open a game as one of its players from the game's admin page, for example to help a player or fix a game. A banner shows whose game it is, with a Stop button. It ends when the admin stops or logs out, never lands in the admin's list of games, and is logged with the admin's name, as is everything done meanwhile.
 - The admin pages show the logo.
+- Admin sign-in security, on a new Security page in the admin panel. Both are optional for each admin:
+  - Passkeys: log in with a fingerprint, face or device PIN instead of a password, with "Log in with a passkey" on the login page.
+  - Authenticator app (TOTP): after the password, the login asks for a 6-digit code. Set up with a QR code that the app itself makes, with 8 recovery codes for when the phone is lost. Each code works only once, wrong codes are limited to 5 per 5 minutes, and turning it off or making new recovery codes needs the password. The secret and recovery codes are stored encrypted.
+  - `php artisan admin:reset-2fa {email}` turns off the authenticator app of an admin who lost it, and with `--passkeys` also deletes their passkeys.
+  - Logins log how the admin logged in (password, password and code, recovery code or passkey).
 
 ## [1.10.1] - 2026-10-25
 

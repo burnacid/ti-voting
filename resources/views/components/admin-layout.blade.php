@@ -19,7 +19,7 @@
                     TI4 Admin
                 </a>
                 @php($unreadFeedback = config('app.feedback') ? \App\Models\Feedback::unread()->count() : 0)
-                @foreach(array_filter(['admin.dashboard' => 'Dashboard', 'admin.games' => 'Games', 'admin.feedback' => config('app.feedback') ? 'Feedback' : null, 'admin.logs' => 'Logs']) as $route => $label)
+                @foreach(array_filter(['admin.dashboard' => 'Dashboard', 'admin.games' => 'Games', 'admin.feedback' => config('app.feedback') ? 'Feedback' : null, 'admin.logs' => 'Logs', 'admin.security' => 'Security']) as $route => $label)
                     <a href="{{ route($route) }}"
                        @class([
                            'inline-flex items-center gap-1.5 text-sm font-medium px-2 py-1 rounded-md',

@@ -3,6 +3,10 @@
     <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
     <h1 class="text-xl font-bold mb-4">Admin login</h1>
 
+    @if(session('status'))
+        <p class="mb-4 text-sm text-amber-700 dark:text-amber-400">{{ session('status') }}</p>
+    @endif
+
     <form wire:submit="login" class="space-y-4">
         <div>
             <label for="email" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Email</label>
@@ -28,5 +32,10 @@
             Log in
         </button>
     </form>
+
+    <!-- Log in with a passkey instead of the password -->
+    <div class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+        <x-authenticate-passkey />
+    </div>
     </div>
 </div>

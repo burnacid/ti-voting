@@ -80,9 +80,14 @@ Route::get('/game/{code}/rejoin', function (string $code) {
     return view('join-game', ['code' => $game->code, 'game' => $game, 'rejoin' => true]);
 })->name('game.rejoin');
 
+// Admin login with a passkey, at /admin/passkeys/... The package's views expect the route names passkeys.*
+Route::prefix(config('app.admin_path'))->middleware(['guest', 'throttle:20,1'])->group(fn () => Route::passkeys());
+
 // Admin
 Route::prefix(config('app.admin_path'))->name('admin.')->group(function () {
     Route::view('/login', 'admin.login')->middleware('guest')->name('login');
+    // Second step of the login when TOTP is on
+    Route::view('/two-factor', 'admin.two-factor')->middleware('guest')->name('two-factor');
 
     Route::middleware('auth')->group(function () {
         Route::get('/', DashboardController::class)->name('dashboard');
@@ -106,6 +111,7 @@ Route::prefix(config('app.admin_path'))->name('admin.')->group(function () {
             return $game ? redirect()->route('admin.games.show', $game) : redirect()->route('admin.games');
         })->name('impersonate.stop');
         Route::view('/logs', 'admin.logs')->name('logs');
+        Route::view('/security', 'admin.security')->name('security');
         Route::get('/feedback', function () {
             abort_unless(config('app.feedback'), 404);
 
