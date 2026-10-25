@@ -4,7 +4,7 @@ All notable changes to TI Voting are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.10.2] - 2026-10-25
 
 ### Added
 - The admin games list shows how each game is set up: where its map comes from (Milty draft, TI4 Lab draft, map string or no map), its expansions (Prophecy of Kings, Thunder's Edge with whether the Fracture is in play, Discordant Stars), whether an agenda is being voted on, and the options that are on, such as Absol's agendas, managed influence or Hidden Agenda off. Each game also shows its number of votes. The game's admin page shows the same.
@@ -213,6 +213,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Milty draft integration to load factions and planets.
 - Planet agendas (any, industrial, cultural, hazardous, non-home), with extra tiles that can be added by tile number.
 
+[1.10.2]: https://github.com/burnacid/ti-voting/compare/v1.10.1...v1.10.2
 [1.10.1]: https://github.com/burnacid/ti-voting/compare/v1.10.0...v1.10.1
 [1.10.0]: https://github.com/burnacid/ti-voting/compare/v1.9.0...v1.10.0
 [1.9.0]: https://github.com/burnacid/ti-voting/compare/v1.8.0...v1.9.0
