@@ -29,8 +29,14 @@ class Game extends Model
         'representative_government',
         'absol_agendas',
         'show_results',
+        'hidden_agenda',
         'star_chart_tiles',
         'status',
+    ];
+
+    // Same as the column default, so a new game has secret votes before it is reloaded
+    protected $attributes = [
+        'hidden_agenda' => true,
     ];
 
     protected $casts = [
@@ -40,6 +46,7 @@ class Game extends Model
         'representative_government' => 'boolean',
         'absol_agendas' => 'boolean',
         'show_results' => 'boolean',
+        'hidden_agenda' => 'boolean',
         'star_chart_tiles' => 'array',
     ];
 

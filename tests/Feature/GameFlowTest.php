@@ -1743,3 +1743,77 @@ test('only the speaker can show the results to all players', function () {
 
     expect($game->fresh()->show_results)->toBeFalse();
 });
+
+test('hidden agenda is on by default and votes stay secret', function () {
+    [$game, $speaker, $other] = makeGame();
+
+    expect($game->fresh()->hidden_agenda)->toBeTrue();
+
+    Livewire::test(GameDashboard::class, ['game' => $game->fresh(), 'player' => $speaker])
+        ->set('newAgendaTitle', 'Open Agenda')
+        ->set('newAgendaDescription', 'Test')
+        ->set('newAgendaCardType', 'law')
+        ->call('createAgenda');
+
+    $agenda = $game->currentAgenda();
+    expect($agenda->secret_votes)->toBeTrue();
+
+    $agenda->update(['reveal_step' => null]);
+    Vote::create(['agenda_id' => $agenda->id, 'player_id' => $other->id, 'option' => 'Against', 'influence_spent' => 4]);
+
+    Livewire::test(GameDashboard::class, ['game' => $game->fresh(), 'player' => $speaker])
+        ->assertSee('Voted')
+        ->assertDontSee('influence spent');
+});
+
+test('without hidden agenda every player sees how each player voted', function () {
+    [$game, $speaker, $other] = makeGame();
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->call('toggleHiddenAgenda')
+        ->set('newAgendaTitle', 'Open Agenda')
+        ->set('newAgendaDescription', 'Test')
+        ->set('newAgendaCardType', 'law')
+        ->call('createAgenda');
+
+    $agenda = $game->currentAgenda();
+    expect($game->fresh()->hidden_agenda)->toBeFalse()
+        ->and($agenda->secret_votes)->toBeFalse();
+
+    $agenda->update(['reveal_step' => null]);
+    Vote::create(['agenda_id' => $agenda->id, 'player_id' => $speaker->id, 'option' => 'Against', 'influence_spent' => 4]);
+
+    Livewire::test(GameDashboard::class, ['game' => $game->fresh(), 'player' => $other])
+        ->assertSee('4 influence spent')
+        ->assertSee('every player sees how you vote');
+});
+
+test('hidden agenda cannot be changed while an agenda is open and never reveals earlier votes', function () {
+    [$game, $speaker, $other] = makeGame();
+    $agenda = makeAgenda($game);
+    Vote::create(['agenda_id' => $agenda->id, 'player_id' => $other->id, 'option' => 'Against', 'influence_spent' => 4]);
+
+    // During voting the switch is locked
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->call('toggleHiddenAgenda');
+    expect($game->fresh()->hidden_agenda)->toBeTrue();
+
+    // After voting it can be switched off, but the ended agenda keeps its secret votes
+    $agenda->update(['status' => 'completed', 'voting_ended_at' => now()]);
+    Livewire::test(GameDashboard::class, ['game' => $game->fresh(), 'player' => $speaker])
+        ->call('toggleHiddenAgenda')
+        ->assertSee('Voting Results')
+        ->assertDontSee('influence spent');
+
+    expect($game->fresh()->hidden_agenda)->toBeFalse()
+        ->and($agenda->fresh()->secret_votes)->toBeTrue();
+});
+
+test('only the speaker can change hidden agenda', function () {
+    [$game, , $other] = makeGame();
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $other])
+        ->call('toggleHiddenAgenda');
+
+    expect($game->fresh()->hidden_agenda)->toBeTrue();
+});

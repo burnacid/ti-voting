@@ -357,6 +357,11 @@
             @elseif($currentAgenda->isVotingOpen() && !$hasVoted)
                 <!-- Voting Form -->
                 <form wire:submit="submitVote" class="space-y-4">
+                    @if(!$currentAgenda->secret_votes)
+                        <p class="text-sm text-blue-800 dark:text-blue-200 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                            Hidden Agenda is off: every player sees how you vote.
+                        </p>
+                    @endif
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                             Choose your option:
@@ -461,6 +466,20 @@
                                     <div class="mt-2 text-sm text-gray-600 dark:text-gray-300">
                                         {{ $result['influence'] }} influence
                                     </div>
+                                    @if(!$currentAgenda->secret_votes)
+                                        {{-- Without Hidden Agenda: who voted for this option, with the influence they spent --}}
+                                        <ul class="mt-2 flex flex-wrap gap-2">
+                                            @foreach($openVotes->where('option', $option)->sortByDesc('influence_spent') as $vote)
+                                                @php($voter = $players->firstWhere('id', $vote->player_id))
+                                                @if($voter)
+                                                    <li class="flex items-center gap-1.5 pl-2.5 pr-0.5 rounded-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 text-sm font-medium text-gray-900 dark:text-white">
+                                                        {{ $voter->name }}
+                                                        <x-influence-hex :value="$vote->influence_spent" small title="{{ $vote->influence_spent }} influence spent" sr-label="influence spent" />
+                                                    </li>
+                                                @endif
+                                            @endforeach
+                                        </ul>
+                                    @endif
                                 </div>
                             @endif
                         @endforeach
@@ -637,13 +656,7 @@
 
                             <!-- Available influence, as the blue influence value on a TI4 planet card -->
                             @if($gamePlayer->influence !== null)
-                                <span class="shrink-0 relative w-9 h-9 grid place-items-center text-sm font-bold tabular-nums text-gray-900 dark:text-white"
-                                      title="{{ $gamePlayer->influence }} influence">
-                                    <svg class="absolute inset-0 w-full h-full text-blue-600 dark:text-blue-400" viewBox="0 0 36 36" fill="none" aria-hidden="true">
-                                        <polygon points="18,2.5 31.4,10.25 31.4,25.75 18,33.5 4.6,25.75 4.6,10.25" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"></polygon>
-                                    </svg>
-                                    <span class="relative">{{ $gamePlayer->influence }}<span class="sr-only"> influence</span></span>
-                                </span>
+                                <x-influence-hex :value="$gamePlayer->influence" />
                             @endif
 
                             <!-- Vote status, or blocking votes while the Speaker checks action cards. Players who predicted cannot vote -->
@@ -656,6 +669,17 @@
                                 </button>
                             @elseif($isBlocked)
                                 <span class="shrink-0 px-2 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-200">Cannot vote</span>
+                            @elseif($hasVotedHere && $openVotes->has($gamePlayer->id))
+                                {{-- Without Hidden Agenda everyone sees the vote --}}
+                                @php($openVote = $openVotes[$gamePlayer->id])
+                                <span class="shrink-0 max-w-[50%] min-w-0 flex items-center gap-1"
+                                      title="Voted {{ $openVote->option }}{{ $openVote->option !== 'Abstain' ? ' with ' . $openVote->influence_spent . ' influence' : '' }}">
+                                    <span class="min-w-0 truncate px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300">{{ $openVote->option }}</span>
+                                    {{-- Influence spent on the vote --}}
+                                    @if($openVote->option !== 'Abstain')
+                                        <x-influence-hex :value="$openVote->influence_spent" title="{{ $openVote->influence_spent }} influence spent" sr-label="influence spent" />
+                                    @endif
+                                </span>
                             @elseif($hasVotedHere)
                                 <span class="shrink-0 inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300">
                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true">
@@ -756,6 +780,13 @@
                             <x-setting-switch action="toggleRepresentativeGovernment" :on="$game->representative_government"
                                               label="Representative Government is in effect"
                                               description="Each player casts 1 vote on each agenda instead of spending influence. Turned on when the law passes For." />
+
+                            {{-- Event card Hidden Agenda: on by default, as secret voting is what this app is for --}}
+                            @php($agendaOpen = $currentAgenda?->status === 'voting')
+                            <x-setting-switch action="toggleHiddenAgenda" :on="$game->hidden_agenda" :disabled="$agendaOpen"
+                                              label="Hidden Agenda"
+                                              :description="'Votes are secret: only the totals are revealed. Off: every player sees how each player votes. '
+                                                  . ($agendaOpen ? 'Can be changed after this agenda.' : 'Applies from the next agenda.')" />
 
                             {{-- Off: the Speaker announces the results --}}
                             <x-setting-switch action="toggleShowResults" :on="$game->show_results"

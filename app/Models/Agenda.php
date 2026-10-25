@@ -65,6 +65,7 @@ class Agenda extends Model
         'type',
         'elect',
         'source',
+        'secret_votes',
         'options',
         'status',
         'reveal_step',
@@ -77,6 +78,7 @@ class Agenda extends Model
     protected $casts = [
         'options' => 'array',
         'blocked_player_ids' => 'array',
+        'secret_votes' => 'boolean',
         'voting_started_at' => 'datetime',
         'voting_ended_at' => 'datetime',
     ];

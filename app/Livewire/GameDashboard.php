@@ -266,6 +266,8 @@ class GameDashboard extends Component
             'type' => $this->newAgendaCardType,
             'elect' => $this->resolveAgendaElect(),
             'source' => $this->newAgendaSource,
+            // Fixed for this agenda, so switching Hidden Agenda later cannot reveal its votes
+            'secret_votes' => $this->game->hidden_agenda,
             'options' => $options,
             'status' => 'voting',
             'reveal_step' => Agenda::STEP_WHEN_REVEALED,
@@ -830,6 +832,35 @@ class GameDashboard extends Component
         $this->refreshData();
     }
 
+    // Hidden Agenda: votes are secret. Only changed between agendas and only applies to the next agenda,
+    // so the Speaker cannot switch it off to see how players voted on an open or ended agenda
+    public function toggleHiddenAgenda()
+    {
+        if (!$this->player->is_speaker) {
+            return;
+        }
+
+        if ($this->game->currentAgenda()) {
+            $this->dispatch('flashMessage', [
+                'Hidden Agenda can only be changed between agendas.',
+                'error'
+            ]);
+            return;
+        }
+
+        $this->game->update(['hidden_agenda' => !$this->game->hidden_agenda]);
+        Log::info($this->game->hidden_agenda ? 'Hidden Agenda turned on' : 'Hidden Agenda turned off');
+
+        $this->dispatch('flashMessage', [
+            $this->game->hidden_agenda
+                ? 'Hidden Agenda is on: votes on the next agenda are secret.'
+                : 'Hidden Agenda is off: every player sees how each player votes on the next agenda.',
+            'info',
+        ]);
+        TriggerRefresh::dispatch($this->game);
+        $this->refreshData();
+    }
+
     public function toggleShowResults()
     {
         if (!$this->player->is_speaker) {
@@ -1065,6 +1096,8 @@ class GameDashboard extends Component
             'rejoinRequests' => $players->filter(fn ($gamePlayer) => $gamePlayer->id !== $this->player->id && $gamePlayer->hasPendingRejoinRequest()),
             'currentAgenda' => $currentAgenda,
             'players' => $players,
+            // Without Hidden Agenda every player sees how each player voted, keyed by player id
+            'openVotes' => $currentAgenda && !$currentAgenda->secret_votes ? $currentAgenda->votes()->get()->keyBy('player_id') : collect(),
             'hasVoted' => $hasVoted,
             'allVoted' => $allVoted,
             'showResults' => $showResults,

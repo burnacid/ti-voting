@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Absol's agendas: the Speaker can switch the agenda list to the agendas of Absol's Lab, which replace the official agendas. Absol's agendas have their own card style, so players see the difference.
 - Agenda cards show the deck they come from, e.g. Prophecy of Kings or Absol's Lab.
 - Show results to all players: with this Speaker setting on, every player sees the results once voting ends, instead of the Speaker announcing them. Breaking a tie and showing who is affected stay with the Speaker. It is off by default.
+- Hidden Agenda, as the event card: votes are secret and only the totals are revealed. It is on by default. With it off, every player sees how each player voted, in the player list and the results, and players are told their vote is public. The Speaker can only change it between agendas, and it only applies to agendas revealed after the change, so it cannot be used to see how players voted on an open or ended agenda.
 
 ### Changed
 - Speaker Settings is split into Voting, Agendas and Map sections, and its settings are on/off switches instead of checkboxes. It no longer has a yellow background.
