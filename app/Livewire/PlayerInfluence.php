@@ -7,6 +7,7 @@ use App\Livewire\Concerns\SharesGameLogContext;
 use App\Models\Player;
 use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 /**
@@ -35,6 +36,15 @@ class PlayerInfluence extends Component
     public function hydrate(): void
     {
         $this->player = Player::find($this->playerId);
+    }
+
+    // Votes and the agenda phase change the influence when the Speaker manages it
+    #[On('triggerRefresh')]
+    #[On('influence-changed')]
+    public function reloadInfluence(): void
+    {
+        $this->player?->refresh();
+        $this->influence = $this->player?->influence ?? '';
     }
 
     // Empty clears it

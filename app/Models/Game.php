@@ -27,8 +27,18 @@ class Game extends Model
         'milty_draft_data',
         'fracture_in_play',
         'representative_government',
+        'absol_agendas',
+        'show_results',
+        'hidden_agenda',
+        'managed_influence',
+        'agenda_phase_started_at',
         'star_chart_tiles',
         'status',
+    ];
+
+    // Same as the column default, so a new game has secret votes before it is reloaded
+    protected $attributes = [
+        'hidden_agenda' => true,
     ];
 
     protected $casts = [
@@ -36,6 +46,11 @@ class Game extends Model
         'milty_draft_data' => 'array',
         'fracture_in_play' => 'boolean',
         'representative_government' => 'boolean',
+        'absol_agendas' => 'boolean',
+        'show_results' => 'boolean',
+        'hidden_agenda' => 'boolean',
+        'managed_influence' => 'boolean',
+        'agenda_phase_started_at' => 'datetime',
         'star_chart_tiles' => 'array',
     ];
 
@@ -78,10 +93,22 @@ class Game extends Model
         return preg_replace('/^<\?xml[^>]*>\s*/', '', $svg);
     }
 
+    // The draft URL to show as a link, only when it is a https URL, so a stored javascript: URL is never linked
+    public function getSafeMiltyUrlAttribute(): ?string
+    {
+        return is_string($this->milty_url) && str_starts_with($this->milty_url, 'https://') ? $this->milty_url : null;
+    }
+
     // Page where players who lost their session ask to rejoin, another player has to confirm it
     public function rejoinUrl(): string
     {
         return route('game.rejoin', $this->code);
+    }
+
+    // With managed influence, players enter their influence after the Speaker starts the agenda phase
+    public function needsInfluenceFrom(Player $player): bool
+    {
+        return $this->managed_influence && $this->agenda_phase_started_at !== null && $player->influence === null;
     }
 
     public static function retentionDays(): int

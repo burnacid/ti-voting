@@ -41,6 +41,33 @@
         </div>
     @endforeach
 
+    <!-- Managed influence: the Speaker started the agenda phase, every player enters their influence -->
+    {{-- A modal that cannot be closed: it stays until the player saved their influence --}}
+    @if($needsPhaseInfluence)
+        <div wire:key="phase-influence-modal" class="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
+            <form wire:submit="savePhaseInfluence" role="dialog" aria-modal="true"
+                  aria-labelledby="phase-influence-title" aria-describedby="phase-influence-description"
+                  x-data x-trap.noscroll="true"
+                  class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 w-full max-w-md">
+                <h2 id="phase-influence-title" class="text-xl font-bold text-gray-900 dark:text-white mb-2">The agenda phase has started</h2>
+                <p id="phase-influence-description" class="text-sm text-gray-600 dark:text-gray-300 mb-4">
+                    Enter the influence you have available. Your votes are taken from it.
+                </p>
+
+                <label for="phaseInfluence" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Your available influence</label>
+                <div class="flex gap-2">
+                    <input type="number" id="phaseInfluence" wire:model="phaseInfluence" min="0" max="99" inputmode="numeric" placeholder="0" autofocus
+                           class="w-24 px-3 py-2.5 text-base sm:text-sm border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white">
+                    <button type="submit"
+                            class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 sm:py-2 px-4 rounded-lg transition-colors">
+                        Save
+                    </button>
+                </div>
+                @error('phaseInfluence') <p class="mt-1 text-red-500 text-sm">{{ $message }}</p> @enderror
+            </form>
+        </div>
+    @endif
+
     <!-- Pick a drafted faction, e.g. after the Speaker added the Milty draft -->
     @if($factionChoices->isNotEmpty())
         <form wire:submit="chooseFaction" class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4">
@@ -98,7 +125,8 @@
                             Preset agenda <span class="font-normal text-gray-500 dark:text-gray-400">(optional)</span>
                         </label>
                         <div class="flex gap-2">
-                            <x-agenda-search :agendas="$availableAgendas" :input-class="$inputClass" />
+                            {{-- Keyed on the agenda deck, so the list is rebuilt when the Speaker switches decks --}}
+                            <x-agenda-search :agendas="$availableAgendas" :input-class="$inputClass" wire:key="agenda-search-{{ $game->absol_agendas ? 'absol' : 'official' }}" />
                             @if($selectedPresetAgenda)
                                 <button type="button"
                                         wire:click="clearPresetSelection"
@@ -232,10 +260,51 @@
                 </form>
             </div>
         @else
-            <button wire:click="toggleCreateAgenda"
-                    class="w-full sm:w-auto bg-green-600 hover:bg-green-700 active:bg-green-800 text-white font-semibold py-3 sm:py-2 px-4 rounded-lg transition-colors">
-                Create New Agenda
-            </button>
+            <div class="flex flex-col sm:flex-row gap-2">
+                @if($game->managed_influence)
+                    {{-- Confirmed in a modal, as it clears every player's influence --}}
+                    <div x-data="{ confirming: false }" x-on:keydown.escape.window="confirming = false" class="contents">
+                        <button type="button" x-on:click="confirming = true"
+                                class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold py-3 sm:py-2 px-4 rounded-lg transition-colors">
+                            Start New Agenda Phase
+                        </button>
+
+                        <template x-teleport="body">
+                            <div x-show="confirming" x-cloak x-transition.opacity
+                                 class="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50"
+                                 x-on:click.self="confirming = false">
+                                <div role="dialog" aria-modal="true" aria-labelledby="start-phase-title" aria-describedby="start-phase-description"
+                                     x-trap.noscroll="confirming"
+                                     class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 w-full max-w-md">
+                                    <h2 id="start-phase-title" class="text-xl font-bold text-gray-900 dark:text-white mb-2">Start New Agenda Phase</h2>
+                                    <p id="start-phase-description" class="text-sm text-gray-600 dark:text-gray-300 mb-6">
+                                        Every player's influence is cleared, and every player is asked to enter the influence they have for this agenda phase.
+                                    </p>
+                                    <div class="flex flex-col-reverse sm:flex-row gap-3 sm:justify-end">
+                                        <button type="button" x-on:click="confirming = false"
+                                                class="px-4 py-2.5 sm:py-2 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700">
+                                            Cancel
+                                        </button>
+                                        <button type="button" x-on:click="confirming = false; $wire.startAgendaPhase()"
+                                                class="px-4 py-2.5 sm:py-2 bg-blue-600 text-white font-semibold rounded-md hover:bg-blue-700">
+                                            Start New Agenda Phase
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                @endif
+                <button wire:click="toggleCreateAgenda"
+                        class="w-full sm:w-auto bg-green-600 hover:bg-green-700 active:bg-green-800 text-white font-semibold py-3 sm:py-2 px-4 rounded-lg transition-colors">
+                    Create New Agenda
+                </button>
+            </div>
+        @endif
+        @if($missingInfluence->isNotEmpty())
+            <p class="text-sm text-gray-600 dark:text-gray-400">
+                Waiting for influence from {{ $missingInfluence->pluck('name')->sort()->implode(', ') }}.
+            </p>
         @endif
     @endif
 
@@ -356,17 +425,30 @@
             @elseif($currentAgenda->isVotingOpen() && !$hasVoted)
                 <!-- Voting Form -->
                 <form wire:submit="submitVote" class="space-y-4">
+                    @if(!$currentAgenda->secret_votes)
+                        <p class="text-sm text-blue-800 dark:text-blue-200 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                            Hidden Agenda is off: every player sees how you vote.
+                        </p>
+                    @endif
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                             Choose your option:
                         </label>
+                        @if($noInfluence)
+                            <p class="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                                {{ $onlyAbstain ? 'You have no influence left, so you abstain.' : 'You have 0 influence, so Abstain is selected.' }}
+                            </p>
+                        @endif
                         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
                             @foreach($currentAgenda->options as $option)
+                                @php($optionDisabled = $onlyAbstain && $option !== 'Abstain')
                                 <label class="flex items-center p-2 rounded-md
                                     {{ $option === 'Abstain' ? 'bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/30 border border-red-200 dark:border-red-800' : 'hover:bg-gray-50 dark:hover:bg-gray-700' }}
+                                    {{ $optionDisabled ? 'opacity-50 cursor-not-allowed' : '' }}
                                     transition-colors">
                                     <input type="radio"
                                            wire:model.live="selectedOption"
+                                           @disabled($optionDisabled)
                                            value="{{ $option }}"
                                            class="{{ $option === 'Abstain' ? 'text-red-600' : 'text-blue-600' }} mr-2">
                                     <span class="{{ $option === 'Abstain' ? 'text-red-800 dark:text-red-200' : 'text-gray-900 dark:text-white' }}">{{ $option }}</span>
@@ -384,17 +466,20 @@
                         </div>
                     @elseif($selectedOption !== 'Abstain')
                     <div>
+                        @php($managedMax = $game->managed_influence && $player->influence !== null ? min(99, $player->influence) : null)
                         <label for="influenceSpent" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Influence to spend (1-99):
+                            Influence to spend (1-{{ $managedMax ?? 99 }}):
                         </label>
                         @if($player->influence !== null)
-                            <p class="text-sm text-gray-600 dark:text-gray-400 mb-2">You have {{ $player->influence }} influence available.</p>
+                            <p class="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                                You have {{ $player->influence }} influence available.{{ $managedMax !== null ? ' It goes down by the influence you spend.' : '' }}
+                            </p>
                         @endif
                         <input type="number"
                                id="influenceSpent"
                                wire:model="influenceSpent"
                                min="1"
-                               max="99"
+                               max="{{ $managedMax ?? 99 }}"
                                class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white">
                         @error('influenceSpent') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
                     </div>
@@ -460,6 +545,20 @@
                                     <div class="mt-2 text-sm text-gray-600 dark:text-gray-300">
                                         {{ $result['influence'] }} influence
                                     </div>
+                                    @if(!$currentAgenda->secret_votes)
+                                        {{-- Without Hidden Agenda: who voted for this option, with the influence they spent --}}
+                                        <ul class="mt-2 flex flex-wrap gap-2">
+                                            @foreach($openVotes->where('option', $option)->sortByDesc('influence_spent') as $vote)
+                                                @php($voter = $players->firstWhere('id', $vote->player_id))
+                                                @if($voter)
+                                                    <li class="flex items-center gap-1.5 pl-2.5 pr-0.5 rounded-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 text-sm font-medium text-gray-900 dark:text-white">
+                                                        {{ $voter->name }}
+                                                        <x-influence-hex :value="$vote->influence_spent" small title="{{ $vote->influence_spent }} influence spent" sr-label="influence spent" />
+                                                    </li>
+                                                @endif
+                                            @endforeach
+                                        </ul>
+                                    @endif
                                 </div>
                             @endif
                         @endforeach
@@ -536,9 +635,9 @@
         </div>
     @endif
 
-    <!-- Speaker Controls, Players and Star Chart, one at a time -->
-    @php($tabs = array_filter(['speaker' => $player->is_speaker ? 'Speaker Settings' : null, 'players' => 'Players', 'star-chart' => $game->milty_draft_data ? 'Star Chart' : null]))
-    @php($defaultTab = $player->is_speaker ? 'speaker' : 'players')
+    <!-- Players, Star Chart and Speaker Controls, one at a time -->
+    @php($tabs = array_filter(['players' => 'Players', 'star-chart' => $game->milty_draft_data ? 'Star Chart' : null, 'speaker' => $player->is_speaker ? 'Speaker Settings' : null]))
+    @php($defaultTab = 'players')
     {{-- Keyed on the tabs, so a new Speaker or a map added later starts on a tab that exists --}}
     <div wire:key="tabs-{{ implode('-', array_keys($tabs)) }}"
          x-data="{
@@ -576,85 +675,6 @@
                 @endforeach
             </div>
         @endif
-
-        <div id="tab-panel-speaker" role="tabpanel" aria-labelledby="tab-speaker"
-             {{ $defaultTab !== 'speaker' ? 'x-cloak' : '' }}
-             x-show="tab === 'speaker'">
-            <!-- Speaker Controls -->
-            @if($player->is_speaker)
-                <div class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-xl p-4 sm:p-6 space-y-4">
-                    <!-- Header -->
-                    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                            <h2 class="text-lg sm:text-xl font-bold text-yellow-800 dark:text-yellow-200">Speaker Settings</h2>
-                            <p class="text-sm text-yellow-700 dark:text-yellow-300">
-                                @if($currentAgenda?->status === 'voting' && $currentAgenda->reveal_step)
-                                    Resolve action cards with the agenda below before voting opens.
-                                @elseif($currentAgenda?->status === 'voting')
-                                    Voting is open.
-                                @else
-                                    Reveal the next agenda when you are ready.
-                                @endif
-                            </p>
-                        </div>
-
-                        @if($currentAgenda?->status === 'voting' && !$currentAgenda->reveal_step)
-                            <button wire:click="endVoting"
-                                    wire:confirm="Are you sure you want to end voting? The results will only be visible to you."
-                                    class="w-full sm:w-auto bg-red-600 hover:bg-red-700 active:bg-red-800 text-white font-semibold py-3 sm:py-2 px-4 rounded-lg transition-colors">
-                                End Voting
-                            </button>
-                        @endif
-                    </div>
-
-                    <!-- Thunder's Edge: The Fracture -->
-                    @if($game->isThundersEdgeGame())
-                        <label class="flex items-center justify-between gap-4 bg-white/70 dark:bg-gray-800/60 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3 cursor-pointer">
-                            <span>
-                                <span class="block font-medium text-gray-900 dark:text-white">The Fracture is in play</span>
-                                <span class="block text-sm text-gray-600 dark:text-gray-400">
-                                    Adds Cocytus, Lethe, Phlegethon and Styx to planet agendas.
-                                </span>
-                            </span>
-                            <input type="checkbox"
-                                   wire:click="toggleFracture"
-                                   @checked($game->fracture_in_play)
-                                   class="h-6 w-6 shrink-0 text-blue-600 rounded">
-                        </label>
-                    @endif
-
-                    <!-- Law: Representative Government -->
-                    <label class="flex items-center justify-between gap-4 bg-white/70 dark:bg-gray-800/60 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3 cursor-pointer">
-                        <span>
-                            <span class="block font-medium text-gray-900 dark:text-white">Representative Government is in effect</span>
-                            <span class="block text-sm text-gray-600 dark:text-gray-400">
-                                Each player casts 1 vote on each agenda instead of spending influence. Turned on when the law passes For.
-                            </span>
-                        </span>
-                        <input type="checkbox"
-                               wire:click="toggleRepresentativeGovernment"
-                               @checked($game->representative_government)
-                               class="h-6 w-6 shrink-0 text-blue-600 rounded">
-                    </label>
-
-                    <!-- Map data: Milty or TI4 Lab draft URL, or a map string -->
-                    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-white/70 dark:bg-gray-800/60 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
-                        <span>
-                            <span class="block font-medium text-gray-900 dark:text-white">Map data</span>
-                            <span class="block text-sm text-gray-600 dark:text-gray-400">
-                                @if($game->milty_draft_data)
-                                    Used for planet agendas, faction choices and Star Chart.
-                                @else
-                                    No map yet. Add a draft URL or map string to use planet agendas, factions and Star Chart.
-                                @endif
-                            </span>
-                        </span>
-                        <livewire:update-milty-url :game="$game" :player="$player" :key="'map-' . $game->id" />
-                    </div>
-
-                </div>
-            @endif
-        </div>
 
         <div id="tab-panel-players" role="tabpanel" aria-labelledby="tab-players"
              {{ $defaultTab !== 'players' ? 'x-cloak' : '' }}
@@ -715,13 +735,7 @@
 
                             <!-- Available influence, as the blue influence value on a TI4 planet card -->
                             @if($gamePlayer->influence !== null)
-                                <span class="shrink-0 relative w-9 h-9 grid place-items-center text-sm font-bold tabular-nums text-gray-900 dark:text-white"
-                                      title="{{ $gamePlayer->influence }} influence">
-                                    <svg class="absolute inset-0 w-full h-full text-blue-600 dark:text-blue-400" viewBox="0 0 36 36" fill="none" aria-hidden="true">
-                                        <polygon points="18,2.5 31.4,10.25 31.4,25.75 18,33.5 4.6,25.75 4.6,10.25" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"></polygon>
-                                    </svg>
-                                    <span class="relative">{{ $gamePlayer->influence }}<span class="sr-only"> influence</span></span>
-                                </span>
+                                <x-influence-hex :value="$gamePlayer->influence" />
                             @endif
 
                             <!-- Vote status, or blocking votes while the Speaker checks action cards. Players who predicted cannot vote -->
@@ -734,6 +748,17 @@
                                 </button>
                             @elseif($isBlocked)
                                 <span class="shrink-0 px-2 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-200">Cannot vote</span>
+                            @elseif($hasVotedHere && $openVotes->has($gamePlayer->id))
+                                {{-- Without Hidden Agenda everyone sees the vote --}}
+                                @php($openVote = $openVotes[$gamePlayer->id])
+                                <span class="shrink-0 max-w-[50%] min-w-0 flex items-center gap-1"
+                                      title="Voted {{ $openVote->option }}{{ $openVote->option !== 'Abstain' ? ' with ' . $openVote->influence_spent . ' influence' : '' }}">
+                                    <span class="min-w-0 truncate px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300">{{ $openVote->option }}</span>
+                                    {{-- Influence spent on the vote --}}
+                                    @if($openVote->option !== 'Abstain')
+                                        <x-influence-hex :value="$openVote->influence_spent" title="{{ $openVote->influence_spent }} influence spent" sr-label="influence spent" />
+                                    @endif
+                                </span>
                             @elseif($hasVotedHere)
                                 <span class="shrink-0 inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300">
                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true">
@@ -790,6 +815,111 @@
             <!-- Star Chart: random system tiles that are not on the map yet -->
             @if($game->milty_draft_data)
                 <x-star-chart :draws="$starChartDraws" :pool-size="$starChartPoolSize" :is-speaker="$player->is_speaker" />
+            @endif
+        </div>
+
+        <div id="tab-panel-speaker" role="tabpanel" aria-labelledby="tab-speaker"
+             {{ $defaultTab !== 'speaker' ? 'x-cloak' : '' }}
+             x-show="tab === 'speaker'">
+            <!-- Speaker Controls -->
+            @if($player->is_speaker)
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 sm:p-6 space-y-4">
+                    <!-- Header -->
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                            <h2 class="text-xl font-bold text-gray-900 dark:text-white">Speaker Settings</h2>
+                            <p class="text-sm text-gray-600 dark:text-gray-400">
+                                @if($currentAgenda?->status === 'voting' && $currentAgenda->reveal_step)
+                                    Resolve action cards with the agenda below before voting opens.
+                                @elseif($currentAgenda?->status === 'voting')
+                                    Voting is open.
+                                @else
+                                    Reveal the next agenda when you are ready.
+                                @endif
+                            </p>
+                        </div>
+
+                        @if($currentAgenda?->status === 'voting' && !$currentAgenda->reveal_step)
+                            <button wire:click="endVoting"
+                                    wire:confirm="Are you sure you want to end voting? {{ $game->show_results ? 'Every player will see the results.' : 'The results will only be visible to you.' }}"
+                                    class="w-full sm:w-auto bg-red-600 hover:bg-red-700 active:bg-red-800 text-white font-semibold py-3 sm:py-2 px-4 rounded-lg transition-colors">
+                                End Voting
+                            </button>
+                        @endif
+                    </div>
+
+                    @php($sectionHeading = 'text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2')
+                    @php($sectionPanel = 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg divide-y divide-gray-200 dark:divide-gray-700 overflow-hidden')
+
+                    <!-- Voting rules -->
+                    <section aria-labelledby="speaker-voting">
+                        <h3 id="speaker-voting" class="{{ $sectionHeading }}">Voting</h3>
+                        <div class="{{ $sectionPanel }}">
+                            {{-- Law: Representative Government --}}
+                            <x-setting-switch action="toggleRepresentativeGovernment" :on="$game->representative_government"
+                                              label="Representative Government is in effect"
+                                              description="Each player casts 1 vote on each agenda instead of spending influence. Turned on when the law passes For." />
+
+                            {{-- Event card Hidden Agenda: on by default, as secret voting is what this app is for --}}
+                            @php($agendaOpen = $currentAgenda?->status === 'voting')
+                            <x-setting-switch action="toggleHiddenAgenda" :on="$game->hidden_agenda" :disabled="$agendaOpen"
+                                              label="Hidden Agenda"
+                                              :description="'Votes are secret: only the totals are revealed. Off: every player sees how each player votes. '
+                                                  . ($agendaOpen ? 'Can be changed after this agenda.' : 'Applies from the next agenda.')" />
+
+                            {{-- Players enter their influence when the agenda phase starts, votes are taken from it --}}
+                            <x-setting-switch action="toggleManagedInfluence" :on="$game->managed_influence" :disabled="$agendaOpen"
+                                              label="Managed influence"
+                                              :warning="$game->hidden_agenda ? 'Hidden Agenda is on, but every player sees the influence of the others go down when they vote. This can show how much someone voted with, and hint at who voted for what.' : null"
+                                              :description="'Start the agenda phase to ask every player for their influence. Their votes are taken from it automatically. '
+                                                  . ($agendaOpen ? 'Can be changed after this agenda.' : '')" />
+
+                            {{-- Off: the Speaker announces the results --}}
+                            <x-setting-switch action="toggleShowResults" :on="$game->show_results"
+                                              label="Show results to all players"
+                                              description="When voting ends, every player sees the results. Off: only you see them and you announce them." />
+                        </div>
+                    </section>
+
+                    <!-- Agenda deck -->
+                    <section aria-labelledby="speaker-agendas">
+                        <h3 id="speaker-agendas" class="{{ $sectionHeading }}">Agendas</h3>
+                        <div class="{{ $sectionPanel }}">
+                            {{-- Absol's Lab agendas replace the official ones --}}
+                            <x-setting-switch action="toggleAbsolAgendas" :on="$game->absol_agendas"
+                                              label="Play with Absol's agendas"
+                                              description="The agenda list shows the agendas of Absol's Lab instead of the official agendas." />
+                        </div>
+                    </section>
+
+                    <!-- Map -->
+                    <section aria-labelledby="speaker-map">
+                        <h3 id="speaker-map" class="{{ $sectionHeading }}">Map</h3>
+                        <div class="{{ $sectionPanel }}">
+                            {{-- Milty or TI4 Lab draft URL, or a map string --}}
+                            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-3 sm:px-4">
+                                <span>
+                                    <span class="block font-medium text-gray-900 dark:text-white">Map data</span>
+                                    <span class="block text-sm text-gray-600 dark:text-gray-400">
+                                        @if($game->milty_draft_data)
+                                            Used for planet agendas, faction choices and Star Chart.
+                                        @else
+                                            No map yet. Add a draft URL or map string to use planet agendas, factions and Star Chart.
+                                        @endif
+                                    </span>
+                                </span>
+                                <livewire:update-milty-url :game="$game" :player="$player" :key="'map-' . $game->id" />
+                            </div>
+
+                            {{-- Thunder's Edge: The Fracture --}}
+                            @if($game->isThundersEdgeGame())
+                                <x-setting-switch action="toggleFracture" :on="$game->fracture_in_play"
+                                                  label="The Fracture is in play"
+                                                  description="Adds Cocytus, Lethe, Phlegethon and Styx to planet agendas." />
+                            @endif
+                        </div>
+                    </section>
+                </div>
             @endif
         </div>
     </div>

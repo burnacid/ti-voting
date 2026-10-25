@@ -16,6 +16,7 @@ use App\Models\Prediction;
 use App\Models\Vote;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 
@@ -42,6 +43,8 @@ class GameDashboard extends Component
     // Faction picked in the prompt shown when the game has a Milty draft and this player has no drafted faction yet
     public $chosenFaction = '';
     public $influenceSpent = 0;
+    // Asked when the Speaker starts the agenda phase with managed influence
+    public $phaseInfluence = '';
 
     // A prediction made aloud after the agenda is revealed, e.g. with a Rider. The Speaker can record one for another player
     public $predictionSource = '';
@@ -53,6 +56,7 @@ class GameDashboard extends Component
     public $newAgendaDescription = '';
     public $newAgendaCardType = null; // law or directive when created from a preset agenda
     public $newAgendaElect = null; // Elect value of the preset agenda, e.g. planet or law
+    public $newAgendaSource = null; // Deck of the preset agenda, e.g. pok or absol
     public $agendaType = 'for_against';
     public $customOptions = '';
     public $customTileNumbers = '';
@@ -104,7 +108,12 @@ class GameDashboard extends Component
         $jsonPath = resource_path('data/agendas.json');
         if (file_exists($jsonPath)) {
             $agendas = json_decode(file_get_contents($jsonPath), true);
-            $this->availableAgendas = collect($agendas)->sortBy('Name')->values()->all();
+            // Absol's Lab agendas replace the official agenda deck
+            $this->availableAgendas = collect($agendas)
+                ->filter(fn ($agenda) => ($agenda['Absol'] ?? false) === (bool) $this->game->absol_agendas)
+                ->sortBy('Name')
+                ->values()
+                ->all();
         }
     }
 
@@ -128,13 +137,19 @@ class GameDashboard extends Component
         // Determine agenda type based on Elect field
         $electType = strtolower($agenda['Elect'] ?? '');
         $this->newAgendaElect = $electType ?: null;
+        $this->newAgendaSource = Agenda::sourceOf($agenda);
 
         $agendaType = array_search($electType, Agenda::ELECT_BY_AGENDA_TYPE, true) ?: 'for_against';
 
-        if (in_array($electType, ['law', 'secret_objective'])) {
+        if (in_array($electType, ['law', 'secret_objective', 'unit_upgrade'])) {
             // These are special cases that might need custom handling
             $this->agendaType = 'custom';
-            $this->customOptions = $electType === 'law' ? 'Law 1, Law 2, Law 3' : 'Secret Objective 1, Secret Objective 2';
+            $this->customOptions = match ($electType) {
+                'law' => 'Law 1, Law 2, Law 3',
+                'secret_objective' => 'Secret Objective 1, Secret Objective 2',
+                // Only the ones a player owns can be elected, the Speaker removes the others
+                'unit_upgrade' => 'Carrier II, Cruiser II, Destroyer II, Dreadnought II, Fighter II, Infantry II, PDS II, Space Dock II, War Sun',
+            };
         } elseif (array_key_exists($agendaType, self::PLANET_AGENDA_TYPES) && $this->game->milty_draft_data == null) {
             // Planets come from the Milty draft
             $this->agendaType = 'custom';
@@ -151,7 +166,7 @@ class GameDashboard extends Component
     public function clearPresetSelection()
     {
         $this->selectedPresetAgenda = '';
-        $this->reset(['newAgendaTitle', 'newAgendaDescription', 'newAgendaCardType', 'newAgendaElect', 'agendaType', 'customOptions', 'customTileNumbers']);
+        $this->reset(['newAgendaTitle', 'newAgendaDescription', 'newAgendaCardType', 'newAgendaElect', 'newAgendaSource', 'agendaType', 'customOptions', 'customTileNumbers']);
     }
 
     public function rules()
@@ -204,21 +219,8 @@ class GameDashboard extends Component
         $this->showCreateAgenda = !$this->showCreateAgenda;
 
         if (!$this->showCreateAgenda) {
-            $this->reset(['newAgendaTitle', 'newAgendaDescription', 'newAgendaCardType', 'newAgendaElect', 'agendaType', 'customOptions', 'customTileNumbers']);
+            $this->reset(['newAgendaTitle', 'newAgendaDescription', 'newAgendaCardType', 'newAgendaElect', 'newAgendaSource', 'agendaType', 'customOptions', 'customTileNumbers']);
         }
-    }
-
-    public function toggleSpeakerResults()
-    {
-        if (!$this->player->is_speaker) {
-            $this->dispatch('flashMessage', [
-                'Only the Speaker can view results during voting.',
-                'error'
-            ]);
-            return;
-        }
-
-        $this->speakerViewResults = !$this->speakerViewResults;
     }
 
     public function createAgenda()
@@ -245,6 +247,7 @@ class GameDashboard extends Component
             'newAgendaTitle' => 'required|string|max:255',
             'newAgendaDescription' => 'required|string|max:1000',
             'newAgendaCardType' => 'required|in:law,directive',
+            'newAgendaSource' => ['nullable', Rule::in(array_keys(Agenda::SOURCE_LABELS))],
             'agendaType' => 'required|in:for_against,elect_player,elect_planet_any,elect_planet_industrial,elect_planet_cultural,elect_planet_hazardous,elect_planet_non_home,custom'
         ]);
 
@@ -265,6 +268,9 @@ class GameDashboard extends Component
             'description' => $this->newAgendaDescription,
             'type' => $this->newAgendaCardType,
             'elect' => $this->resolveAgendaElect(),
+            'source' => $this->newAgendaSource,
+            // Fixed for this agenda, so switching Hidden Agenda later cannot reveal its votes
+            'secret_votes' => $this->game->hidden_agenda,
             'options' => $options,
             'status' => 'voting',
             'reveal_step' => Agenda::STEP_WHEN_REVEALED,
@@ -273,7 +279,7 @@ class GameDashboard extends Component
 
         Log::info('Agenda revealed', ['agenda' => $agenda->title, 'options' => count($options)]);
 
-        $this->reset(['newAgendaTitle', 'newAgendaDescription', 'newAgendaCardType', 'newAgendaElect', 'agendaType', 'customOptions', 'showCreateAgenda', 'showAffectedPlayers']);
+        $this->reset(['newAgendaTitle', 'newAgendaDescription', 'newAgendaCardType', 'newAgendaElect', 'newAgendaSource', 'agendaType', 'customOptions', 'showCreateAgenda', 'showAffectedPlayers']);
         $this->dispatch('flashMessage', [
             'New agenda revealed. Ask the players for "When an agenda is revealed" action cards.',
             'success'
@@ -394,7 +400,7 @@ class GameDashboard extends Component
         } catch (\Exception $e) {
             report($e);
             $this->dispatch('flashMessage', [
-                'Failed to transfer speaker token: ' . $e->getMessage(),
+                'Failed to transfer the Speaker token. Please try again.',
                 'error'
             ]);
         }
@@ -623,11 +629,29 @@ class GameDashboard extends Component
             return;
         }
 
+        if ($this->game->needsInfluenceFrom($this->player)) {
+            $this->dispatch('flashMessage', [
+                'Enter your influence for this agenda phase first.',
+                'error'
+            ]);
+            return;
+        }
+
         $oneVoteEach = $this->game->representative_government;
+        // With managed influence the votes are taken from the player's influence. Abstaining and Representative Government cost nothing
+        $spendsInfluence = $this->game->managed_influence && !$oneVoteEach && $this->selectedOption !== 'Abstain' && $this->player->influence !== null;
+        $maxVotes = $spendsInfluence ? min(99, $this->player->influence) : 99;
+
+        if ($spendsInfluence && $maxVotes < 1) {
+            $this->addError('influenceSpent', 'You have no influence left. Abstain instead.');
+            return;
+        }
 
         $this->validate([
             'selectedOption' => ['required', 'string', Rule::in($currentAgenda->options)],
-            'influenceSpent' => $this->selectedOption === 'Abstain' || $oneVoteEach ? 'nullable' : 'required|integer|min:1|max:99',
+            'influenceSpent' => $this->selectedOption === 'Abstain' || $oneVoteEach ? 'nullable' : "required|integer|min:1|max:{$maxVotes}",
+        ], [
+            'influenceSpent.max' => "You have {$maxVotes} influence available.",
         ]);
 
         // Force influence to 0 when abstaining, and to 1 vote under Representative Government
@@ -638,18 +662,40 @@ class GameDashboard extends Component
         }
 
         try {
-            Vote::create([
+            $castVote = fn () => Vote::create([
                 'agenda_id' => $currentAgenda->id,
                 'player_id' => $this->player->id,
                 'option' => $this->selectedOption,
                 'influence_spent' => $this->influenceSpent,
             ]);
+
+            if ($spendsInfluence) {
+                // The vote only counts when the influence is still there, e.g. not lowered in another tab in the meantime
+                DB::transaction(function () use ($castVote) {
+                    $castVote();
+
+                    if (!Player::whereKey($this->player->id)->where('influence', '>=', (int) $this->influenceSpent)->decrement('influence', (int) $this->influenceSpent)) {
+                        throw new \RuntimeException('Not enough influence');
+                    }
+                });
+            } else {
+                $castVote();
+            }
         } catch (UniqueConstraintViolationException) {
             $this->dispatch('flashMessage', [
                 'You have already voted on this agenda.',
                 'error'
             ]);
             return;
+        } catch (\RuntimeException) {
+            $this->addError('influenceSpent', 'Your influence changed. Check it and vote again.');
+            $this->refreshData();
+            return;
+        }
+
+        if ($spendsInfluence) {
+            // Updates the influence in the game header
+            $this->dispatch('influence-changed');
         }
 
         Log::info('Vote cast', ['agenda' => $currentAgenda->title, 'option' => $this->selectedOption, 'influence' => (int) $this->influenceSpent]);
@@ -694,7 +740,9 @@ class GameDashboard extends Component
         if ($currentAgenda) {
             $this->completeAgenda($currentAgenda);
             $this->dispatch('flashMessage', [
-                'Voting has ended. Please announce the results to the other players.',
+                $this->game->show_results
+                    ? 'Voting has ended. Every player can see the results.'
+                    : 'Voting has ended. Please announce the results to the other players.',
                 'info'
             ]);
             $this->refreshData();
@@ -705,10 +753,15 @@ class GameDashboard extends Component
     // Ends voting, by the Speaker or by itself once every player who may vote has voted
     private function completeAgenda(Agenda $agenda): void
     {
-        $agenda->update([
+        // Only ends it once when the last two votes come in at the same time
+        $ended = Agenda::whereKey($agenda->id)->where('status', 'voting')->update([
             'status' => 'completed',
             'voting_ended_at' => now(),
         ]);
+        if (!$ended) {
+            return;
+        }
+        $agenda->refresh();
         Log::info('Voting ended', ['agenda' => $agenda->title, 'votes' => $agenda->votes()->count()]);
 
         $this->applyRepresentativeGovernment($agenda);
@@ -818,6 +871,156 @@ class GameDashboard extends Component
 
         $this->game->removeStarChartTile((string) $tile);
         Log::info('Star Chart tile removed', ['tile' => (string) $tile]);
+        TriggerRefresh::dispatch($this->game);
+        $this->refreshData();
+    }
+
+    // Hidden Agenda: votes are secret. Only changed between agendas and only applies to the next agenda,
+    // so the Speaker cannot switch it off to see how players voted on an open or ended agenda
+    public function toggleHiddenAgenda()
+    {
+        if (!$this->player->is_speaker) {
+            return;
+        }
+
+        if ($this->game->currentAgenda()) {
+            $this->dispatch('flashMessage', [
+                'Hidden Agenda can only be changed between agendas.',
+                'error'
+            ]);
+            return;
+        }
+
+        $this->game->update(['hidden_agenda' => !$this->game->hidden_agenda]);
+        Log::info($this->game->hidden_agenda ? 'Hidden Agenda turned on' : 'Hidden Agenda turned off');
+
+        $this->dispatch('flashMessage', [
+            $this->game->hidden_agenda
+                ? 'Hidden Agenda is on: votes on the next agenda are secret.'
+                : 'Hidden Agenda is off: every player sees how each player votes on the next agenda.',
+            'info',
+        ]);
+        TriggerRefresh::dispatch($this->game);
+        $this->refreshData();
+    }
+
+    // Managed influence: the Speaker starts the agenda phase, players enter their influence and votes are taken from it
+    public function toggleManagedInfluence()
+    {
+        if (!$this->player->is_speaker) {
+            return;
+        }
+
+        if ($this->game->currentAgenda()) {
+            $this->dispatch('flashMessage', [
+                'Managed influence can only be changed between agendas.',
+                'error'
+            ]);
+            return;
+        }
+
+        $on = !$this->game->managed_influence;
+        $this->game->update(['managed_influence' => $on, 'agenda_phase_started_at' => null]);
+        Log::info($on ? 'Managed influence turned on' : 'Managed influence turned off');
+
+        $this->dispatch('flashMessage', [
+            $on
+                ? 'Managed influence is on. Start the agenda phase to ask every player for their influence.'
+                : 'Managed influence is off. Players keep track of their own influence.',
+            'info',
+        ]);
+        TriggerRefresh::dispatch($this->game);
+        $this->refreshData();
+    }
+
+    public function startAgendaPhase()
+    {
+        if (!$this->player->is_speaker || !$this->game->managed_influence) {
+            return;
+        }
+
+        if ($this->game->currentAgenda()) {
+            $this->dispatch('flashMessage', [
+                'Finish the current agenda first.',
+                'error'
+            ]);
+            return;
+        }
+
+        // Everyone enters the influence they have for this agenda phase
+        DB::transaction(function () {
+            $this->game->players()->update(['influence' => null]);
+            $this->game->update(['agenda_phase_started_at' => now()]);
+        });
+        Log::info('Agenda phase started');
+
+        $this->dispatch('flashMessage', [
+            'Agenda phase started. Every player is asked for their influence.',
+            'success',
+        ]);
+        $this->dispatch('influence-changed');
+        TriggerRefresh::dispatch($this->game);
+        $this->refreshData();
+    }
+
+    public function savePhaseInfluence()
+    {
+        $this->validate(
+            ['phaseInfluence' => 'required|integer|min:0|max:99'],
+            [
+                'phaseInfluence.required' => 'Enter your influence.',
+                'phaseInfluence.integer' => 'Enter a whole number.',
+                'phaseInfluence.min' => 'Influence cannot be negative.',
+                'phaseInfluence.max' => 'Influence can be at most 99.',
+            ]
+        );
+
+        $this->player->update(['influence' => (int) $this->phaseInfluence]);
+        Log::info('Influence entered for the agenda phase', ['influence' => (int) $this->phaseInfluence]);
+
+        $this->reset('phaseInfluence');
+        $this->dispatch('influence-changed');
+        TriggerRefresh::dispatch($this->game);
+        $this->refreshData();
+    }
+
+    public function toggleShowResults()
+    {
+        if (!$this->player->is_speaker) {
+            return;
+        }
+
+        $this->game->update(['show_results' => !$this->game->show_results]);
+        Log::info($this->game->show_results ? 'Results shown to all players' : 'Results shown to the Speaker only');
+
+        $this->dispatch('flashMessage', [
+            $this->game->show_results
+                ? 'Every player now sees the results when voting ends.'
+                : 'Only you see the results when voting ends.',
+            'info',
+        ]);
+        TriggerRefresh::dispatch($this->game);
+        $this->refreshData();
+    }
+
+    public function toggleAbsolAgendas()
+    {
+        if (!$this->player->is_speaker) {
+            return;
+        }
+
+        $this->game->update(['absol_agendas' => !$this->game->absol_agendas]);
+        Log::info($this->game->absol_agendas ? "Absol's agendas turned on" : "Absol's agendas turned off");
+
+        $this->clearPresetSelection();
+        $this->loadAvailableAgendas();
+
+        $this->dispatch('flashMessage', [
+            $this->game->absol_agendas
+                ? "The agenda list now shows the agendas of Absol's Lab."
+                : 'The agenda list now shows the official agendas.',
+            'info',
+        ]);
         TriggerRefresh::dispatch($this->game);
         $this->refreshData();
     }
@@ -974,8 +1177,8 @@ class GameDashboard extends Component
 
         $currentAgenda = $this->game->currentAgenda();
 
-        // Results of the last ended agenda remain visible to the Speaker only
-        if (!$currentAgenda && $this->player->is_speaker) {
+        // Results of the last ended agenda remain visible to the Speaker, and to everyone when the Speaker shows them
+        if (!$currentAgenda && ($this->player->is_speaker || $this->game->show_results)) {
             $currentAgenda = $this->game->lastCompletedAgenda();
         }
 
@@ -1002,6 +1205,15 @@ class GameDashboard extends Component
 
         $voteResults = $showResults ? $currentAgenda->getVoteResults() : null;
 
+        // A player without influence abstains, unless Representative Government gives everyone 1 vote.
+        // With managed influence it is the only choice, as the votes are taken from their influence
+        $noInfluence = $this->player->influence === 0 && !$this->game->representative_government;
+        $onlyAbstain = $noInfluence && $this->game->managed_influence;
+        if ($noInfluence && $currentAgenda?->isVotingOpen() && !$hasVoted
+            && ($this->selectedOption === '' || ($onlyAbstain && $this->selectedOption !== 'Abstain'))) {
+            $this->selectedOption = 'Abstain';
+        }
+
         return view('livewire.game-dashboard', [
             'player' => $this->player,
             // Asked when the game has a Milty draft and this player's faction is not one of the drafted factions
@@ -1016,6 +1228,13 @@ class GameDashboard extends Component
             'rejoinRequests' => $players->filter(fn ($gamePlayer) => $gamePlayer->id !== $this->player->id && $gamePlayer->hasPendingRejoinRequest()),
             'currentAgenda' => $currentAgenda,
             'players' => $players,
+            'noInfluence' => $noInfluence,
+            'onlyAbstain' => $onlyAbstain,
+            'needsPhaseInfluence' => $this->game->needsInfluenceFrom($this->player),
+            // For the Speaker: who did not enter their influence for this agenda phase yet
+            'missingInfluence' => $players->filter(fn ($gamePlayer) => $this->game->needsInfluenceFrom($gamePlayer))->values(),
+            // Without Hidden Agenda every player sees how each player voted, keyed by player id
+            'openVotes' => $currentAgenda && !$currentAgenda->secret_votes ? $currentAgenda->votes()->get()->keyBy('player_id') : collect(),
             'hasVoted' => $hasVoted,
             'allVoted' => $allVoted,
             'showResults' => $showResults,

@@ -9,6 +9,7 @@ use App\Services\DraftImporter;
 use Illuminate\Contracts\View\Factory;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\RateLimiter;
 use InvalidArgumentException;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
@@ -63,6 +64,14 @@ class UpdateMiltyUrl extends Component
         $this->validate([
             'miltyUrl' => 'required|string|max:2000',
         ]);
+
+        // Each import fetches the draft from Milty or TI4 Lab
+        $throttleKey = 'draft-import|' . request()->ip();
+        if (RateLimiter::tooManyAttempts($throttleKey, 20)) {
+            $this->addError('miltyUrl', 'Too many drafts loaded. Try again in ' . ceil(RateLimiter::availableIn($throttleKey) / 60) . ' minutes.');
+            return;
+        }
+        RateLimiter::hit($throttleKey, 600);
 
         try {
             $draft = (new DraftImporter())->import($this->miltyUrl);

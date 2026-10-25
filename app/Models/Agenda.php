@@ -36,6 +36,16 @@ class Agenda extends Model
         'law' => 'Elect Law',
         'strategy card' => 'Elect Strategy Card',
         'secret_objective' => 'Elect Scored Secret Objective',
+        'unit_upgrade' => 'Elect Owned Non-Faction Unit Upgrade Technology',
+    ];
+
+    // Decks a preset agenda can come from, shown as a tag on the card
+    public const SOURCE_POK = 'pok';
+    public const SOURCE_ABSOL = 'absol';
+
+    public const SOURCE_LABELS = [
+        self::SOURCE_POK => 'Prophecy of Kings',
+        self::SOURCE_ABSOL => 'Absol’s Lab',
     ];
 
     // Elect value for agendas created without a preset, keyed by the agenda type picked in the form
@@ -54,6 +64,8 @@ class Agenda extends Model
         'description',
         'type',
         'elect',
+        'source',
+        'secret_votes',
         'options',
         'status',
         'reveal_step',
@@ -66,6 +78,7 @@ class Agenda extends Model
     protected $casts = [
         'options' => 'array',
         'blocked_player_ids' => 'array',
+        'secret_votes' => 'boolean',
         'voting_started_at' => 'datetime',
         'voting_ended_at' => 'datetime',
     ];
@@ -234,6 +247,28 @@ class Agenda extends Model
     public function getRevealStepLabelAttribute(): ?string
     {
         return self::REVEAL_STEP_LABELS[$this->reveal_step] ?? null;
+    }
+
+    /**
+     * The deck of an agenda in agendas.json, null for the base game.
+     */
+    public static function sourceOf(array $preset): ?string
+    {
+        return match (true) {
+            (bool) ($preset['Absol'] ?? false) => self::SOURCE_ABSOL,
+            (bool) ($preset['Pok'] ?? false) => self::SOURCE_POK,
+            default => null,
+        };
+    }
+
+    public function isAbsol(): bool
+    {
+        return $this->source === self::SOURCE_ABSOL;
+    }
+
+    public function getSourceLabelAttribute(): ?string
+    {
+        return self::SOURCE_LABELS[$this->source] ?? null;
     }
 
     public function getElectLabelAttribute(): ?string

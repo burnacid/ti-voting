@@ -37,7 +37,8 @@ class DraftImporter
             $data = $tiDraft->fetchDraftData($draftId)
                 ?? throw new InvalidArgumentException('Could not load the TI4 Lab draft. Please check the URL and try again.');
 
-            return ['milty_url' => $input, 'milty_draft_id' => $draftId, 'milty_draft_data' => $data];
+            // Stored as a URL built from the id, never the raw input, as it is shown as a link
+            return ['milty_url' => TiDraftService::draftUrl($draftId), 'milty_draft_id' => $draftId, 'milty_draft_data' => $data];
         }
 
         $milty = new MiltyService();
@@ -45,7 +46,7 @@ class DraftImporter
             $data = $milty->fetchDraftData($draftId)
                 ?? throw new InvalidArgumentException('Could not fetch Milty draft data. Please check the URL and try again.');
 
-            return ['milty_url' => $input, 'milty_draft_id' => $draftId, 'milty_draft_data' => $data];
+            return ['milty_url' => MiltyService::draftUrl($draftId), 'milty_draft_id' => $draftId, 'milty_draft_data' => $data];
         }
 
         throw new InvalidArgumentException(self::HELP);

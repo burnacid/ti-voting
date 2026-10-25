@@ -1287,13 +1287,13 @@ test('players, speaker controls and star chart are tabs below the agenda', funct
     [$game, $speaker, $other] = makeGame(['milty_draft_data' => starChartDraft()]);
     makeAgenda($game);
 
-    // The Speaker starts on the Speaker tab, the agenda stays visible above the tabs
+    // Everyone starts on the Players tab, the Speaker tab comes last, the agenda stays visible above the tabs
     Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
         ->assertSeeHtml('id="tab-players"')
         ->assertSeeHtml('id="tab-speaker"')
         ->assertSeeHtml('id="tab-star-chart"')
-        ->assertSeeHtml("tab: 'speaker'")
-        ->assertSeeInOrder(['Test Agenda', 'id="tab-speaker"', 'id="tab-players"', 'id="tab-star-chart"', 'Speaker Settings', 'Draw a system tile'], false);
+        ->assertSeeHtml("tab: 'players'")
+        ->assertSeeInOrder(['Test Agenda', 'id="tab-players"', 'id="tab-star-chart"', 'id="tab-speaker"', 'Draw a system tile', 'Speaker Settings'], false);
 
     Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $other])
         ->assertSeeHtml('id="tab-players"')
@@ -1627,4 +1627,368 @@ test('riders do not show who voted', function () {
     Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
         ->assertSee('Correct')
         ->assertDontSee('Voted For:');
+});
+
+test('the speaker can switch the agenda list to absol\'s agendas', function () {
+    [$game, $speaker] = makeGame();
+
+    $component = Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker]);
+    $official = collect($component->get('availableAgendas'));
+    expect($official->pluck('Name'))->toContain('Core Mining')
+        ->and($official->where('Absol', true))->toBeEmpty();
+
+    $component->call('toggleAbsolAgendas');
+    $absol = collect($component->get('availableAgendas'));
+
+    // Absol's agendas replace the official ones
+    expect($game->fresh()->absol_agendas)->toBeTrue()
+        ->and($absol)->not->toBeEmpty()
+        ->and($absol->every(fn ($agenda) => $agenda['Absol'] ?? false))->toBeTrue()
+        ->and($absol->pluck('Name'))->toContain('Affirmation of Divine Right')
+        ->and($absol->pluck('Name'))->not->toContain('Core Mining');
+
+    $component->set('selectedPresetAgenda', 'Mutiny')
+        ->assertSet('newAgendaDescription', $absol->firstWhere('Name', 'Mutiny')['Effect'])
+        ->call('createAgenda')
+        ->assertSeeHtml('agenda-card-absol')
+        ->assertSeeHtml('<p class="agenda-card-source">Absol’s Lab</p>');
+
+    expect($game->currentAgenda()->title)->toBe('Mutiny')
+        ->and($game->currentAgenda()->source)->toBe(Agenda::SOURCE_ABSOL);
+});
+
+test('official agendas keep the official card style', function () {
+    [$game, $speaker] = makeGame();
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->set('selectedPresetAgenda', 'Mutiny')
+        ->call('createAgenda')
+        ->assertDontSeeHtml('agenda-card-absol')
+        ->assertDontSeeHtml('agenda-card-source');
+
+    expect($game->currentAgenda()->source)->toBeNull();
+});
+
+test('prophecy of kings agendas are tagged on the card', function () {
+    [$game, $speaker] = makeGame();
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->set('selectedPresetAgenda', 'Articles of War')
+        ->call('createAgenda')
+        ->assertSeeHtml('<p class="agenda-card-source">Prophecy of Kings</p>')
+        ->assertDontSeeHtml('agenda-card-absol');
+
+    expect($game->currentAgenda()->source)->toBe(Agenda::SOURCE_POK);
+});
+
+test('only the speaker can switch to absol\'s agendas', function () {
+    [$game, $speaker, $other] = makeGame();
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $other])
+        ->call('toggleAbsolAgendas');
+
+    expect($game->fresh()->absol_agendas)->toBeFalse();
+});
+
+test('absol\'s publicize weapon schematics elects a unit upgrade', function () {
+    [$game, $speaker] = makeGame(['absol_agendas' => true]);
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->set('selectedPresetAgenda', 'Publicize Weapon Schematics')
+        ->assertSet('agendaType', 'custom')
+        ->call('createAgenda')
+        ->assertSeeHtml('<p class="agenda-card-elect">Elect Owned Non-Faction Unit Upgrade Technology</p>');
+
+    expect($game->currentAgenda()->options)->toContain('War Sun', 'Abstain');
+});
+
+test('results are shown to the speaker only by default', function () {
+    [$game, $speaker, $other] = makeGame();
+    $agenda = makeAgenda($game);
+    Vote::create(['agenda_id' => $agenda->id, 'player_id' => $other->id, 'option' => 'For', 'influence_spent' => 3]);
+    $agenda->update(['status' => 'completed', 'voting_ended_at' => now()]);
+
+    expect($game->fresh()->show_results)->toBeFalse();
+
+    Livewire::test(GameDashboard::class, ['game' => $game->fresh(), 'player' => $speaker])
+        ->assertSee('Voting Results');
+    Livewire::test(GameDashboard::class, ['game' => $game->fresh(), 'player' => $other])
+        ->assertDontSee('Voting Results');
+});
+
+test('the speaker can show the results to all players', function () {
+    [$game, $speaker, $other] = makeGame();
+    $agenda = makeAgenda($game);
+    Vote::create(['agenda_id' => $agenda->id, 'player_id' => $other->id, 'option' => 'For', 'influence_spent' => 3]);
+    $agenda->update(['status' => 'completed', 'voting_ended_at' => now()]);
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->assertSee('Show results to all players')
+        ->call('toggleShowResults');
+
+    expect($game->fresh()->show_results)->toBeTrue();
+
+    // Other players see the results, but the tie-break and affected players stay with the Speaker
+    Livewire::test(GameDashboard::class, ['game' => $game->fresh(), 'player' => $other])
+        ->assertSee('Voting Results')
+        ->assertSee('3 influence')
+        ->assertDontSee('Show results to all players');
+});
+
+test('only the speaker can show the results to all players', function () {
+    [$game, , $other] = makeGame();
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $other])
+        ->call('toggleShowResults');
+
+    expect($game->fresh()->show_results)->toBeFalse();
+});
+
+test('hidden agenda is on by default and votes stay secret', function () {
+    [$game, $speaker, $other] = makeGame();
+
+    expect($game->fresh()->hidden_agenda)->toBeTrue();
+
+    Livewire::test(GameDashboard::class, ['game' => $game->fresh(), 'player' => $speaker])
+        ->set('newAgendaTitle', 'Open Agenda')
+        ->set('newAgendaDescription', 'Test')
+        ->set('newAgendaCardType', 'law')
+        ->call('createAgenda');
+
+    $agenda = $game->currentAgenda();
+    expect($agenda->secret_votes)->toBeTrue();
+
+    $agenda->update(['reveal_step' => null]);
+    Vote::create(['agenda_id' => $agenda->id, 'player_id' => $other->id, 'option' => 'Against', 'influence_spent' => 4]);
+
+    Livewire::test(GameDashboard::class, ['game' => $game->fresh(), 'player' => $speaker])
+        ->assertSee('Voted')
+        ->assertDontSee('influence spent');
+});
+
+test('without hidden agenda every player sees how each player voted', function () {
+    [$game, $speaker, $other] = makeGame();
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->call('toggleHiddenAgenda')
+        ->set('newAgendaTitle', 'Open Agenda')
+        ->set('newAgendaDescription', 'Test')
+        ->set('newAgendaCardType', 'law')
+        ->call('createAgenda');
+
+    $agenda = $game->currentAgenda();
+    expect($game->fresh()->hidden_agenda)->toBeFalse()
+        ->and($agenda->secret_votes)->toBeFalse();
+
+    $agenda->update(['reveal_step' => null]);
+    Vote::create(['agenda_id' => $agenda->id, 'player_id' => $speaker->id, 'option' => 'Against', 'influence_spent' => 4]);
+
+    Livewire::test(GameDashboard::class, ['game' => $game->fresh(), 'player' => $other])
+        ->assertSee('4 influence spent')
+        ->assertSee('every player sees how you vote');
+});
+
+test('hidden agenda cannot be changed while an agenda is open and never reveals earlier votes', function () {
+    [$game, $speaker, $other] = makeGame();
+    $agenda = makeAgenda($game);
+    Vote::create(['agenda_id' => $agenda->id, 'player_id' => $other->id, 'option' => 'Against', 'influence_spent' => 4]);
+
+    // During voting the switch is locked
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->call('toggleHiddenAgenda');
+    expect($game->fresh()->hidden_agenda)->toBeTrue();
+
+    // After voting it can be switched off, but the ended agenda keeps its secret votes
+    $agenda->update(['status' => 'completed', 'voting_ended_at' => now()]);
+    Livewire::test(GameDashboard::class, ['game' => $game->fresh(), 'player' => $speaker])
+        ->call('toggleHiddenAgenda')
+        ->assertSee('Voting Results')
+        ->assertDontSee('influence spent');
+
+    expect($game->fresh()->hidden_agenda)->toBeFalse()
+        ->and($agenda->fresh()->secret_votes)->toBeTrue();
+});
+
+test('only the speaker can change hidden agenda', function () {
+    [$game, , $other] = makeGame();
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $other])
+        ->call('toggleHiddenAgenda');
+
+    expect($game->fresh()->hidden_agenda)->toBeTrue();
+});
+
+function startManagedPhase(Game $game, Player $speaker): void
+{
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->call('toggleManagedInfluence')
+        ->assertSee('Start New Agenda Phase')
+        ->call('startAgendaPhase');
+}
+
+test('managed influence is off by default and only the speaker can turn it on', function () {
+    [$game, $speaker, $other] = makeGame();
+
+    expect($game->fresh()->managed_influence)->toBeFalse();
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->assertDontSee('Start New Agenda Phase');
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $other])
+        ->call('toggleManagedInfluence')
+        ->call('startAgendaPhase');
+
+    expect($game->fresh())->managed_influence->toBeFalse()->agenda_phase_started_at->toBeNull();
+});
+
+test('starting the agenda phase asks every player for their influence', function () {
+    [$game, $speaker, $other] = makeGame();
+    $other->update(['influence' => 7]);
+
+    startManagedPhase($game, $speaker);
+
+    expect($game->fresh()->agenda_phase_started_at)->not->toBeNull()
+        ->and($other->fresh()->influence)->toBeNull();
+
+    Livewire::test(GameDashboard::class, ['game' => $game->fresh(), 'player' => $speaker])
+        ->assertSee('Waiting for influence from')
+        ->assertSee($other->name);
+
+    Livewire::test(GameDashboard::class, ['game' => $game->fresh(), 'player' => $other->fresh()])
+        ->assertSee('The agenda phase has started')
+        ->set('phaseInfluence', 99 + 1)
+        ->call('savePhaseInfluence')
+        ->assertHasErrors('phaseInfluence')
+        ->set('phaseInfluence', 6)
+        ->call('savePhaseInfluence')
+        ->assertHasNoErrors()
+        ->assertDontSee('The agenda phase has started');
+
+    expect($other->fresh()->influence)->toBe(6);
+});
+
+test('with managed influence a vote is taken from the player\'s influence', function () {
+    [$game, $speaker, $other] = makeGame();
+    startManagedPhase($game, $speaker);
+    $other->update(['influence' => 6]);
+    $agenda = makeAgenda($game);
+
+    // More than the player has is refused
+    Livewire::test(GameDashboard::class, ['game' => $game->fresh(), 'player' => $other->fresh()])
+        ->set('selectedOption', 'For')
+        ->set('influenceSpent', 7)
+        ->call('submitVote')
+        ->assertHasErrors('influenceSpent')
+        ->set('influenceSpent', 4)
+        ->call('submitVote')
+        ->assertHasNoErrors()
+        ->assertDispatched('influence-changed');
+
+    expect($other->fresh()->influence)->toBe(2)
+        ->and($agenda->votes()->first()->influence_spent)->toBe(4);
+});
+
+test('with managed influence abstaining and representative government cost no influence', function () {
+    [$game, $speaker, $other] = makeGame();
+    startManagedPhase($game, $speaker);
+    $speaker->update(['influence' => 5]);
+    $other->update(['influence' => 5]);
+    makeAgenda($game);
+
+    Livewire::test(GameDashboard::class, ['game' => $game->fresh(), 'player' => $other->fresh()])
+        ->set('selectedOption', 'Abstain')
+        ->call('submitVote');
+    expect($other->fresh()->influence)->toBe(5);
+
+    $game->update(['representative_government' => true]);
+    Livewire::test(GameDashboard::class, ['game' => $game->fresh(), 'player' => $speaker->fresh()])
+        ->set('selectedOption', 'For')
+        ->call('submitVote');
+    expect($speaker->fresh()->influence)->toBe(5);
+});
+
+test('with managed influence a player enters their influence before voting', function () {
+    [$game, $speaker, $other] = makeGame();
+    startManagedPhase($game, $speaker);
+    $agenda = makeAgenda($game);
+
+    Livewire::test(GameDashboard::class, ['game' => $game->fresh(), 'player' => $other->fresh()])
+        ->set('selectedOption', 'For')
+        ->set('influenceSpent', 1)
+        ->call('submitVote');
+
+    expect($agenda->votes()->count())->toBe(0);
+});
+
+test('managed influence cannot be changed or a phase started while an agenda is open', function () {
+    [$game, $speaker] = makeGame();
+    makeAgenda($game);
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->call('toggleManagedInfluence');
+    expect($game->fresh()->managed_influence)->toBeFalse();
+
+    $game->update(['managed_influence' => true]);
+    Livewire::test(GameDashboard::class, ['game' => $game->fresh(), 'player' => $speaker])
+        ->call('startAgendaPhase');
+    expect($game->fresh()->agenda_phase_started_at)->toBeNull();
+});
+
+test('the influence in the game header follows managed influence', function () {
+    [$game, , $other] = makeGame();
+    $other->update(['influence' => 5]);
+
+    $header = Livewire::test(\App\Livewire\PlayerInfluence::class, ['game' => $game, 'player' => $other])
+        ->assertSet('influence', 5);
+
+    $other->update(['influence' => 2]);
+    $header->dispatch('influence-changed')->assertSet('influence', 2);
+});
+
+test('managed influence warns that it can show votes when hidden agenda is on', function () {
+    [$game, $speaker] = makeGame();
+
+    Livewire::test(GameDashboard::class, ['game' => $game->fresh(), 'player' => $speaker])
+        ->assertSee('hint at who voted for what');
+
+    $game->update(['hidden_agenda' => false]);
+    Livewire::test(GameDashboard::class, ['game' => $game->fresh(), 'player' => $speaker])
+        ->assertDontSee('hint at who voted for what');
+});
+
+test('a player with 0 influence has abstain selected', function () {
+    [$game, , $other] = makeGame();
+    $other->update(['influence' => 0]);
+    makeAgenda($game);
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $other->fresh()])
+        ->assertSet('selectedOption', 'Abstain')
+        ->assertSee('You have 0 influence, so Abstain is selected.')
+        // Without managed influence they can still pick another option
+        ->set('selectedOption', 'For')
+        ->assertSet('selectedOption', 'For');
+});
+
+test('with managed influence a player with 0 influence can only abstain', function () {
+    [$game, $speaker, $other] = makeGame();
+    startManagedPhase($game, $speaker);
+    $other->update(['influence' => 0]);
+    $agenda = makeAgenda($game);
+
+    Livewire::test(GameDashboard::class, ['game' => $game->fresh(), 'player' => $other->fresh()])
+        ->assertSet('selectedOption', 'Abstain')
+        ->assertSee('You have no influence left, so you abstain.')
+        ->set('selectedOption', 'For')
+        ->assertSet('selectedOption', 'Abstain')
+        ->call('submitVote');
+
+    expect($agenda->votes()->first()->option)->toBe('Abstain');
+});
+
+test('under representative government a player with 0 influence still votes', function () {
+    [$game, , $other] = makeGame(['representative_government' => true]);
+    $other->update(['influence' => 0]);
+    makeAgenda($game);
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $other->fresh()])
+        ->assertSet('selectedOption', '');
 });

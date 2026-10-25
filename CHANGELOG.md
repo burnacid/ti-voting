@@ -4,11 +4,33 @@ All notable changes to TI Voting are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.10.0] - 2026-10-25
 
 ### Added
 - Feedback: anyone can send an idea, a bug or other feedback with the Feedback link in the footer, optionally with a name or contact for a reply. Feedback sent from a game remembers the game. It can be sent five times an hour. Feedback is only on the public site: self-hosted installs don't have it unless `FEEDBACK_ENABLED=true` is set.
 - The admin panel has a Feedback page with the feedback, which can be filtered, marked as read or unread and deleted. The menu shows how many are unread, and the dashboard shows the most recent feedback.
+- Absol's agendas: the Speaker can switch the agenda list to the agendas of Absol's Lab, which replace the official agendas. Absol's agendas have their own card style, so players see the difference.
+- Agenda cards show the deck they come from, e.g. Prophecy of Kings or Absol's Lab.
+- Show results to all players: with this Speaker setting on, every player sees the results once voting ends, instead of the Speaker announcing them. Breaking a tie and showing who is affected stay with the Speaker. It is off by default.
+- Hidden Agenda, as the event card: votes are secret and only the totals are revealed. It is on by default. With it off, every player sees how each player voted, in the player list and the results, and players are told their vote is public. The Speaker can only change it between agendas, and it only applies to agendas revealed after the change, so it cannot be used to see how players voted on an open or ended agenda.
+- Managed influence: with this Speaker setting on, the Speaker has a Start New Agenda Phase button, confirmed in a dialog, that asks every player for their available influence in a dialog they cannot skip. A vote can't spend more influence than the player has, and the votes are taken from it automatically. Abstaining and votes under Representative Government cost nothing. A player with no influence left can only abstain. The Speaker sees who still has to enter their influence, and the setting can only be changed between agendas. With Hidden Agenda on, the setting warns that players seeing each other's influence go down can hint at who voted for what. It is off by default.
+
+### Changed
+- Speaker Settings is split into Voting, Agendas and Map sections, and its settings are on/off switches instead of checkboxes. It no longer has a yellow background.
+- Speaker Settings is the last tab, and everyone, also the Speaker, starts on the Players tab.
+- A player with 0 influence has Abstain selected when voting opens, except under Representative Government.
+
+### Removed
+- The Speaker's unused option to view results during voting.
+
+### Security
+- A map draft URL is only accepted from milty.shenanigans.be or tidraft.com, and the game stores a clean link made from the draft id. Before, a crafted URL could run a script for anyone who opened the map draft link, the admin included. Existing games only show the link when it is a https URL.
+- The draft data of a new game can no longer be changed from the browser, and an agenda's deck must be a known deck.
+- Loading a draft is limited to 20 times per 10 minutes per visitor, so the draft sites cannot be flooded through the app.
+- A failed Speaker transfer no longer shows the technical error to the player.
+
+### Fixed
+- When the last two votes come in at the same moment, voting ends once instead of twice.
 
 ## [1.9.0] - 2026-10-24
 
@@ -167,6 +189,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Milty draft integration to load factions and planets.
 - Planet agendas (any, industrial, cultural, hazardous, non-home), with extra tiles that can be added by tile number.
 
+[1.10.0]: https://github.com/burnacid/ti-voting/compare/v1.9.0...v1.10.0
 [1.9.0]: https://github.com/burnacid/ti-voting/compare/v1.8.0...v1.9.0
 [1.8.0]: https://github.com/burnacid/ti-voting/compare/v1.7.0...v1.8.0
 [1.7.0]: https://github.com/burnacid/ti-voting/compare/v1.6.0...v1.7.0

@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\Rule;
 use InvalidArgumentException;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class CreateGame extends Component
@@ -20,9 +21,14 @@ class CreateGame extends Component
 
     // A Milty or TI4 Lab draft URL, or a map string
     public $miltyUrl = '';
+    // Set only by fetchMiltyData, locked so a client cannot save its own draft URL or data
+    #[Locked]
     public $miltyDraftUrl = null;
+    #[Locked]
     public $hasMiltyData = false;
+    #[Locked]
     public $miltyDraftData = null;
+    #[Locked]
     public $miltyDraftId = null;
     public $miltyError = null;
 
@@ -48,6 +54,15 @@ class CreateGame extends Component
 
     protected function fetchMiltyData()
     {
+        // Each import fetches the draft from Milty or TI4 Lab
+        $throttleKey = 'draft-import|' . request()->ip();
+        if (RateLimiter::tooManyAttempts($throttleKey, 20)) {
+            $this->miltyError = 'Too many drafts loaded. Try again in ' . ceil(RateLimiter::availableIn($throttleKey) / 60) . ' minutes.';
+            $this->resetMiltyData();
+            return;
+        }
+        RateLimiter::hit($throttleKey, 600);
+
         try {
             $draft = (new DraftImporter())->import($this->miltyUrl);
         } catch (InvalidArgumentException $e) {
