@@ -106,7 +106,21 @@
             <div>
                 <p class="font-semibold text-amber-900 dark:text-amber-100">Representative Government is in effect</p>
                 <p class="text-sm text-amber-800 dark:text-amber-200">
-                    Players cannot exhaust planets to vote. Each player casts 1 vote on each agenda.
+                    @php($mecatolRex = $game->mecatolRexPlayer?->name)
+                    Players cannot exhaust planets to vote. Each player casts 1 vote on each agenda{{ $game->absol_agendas
+                        ? ', except the player who controls Mecatol Rex' . ($mecatolRex ? " ({$mecatolRex})" : '') . ', who may cast 2. Players cannot cast additional votes.'
+                        : '.' }}
+                </p>
+            </div>
+        </div>
+    @endif
+    @if($game->termLimitsInEffect())
+        <div class="flex items-start gap-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4">
+            <span class="shrink-0 mt-0.5 px-2 py-0.5 rounded text-xs font-semibold uppercase bg-amber-200 text-amber-900 dark:bg-amber-800 dark:text-amber-100">Law</span>
+            <div>
+                <p class="font-semibold text-amber-900 dark:text-amber-100">Term Limits is in effect</p>
+                <p class="text-sm text-amber-800 dark:text-amber-200">
+                    When an agenda resolves the way the Speaker voted or predicted, or the Speaker broke the tie, the other player who cast the most votes for an outcome that was not resolved takes the speaker token.
                 </p>
             </div>
         </div>
@@ -459,10 +473,30 @@
                     </div>
 
                     @if($game->representative_government)
+                        @php($myVotes = $game->representativeVotesFor($player))
                         <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
-                            <p class="text-sm text-blue-800 dark:text-blue-200">
-                                Representative Government is in effect: your vote counts as 1 vote.
-                            </p>
+                            @if($myVotes > 1 && $selectedOption !== 'Abstain')
+                                {{-- Absol's Representative Government: the player who controls Mecatol Rex may cast 2 votes --}}
+                                <fieldset>
+                                    <legend class="text-sm text-blue-800 dark:text-blue-200">
+                                        Representative Government is in effect. You control Mecatol Rex, so you may cast up to {{ $myVotes }} votes.
+                                    </legend>
+                                    <div class="mt-2 flex gap-2">
+                                        @foreach(range(1, $myVotes) as $count)
+                                            <label class="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 sm:py-2 rounded-lg border cursor-pointer transition-colors
+                                                {{ (int) $influenceSpent === $count ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white dark:bg-gray-800 border-blue-200 dark:border-blue-800 text-gray-900 dark:text-white hover:bg-blue-100 dark:hover:bg-blue-900/40' }}">
+                                                <input type="radio" wire:model.live="influenceSpent" value="{{ $count }}" class="sr-only">
+                                                <span class="font-semibold">{{ $count }} {{ $count === 1 ? 'vote' : 'votes' }}</span>
+                                            </label>
+                                        @endforeach
+                                    </div>
+                                </fieldset>
+                                @error('influenceSpent') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
+                            @else
+                                <p class="text-sm text-blue-800 dark:text-blue-200">
+                                    Representative Government is in effect: your vote counts as 1 vote.
+                                </p>
+                            @endif
                         </div>
                     @elseif($selectedOption !== 'Abstain')
                     <div>
@@ -566,7 +600,7 @@
 
                     <!-- Outcomes like 'Each player who voted "For"': the Speaker shows who they apply to. Predictions also need the winner -->
                     @php($affectsVoters = $currentAgenda->affectsVoters())
-                    @if($player->is_speaker && $currentAgenda->status === 'completed' && ($affectsVoters || $predictions->isNotEmpty()))
+                    @if($player->is_speaker && $currentAgenda->status === 'completed' && ($affectsVoters || $predictions->isNotEmpty() || $game->termLimitsInEffect()))
                         @php($outcome = $currentAgenda->outcome())
                         <div class="mt-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
                             @if($outcome === null)
@@ -574,6 +608,8 @@
                                 <p class="text-sm text-blue-800 dark:text-blue-200 mt-1">
                                     @if($affectsVoters)
                                         This agenda affects players by how they voted. As Speaker you break the tie first, then you can see who is affected.
+                                    @elseif($predictions->isEmpty())
+                                        As Speaker you break the tie. Under Term Limits that can move the speaker token.
                                     @else
                                         As Speaker you break the tie first, then you can see which predictions are correct.
                                     @endif
@@ -603,10 +639,66 @@
                                 @if($affectsVoters && $showAffectedPlayers)
                                     @php($effect = $currentAgenda->outcomeEffect($outcome))
                                     @php($affected = $currentAgenda->playersAffectedBy($outcome))
+                                    @php($topVoters = $currentAgenda->topVotersBy($outcome))
+                                    @php($orderedVoters = $currentAgenda->votersInOrderBy($outcome))
+                                    {{-- An ordered list replaces the plain list of the same voters, e.g. Seed of an Empire --}}
+                                    @php($affected = array_diff_key($affected, array_flip(array_column($orderedVoters, 'option'))))
                                     <div class="mt-3 space-y-3">
                                         @if($effect)
                                             <p class="text-sm text-blue-800 dark:text-blue-200"><strong>{{ $outcome }}:</strong> {{ $effect }}</p>
                                         @endif
+                                        <!-- Outcomes like 'The player who cast the most votes "For"' -->
+                                        @foreach($topVoters as $top)
+                                            <div>
+                                                <p class="text-sm font-medium text-gray-900 dark:text-white">
+                                                    @if(in_array($top['option'], ['For', 'Against'], true))
+                                                        {{ $top['other'] ? 'Other player' : 'Player' }} who cast the most votes &ldquo;{{ $top['option'] }}&rdquo;
+                                                    @else
+                                                        {{ $top['other'] ? 'Other player' : 'Player' }} who cast the most votes for {{ $top['option'] }}
+                                                    @endif
+                                                </p>
+                                                @if(empty($top['players']))
+                                                    <p class="text-sm text-gray-600 dark:text-gray-300">Nobody, so this part affects no one.</p>
+                                                @else
+                                                    @if(count($top['players']) > 1)
+                                                        <p class="text-sm text-gray-600 dark:text-gray-300">Tied with {{ $top['influence'] }} votes each.</p>
+                                                    @endif
+                                                    <ul class="mt-1 flex flex-wrap gap-2">
+                                                        @foreach($top['players'] as $name)
+                                                            <li class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-sm font-medium bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-blue-200 dark:border-blue-800">
+                                                                {{ $name }}
+                                                                <x-influence-hex :value="$top['influence']" small title="{{ $top['influence'] }} votes" sr-label="votes" />
+                                                            </li>
+                                                        @endforeach
+                                                    </ul>
+                                                @endif
+                                            </div>
+                                        @endforeach
+                                        <!-- Outcomes like 'each other player that voted for them ... (from most votes to least)' -->
+                                        @foreach($orderedVoters as $ordered)
+                                            <div>
+                                                <p class="text-sm font-medium text-gray-900 dark:text-white">
+                                                    @if(in_array($ordered['option'], ['For', 'Against'], true))
+                                                        {{ $ordered['other'] ? 'Other players' : 'Players' }} who voted &ldquo;{{ $ordered['option'] }}&rdquo;, from most votes to least
+                                                    @else
+                                                        {{ $ordered['other'] ? 'Other players' : 'Players' }} who voted for {{ $ordered['option'] }}, from most votes to least
+                                                    @endif
+                                                </p>
+                                                @if(empty($ordered['voters']))
+                                                    <p class="text-sm text-gray-600 dark:text-gray-300">Nobody, so this part affects no one.</p>
+                                                @else
+                                                    <ol class="mt-1 flex flex-wrap gap-2">
+                                                        @foreach($ordered['voters'] as $voter)
+                                                            <li class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-sm font-medium bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-blue-200 dark:border-blue-800">
+                                                                <span class="text-gray-500 dark:text-gray-400">{{ $loop->iteration }}.</span>
+                                                                {{ $voter['name'] }}
+                                                                <x-influence-hex :value="$voter['influence']" small title="{{ $voter['influence'] }} votes" sr-label="votes" />
+                                                            </li>
+                                                        @endforeach
+                                                    </ol>
+                                                @endif
+                                            </div>
+                                        @endforeach
                                         @forelse($affected as $vote => $names)
                                             <div>
                                                 <p class="text-sm font-medium text-gray-900 dark:text-white">Players who voted &ldquo;{{ $vote }}&rdquo;</p>
@@ -621,10 +713,42 @@
                                                 @endif
                                             </div>
                                         @empty
-                                            <p class="text-sm text-gray-600 dark:text-gray-300">This outcome does not depend on how players voted.</p>
+                                            @if(empty($topVoters) && empty($orderedVoters))
+                                                <p class="text-sm text-gray-600 dark:text-gray-300">This outcome does not depend on how players voted.</p>
+                                            @endif
                                         @endforelse
                                     </div>
                                 @endif
+                            @endif
+                        </div>
+                    @endif
+
+                    <!-- Term Limits: the speaker token may move. Only for the Speaker of this agenda, while they still have the token -->
+                    @php($handover = $player->is_speaker && $player->id === $currentAgenda->speaker_id ? $currentAgenda->termLimitsHandover() : null)
+                    @if($handover)
+                        @php($reasonLabels = ['voted' => 'you voted for it', 'predicted' => 'you predicted it', 'tiebreak' => 'you broke the tie'])
+                        <div class="mt-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+                            <p class="font-semibold text-amber-900 dark:text-amber-100">Term Limits: the speaker token moves</p>
+                            <p class="text-sm text-amber-800 dark:text-amber-200 mt-1">
+                                {{ $currentAgenda->outcome() }} was resolved and {{ collect($handover['reasons'])->map(fn ($reason) => $reasonLabels[$reason])->join(', ', ' and ') }}.
+                                The other player who cast the most votes for an outcome that was not resolved takes the speaker token.
+                            </p>
+                            @if(empty($handover['candidates']))
+                                <p class="text-sm text-amber-800 dark:text-amber-200 mt-2">Nobody else voted for an outcome that was not resolved, so you keep the speaker token.</p>
+                            @else
+                                @if(count($handover['candidates']) > 1)
+                                    <p class="text-sm text-amber-800 dark:text-amber-200 mt-2">Tied with {{ $handover['candidates'][0]['influence'] }} votes each. Agree with the table who takes it.</p>
+                                @endif
+                                <div class="mt-3 flex flex-col sm:flex-row sm:flex-wrap gap-2">
+                                    @foreach($handover['candidates'] as $candidate)
+                                        <button wire:click="transferSpeaker('{{ $candidate['player']->id }}')"
+                                                wire:confirm="Give the speaker token to {{ $candidate['player']->name }}?"
+                                                class="w-full sm:w-auto bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white font-semibold py-3 sm:py-2 px-4 rounded-lg transition-colors">
+                                            Give speaker token to {{ $candidate['player']->name }}
+                                            <span class="font-normal opacity-90">({{ $candidate['influence'] }} votes for {{ $candidate['option'] }})</span>
+                                        </button>
+                                    @endforeach
+                                </div>
                             @endif
                         </div>
                     @endif
@@ -858,7 +982,29 @@
                             {{-- Law: Representative Government --}}
                             <x-setting-switch action="toggleRepresentativeGovernment" :on="$game->representative_government"
                                               label="Representative Government is in effect"
-                                              description="Each player casts 1 vote on each agenda instead of spending influence. Turned on when the law passes For." />
+                                              :description="($game->absol_agendas ? 'Each player casts 1 vote on each agenda instead of spending influence, the player who controls Mecatol Rex up to 2. ' : 'Each player casts 1 vote on each agenda instead of spending influence. ') . 'Turned on when the law passes For.'" />
+
+                            {{-- Absol's Representative Government: the player who controls Mecatol Rex may cast 2 votes --}}
+                            @if($game->absol_agendas && $game->representative_government)
+                                <div class="p-3 sm:px-4">
+                                    <label for="mecatolRexPlayer" class="block font-medium text-gray-900 dark:text-white">Controls Mecatol Rex</label>
+                                    <p class="text-sm text-gray-600 dark:text-gray-400">This player may cast 2 votes on each agenda under Representative Government.</p>
+                                    <select id="mecatolRexPlayer" wire:change="setMecatolRexPlayer($event.target.value)"
+                                            class="mt-2 {{ $inputClass }}">
+                                        <option value="">Nobody</option>
+                                        @foreach($players->sortBy('name') as $gamePlayer)
+                                            <option value="{{ $gamePlayer->id }}" @selected($game->mecatol_rex_player_id === $gamePlayer->id)>{{ $gamePlayer->name }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                            @endif
+
+                            {{-- Absol's law: Term Limits, only with Absol's agendas --}}
+                            @if($game->absol_agendas)
+                                <x-setting-switch action="toggleTermLimits" :on="$game->term_limits"
+                                                  label="Term Limits is in effect"
+                                                  description="After each agenda you see if the speaker token moves to another player. Turned on when the law passes For." />
+                            @endif
 
                             {{-- Event card Hidden Agenda: on by default, as secret voting is what this app is for --}}
                             @php($agendaOpen = $currentAgenda?->status === 'voting')

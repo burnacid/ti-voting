@@ -264,6 +264,8 @@ class GameDashboard extends Component
 
         $agenda = Agenda::create([
             'game_id' => $this->game->id,
+            // Term Limits looks at how this Speaker voted, even after the token moves
+            'speaker_id' => $this->player->id,
             'title' => $this->newAgendaTitle,
             'description' => $this->newAgendaDescription,
             'type' => $this->newAgendaCardType,
@@ -638,6 +640,9 @@ class GameDashboard extends Component
         }
 
         $oneVoteEach = $this->game->representative_government;
+        // Under Absol's Representative Government the player who controls Mecatol Rex may cast 1 or 2 votes
+        $representativeVotes = $oneVoteEach ? $this->game->representativeVotesFor($this->player) : 1;
+        $choosesVotes = $representativeVotes > 1 && $this->selectedOption !== 'Abstain';
         // With managed influence the votes are taken from the player's influence. Abstaining and Representative Government cost nothing
         $spendsInfluence = $this->game->managed_influence && !$oneVoteEach && $this->selectedOption !== 'Abstain' && $this->player->influence !== null;
         $maxVotes = $spendsInfluence ? min(99, $this->player->influence) : 99;
@@ -649,15 +654,21 @@ class GameDashboard extends Component
 
         $this->validate([
             'selectedOption' => ['required', 'string', Rule::in($currentAgenda->options)],
-            'influenceSpent' => $this->selectedOption === 'Abstain' || $oneVoteEach ? 'nullable' : "required|integer|min:1|max:{$maxVotes}",
-        ], [
+            'influenceSpent' => match (true) {
+                $choosesVotes => "required|integer|min:1|max:{$representativeVotes}",
+                $this->selectedOption === 'Abstain' || $oneVoteEach => 'nullable',
+                default => "required|integer|min:1|max:{$maxVotes}",
+            },
+        ], $choosesVotes ? [
+            'influenceSpent.*' => "Choose to cast 1 or {$representativeVotes} votes.",
+        ] : [
             'influenceSpent.max' => "You have {$maxVotes} influence available.",
         ]);
 
-        // Force influence to 0 when abstaining, and to 1 vote under Representative Government
+        // Force influence to 0 when abstaining, and to 1 vote under Representative Government (2 for Mecatol Rex under Absol's)
         if ($this->selectedOption === 'Abstain') {
             $this->influenceSpent = 0;
-        } elseif ($oneVoteEach) {
+        } elseif ($oneVoteEach && !$choosesVotes) {
             $this->influenceSpent = 1;
         }
 
@@ -765,6 +776,7 @@ class GameDashboard extends Component
         Log::info('Voting ended', ['agenda' => $agenda->title, 'votes' => $agenda->votes()->count()]);
 
         $this->applyRepresentativeGovernment($agenda);
+        $this->applyTermLimits($agenda);
     }
 
     /**
@@ -782,12 +794,40 @@ class GameDashboard extends Component
             $this->game->update(['representative_government' => true]);
             Log::info('Representative Government put in effect', ['tiebreak' => $agenda->tiebreak_option !== null]);
             $this->dispatch('flashMessage', [
-                'Representative Government passed: from now on each player casts 1 vote on each agenda.',
+                $this->game->absol_agendas
+                    ? 'Representative Government passed: from now on each player casts 1 vote on each agenda, the player who controls Mecatol Rex up to 2. Pick who controls it in the Speaker Settings.'
+                    : 'Representative Government passed: from now on each player casts 1 vote on each agenda.',
                 'success'
             ]);
         } elseif ($outcome === null && $this->player->is_speaker) {
             $this->dispatch('flashMessage', [
                 'Representative Government is tied. As Speaker you decide: break the tie in the results.',
+                'info'
+            ]);
+        }
+    }
+
+    /**
+     * Put Term Limits in effect when it was voted "For". On a tie it waits for the Speaker to break it.
+     */
+    private function applyTermLimits(Agenda $agenda): void
+    {
+        if (strcasecmp($agenda->title, Game::TERM_LIMITS) !== 0 || !$this->game->absol_agendas || $this->game->term_limits) {
+            return;
+        }
+
+        $outcome = $agenda->outcome();
+
+        if ($outcome === 'For') {
+            $this->game->update(['term_limits' => true]);
+            Log::info('Term Limits put in effect', ['tiebreak' => $agenda->tiebreak_option !== null]);
+            $this->dispatch('flashMessage', [
+                'Term Limits passed: from now on the speaker token can move after each agenda.',
+                'success'
+            ]);
+        } elseif ($outcome === null && $this->player->is_speaker) {
+            $this->dispatch('flashMessage', [
+                'Term Limits is tied. As Speaker you decide: break the tie in the results.',
                 'info'
             ]);
         }
@@ -810,6 +850,7 @@ class GameDashboard extends Component
 
         $this->dispatch('flashMessage', ["You broke the tie: {$option} wins.", 'success']);
         $this->applyRepresentativeGovernment($agenda);
+        $this->applyTermLimits($agenda);
         TriggerRefresh::dispatch($this->game);
         $this->refreshData();
     }
@@ -836,6 +877,48 @@ class GameDashboard extends Component
             $this->game->representative_government
                 ? 'Representative Government is in effect: each player casts 1 vote on each agenda.'
                 : 'Representative Government is no longer in effect: players spend influence to vote again.',
+            'info'
+        ]);
+        TriggerRefresh::dispatch($this->game);
+        $this->refreshData();
+    }
+
+    // Absol's Representative Government: the player who controls Mecatol Rex may cast 2 votes. Empty for nobody
+    public function setMecatolRexPlayer($playerId)
+    {
+        if (!$this->player->is_speaker) {
+            return;
+        }
+
+        $controller = $playerId ? $this->game->players()->find($playerId) : null;
+        if ($playerId && !$controller) {
+            return;
+        }
+
+        $this->game->update(['mecatol_rex_player_id' => $controller?->id]);
+        Log::info('Mecatol Rex controller set', ['player' => $controller?->name]);
+
+        $this->dispatch('flashMessage', [
+            $controller ? "{$controller->name} controls Mecatol Rex." : 'Nobody controls Mecatol Rex.',
+            'info'
+        ]);
+        TriggerRefresh::dispatch($this->game);
+        $this->refreshData();
+    }
+
+    public function toggleTermLimits()
+    {
+        if (!$this->player->is_speaker || !$this->game->absol_agendas) {
+            return;
+        }
+
+        $this->game->update(['term_limits' => !$this->game->term_limits]);
+        Log::info($this->game->term_limits ? 'Term Limits put in effect' : 'Term Limits removed');
+
+        $this->dispatch('flashMessage', [
+            $this->game->term_limits
+                ? 'Term Limits is in effect: after each agenda you see if the speaker token moves.'
+                : 'Term Limits is no longer in effect.',
             'info'
         ]);
         TriggerRefresh::dispatch($this->game);

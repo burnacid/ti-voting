@@ -36,4 +36,7 @@
     @if($game->representative_government)
         <span class="{{ $pill }} bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">Representative Government</span>
     @endif
+    @if($game->termLimitsInEffect())
+        <span class="{{ $pill }} bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">Term Limits</span>
+    @endif
 </div>

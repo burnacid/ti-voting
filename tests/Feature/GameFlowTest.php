@@ -885,6 +885,145 @@ test('agendas that do not depend on how players voted have no affected players',
         ->and($agenda->fresh()->playersAffectedBy('Against'))->toBe(['Against' => []]);
 });
 
+test('after an agenda naming who cast the most votes the speaker can show that player', function () {
+    [$game, $speaker, $other] = makeGame();
+    $third = Player::create(['game_id' => $game->id, 'name' => 'Third', 'session_token' => Player::generateSessionToken()]);
+    $agenda = makeAgenda($game);
+    $agenda->update([
+        'title' => 'Fleet Regulations',
+        'source' => Agenda::SOURCE_ABSOL,
+        'description' => "FOR : Place a control token for the player that cast the most votes \"For\" on this card.\nAGAINST : The player who cast the most votes \"Against\" draws 5 action cards.",
+    ]);
+    Vote::create(['agenda_id' => $agenda->id, 'player_id' => $speaker->id, 'option' => 'For', 'influence_spent' => 3]);
+    Vote::create(['agenda_id' => $agenda->id, 'player_id' => $other->id, 'option' => 'For', 'influence_spent' => 5]);
+    Vote::create(['agenda_id' => $agenda->id, 'player_id' => $third->id, 'option' => 'Against', 'influence_spent' => 4]);
+
+    expect($agenda->fresh()->affectsVoters())->toBeTrue()
+        ->and($agenda->fresh()->topVotersBy('For'))->toBe([['option' => 'For', 'other' => false, 'players' => ['Other'], 'influence' => 5]])
+        ->and($agenda->fresh()->topVotersBy('Against'))->toBe([['option' => 'Against', 'other' => false, 'players' => ['Third'], 'influence' => 4]]);
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->call('endVoting')
+        ->assertSee('For wins')
+        ->call('toggleAffectedPlayers')
+        ->assertSeeInOrder(['Player who cast the most votes', 'For', 'Other'])
+        ->assertDontSee('This outcome does not depend on how players voted.');
+});
+
+test('most votes for the elected player leaves out the elected player when it says other', function () {
+    [$game, $speaker, $other] = makeGame();
+    $third = Player::create(['game_id' => $game->id, 'name' => 'Third', 'session_token' => Player::generateSessionToken()]);
+    $agenda = makeAgenda($game);
+    $agenda->update([
+        'elect' => 'player',
+        'options' => ['Speaker', 'Other', 'Third', 'Abstain'],
+        'description' => 'The elected player draws 2 secret objectives, then gives one promissory note from their hand to the other player that cast the most votes for them.',
+    ]);
+    Vote::create(['agenda_id' => $agenda->id, 'player_id' => $speaker->id, 'option' => 'Speaker', 'influence_spent' => 9]);
+    Vote::create(['agenda_id' => $agenda->id, 'player_id' => $other->id, 'option' => 'Speaker', 'influence_spent' => 2]);
+    Vote::create(['agenda_id' => $agenda->id, 'player_id' => $third->id, 'option' => 'Speaker', 'influence_spent' => 2]);
+
+    expect($agenda->fresh()->topVotersBy('Speaker'))->toBe([['option' => 'Speaker', 'other' => true, 'players' => ['Other', 'Third'], 'influence' => 2]]);
+
+    // Without "other" the elected player counts too
+    $agenda->update(['description' => 'The player who cast the most votes for the elected player looks at the elected player\'s action cards.']);
+    expect($agenda->fresh()->topVotersBy('Speaker'))->toBe([['option' => 'Speaker', 'other' => false, 'players' => ['Speaker'], 'influence' => 9]]);
+
+    // About a later agenda, so not shown now
+    $agenda->update(['description' => 'The other player who cast the most votes for an outcome that was not resolved takes the speaker token.']);
+    expect($agenda->fresh()->topVotersBy('Speaker'))->toBe([]);
+});
+
+test('term limits passing for puts it in effect and only the speaker can toggle it', function () {
+    [$game, $speaker, $other] = makeGame(['absol_agendas' => true]);
+    $agenda = makeAgenda($game);
+    $agenda->update(['title' => 'Term Limits']);
+    Vote::create(['agenda_id' => $agenda->id, 'player_id' => $speaker->id, 'option' => 'For', 'influence_spent' => 5]);
+    Vote::create(['agenda_id' => $agenda->id, 'player_id' => $other->id, 'option' => 'Against', 'influence_spent' => 2]);
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])->call('endVoting');
+    expect($game->fresh()->term_limits)->toBeTrue()
+        // Term Limits itself does not move the token under its own law
+        ->and($agenda->fresh()->termLimitsHandover())->toBeNull();
+
+    Livewire::test(GameDashboard::class, ['game' => $game->fresh(), 'player' => $other])
+        ->assertSee('Term Limits is in effect')
+        ->call('toggleTermLimits');
+    expect($game->fresh()->term_limits)->toBeTrue();
+
+    Livewire::test(GameDashboard::class, ['game' => $game->fresh(), 'player' => $speaker])->call('toggleTermLimits');
+    expect($game->fresh()->term_limits)->toBeFalse();
+});
+
+test('term limits only shows and counts with absol agendas on', function () {
+    [$game, $speaker, $other] = makeGame();
+    $agenda = makeAgenda($game);
+    $agenda->update(['title' => 'Term Limits']);
+    Vote::create(['agenda_id' => $agenda->id, 'player_id' => $speaker->id, 'option' => 'For', 'influence_spent' => 5]);
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->assertDontSee('Term Limits is in effect')
+        ->call('toggleTermLimits')
+        ->call('endVoting');
+    expect($game->fresh()->term_limits)->toBeFalse();
+
+    // Left on from before, then Absol's agendas turned off
+    $game->update(['term_limits' => true]);
+    expect($game->fresh()->termLimitsInEffect())->toBeFalse();
+    Livewire::test(GameDashboard::class, ['game' => $game->fresh(), 'player' => $speaker])
+        ->assertDontSee('Term Limits is in effect');
+});
+
+test('under term limits the speaker token goes to the top voter for an outcome that was not resolved', function () {
+    [$game, $speaker, $other] = makeGame(['absol_agendas' => true, 'term_limits' => true]);
+    $third = Player::create(['game_id' => $game->id, 'name' => 'Third', 'session_token' => Player::generateSessionToken()]);
+    $agenda = makeAgenda($game);
+    $agenda->update(['speaker_id' => $speaker->id]);
+    Vote::create(['agenda_id' => $agenda->id, 'player_id' => $speaker->id, 'option' => 'For', 'influence_spent' => 9]);
+    Vote::create(['agenda_id' => $agenda->id, 'player_id' => $other->id, 'option' => 'Against', 'influence_spent' => 2]);
+    Vote::create(['agenda_id' => $agenda->id, 'player_id' => $third->id, 'option' => 'Against', 'influence_spent' => 4]);
+
+    $view = Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->call('endVoting')
+        ->assertSee('Term Limits: the speaker token moves')
+        ->assertSee('Give speaker token to Third');
+
+    $handover = $agenda->fresh()->termLimitsHandover();
+    expect($handover['reasons'])->toBe(['voted'])
+        ->and(collect($handover['candidates'])->map(fn ($c) => [$c['player']->name, $c['option'], $c['influence']])->all())
+        ->toBe([['Third', 'Against', 4]]);
+
+    $view->call('transferSpeaker', $third->id);
+    expect($game->fresh()->speaker_id)->toBe($third->id);
+
+    // The new Speaker is not asked to pass it on again
+    Livewire::test(GameDashboard::class, ['game' => $game->fresh(), 'player' => $third->fresh()])
+        ->assertDontSee('Term Limits: the speaker token moves');
+});
+
+test('term limits applies when the speaker predicted or broke the tie, not when they lost', function () {
+    [$game, $speaker, $other] = makeGame(['absol_agendas' => true, 'term_limits' => true]);
+    $agenda = makeAgenda($game);
+    $agenda->update(['speaker_id' => $speaker->id, 'status' => 'completed']);
+    Vote::create(['agenda_id' => $agenda->id, 'player_id' => $speaker->id, 'option' => 'Against', 'influence_spent' => 1]);
+    Vote::create(['agenda_id' => $agenda->id, 'player_id' => $other->id, 'option' => 'For', 'influence_spent' => 3]);
+
+    // For won, the Speaker voted Against
+    expect($agenda->fresh()->termLimitsHandover())->toBeNull();
+
+    // The Speaker predicted For; nobody else voted for Against, so they keep the token
+    Prediction::create(['agenda_id' => $agenda->id, 'player_id' => $speaker->id, 'source' => 'politics_rider', 'option' => 'For']);
+    expect($agenda->fresh()->termLimitsHandover())->toBe(['reasons' => ['predicted'], 'candidates' => []]);
+
+    // Tied and broken by the Speaker
+    Vote::where('player_id', $speaker->id)->update(['influence_spent' => 3]);
+    expect($agenda->fresh()->termLimitsHandover())->toBeNull();
+    $agenda->update(['tiebreak_option' => 'Against']);
+    $handover = $agenda->fresh()->termLimitsHandover();
+    expect($handover['reasons'])->toBe(['voted', 'tiebreak'])
+        ->and($handover['candidates'][0]['player']->name)->toBe('Other');
+});
+
 test('on a tie the speaker breaks it before seeing who is affected', function () {
     [$game, $speaker, $other] = makeGame();
     $agenda = makeMutiny($game);
@@ -1991,4 +2130,107 @@ test('under representative government a player with 0 influence still votes', fu
 
     Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $other->fresh()])
         ->assertSet('selectedOption', '');
+});
+
+test('under absol representative government the player who controls mecatol rex casts 2 votes', function () {
+    [$game, $speaker, $other] = makeGame(['representative_government' => true, 'absol_agendas' => true]);
+    $agenda = makeAgenda($game);
+    $agenda->update(['reveal_step' => null]);
+
+    // Only the Speaker picks who controls Mecatol Rex
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $other])->call('setMecatolRexPlayer', $other->id);
+    expect($game->fresh()->mecatol_rex_player_id)->toBeNull();
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->assertSee('Controls Mecatol Rex')
+        ->call('setMecatolRexPlayer', $other->id);
+    expect($game->fresh()->mecatol_rex_player_id)->toBe($other->id);
+
+    // They may cast 1 or 2 votes, and have to pick
+    Livewire::test(GameDashboard::class, ['game' => $game->fresh(), 'player' => $other])
+        ->set('selectedOption', 'For')
+        ->assertSee('You control Mecatol Rex, so you may cast up to 2 votes.')
+        ->call('submitVote')
+        ->assertHasErrors('influenceSpent')
+        ->set('influenceSpent', 3)
+        ->call('submitVote')
+        ->assertHasErrors('influenceSpent')
+        ->set('influenceSpent', 2)
+        ->call('submitVote')
+        ->assertHasNoErrors();
+    Livewire::test(GameDashboard::class, ['game' => $game->fresh(), 'player' => $speaker])
+        ->set('selectedOption', 'Against')
+        ->call('submitVote');
+
+    expect($agenda->votes()->where('player_id', $other->id)->value('influence_spent'))->toBe(2)
+        ->and($agenda->votes()->where('player_id', $speaker->id)->value('influence_spent'))->toBe(1);
+
+    // Casting only 1 vote is allowed too
+    $next = makeAgenda($game);
+    $next->update(['reveal_step' => null]);
+    $agenda->update(['status' => 'completed']);
+    Livewire::test(GameDashboard::class, ['game' => $game->fresh(), 'player' => $other])
+        ->set('selectedOption', 'Against')
+        ->set('influenceSpent', 1)
+        ->call('submitVote')
+        ->assertHasNoErrors();
+    expect($next->votes()->where('player_id', $other->id)->value('influence_spent'))->toBe(1);
+});
+
+test('without absol agendas representative government gives mecatol rex no extra vote', function () {
+    [$game, , $other] = makeGame(['representative_government' => true]);
+    $game->update(['mecatol_rex_player_id' => $other->id]);
+
+    expect($game->fresh()->representativeVotesFor($other))->toBe(1);
+    Livewire::test(GameDashboard::class, ['game' => $game->fresh(), 'player' => $other])
+        ->assertDontSee('Controls Mecatol Rex');
+});
+
+test('imperial arbiter lists the other players who voted for the elected player from most votes to least', function () {
+    [$game, $speaker, $other] = makeGame();
+    $third = Player::create(['game_id' => $game->id, 'name' => 'Third', 'session_token' => Player::generateSessionToken()]);
+    $fourth = Player::create(['game_id' => $game->id, 'name' => 'Fourth', 'session_token' => Player::generateSessionToken()]);
+    $agenda = makeAgenda($game);
+    $agenda->update([
+        'title' => 'Imperial Arbiter',
+        'elect' => 'player',
+        'options' => ['Speaker', 'Other', 'Third', 'Fourth', 'Abstain'],
+        'description' => "The elected player gains this card and gives each other player that voted for them 1 promissory note from their hand (from most votes to least), if able.\nAt the start of the action phase, the owner of this card may spend 1 command token.",
+    ]);
+    Vote::create(['agenda_id' => $agenda->id, 'player_id' => $speaker->id, 'option' => 'Speaker', 'influence_spent' => 9]);
+    Vote::create(['agenda_id' => $agenda->id, 'player_id' => $other->id, 'option' => 'Speaker', 'influence_spent' => 2]);
+    Vote::create(['agenda_id' => $agenda->id, 'player_id' => $third->id, 'option' => 'Speaker', 'influence_spent' => 5]);
+    Vote::create(['agenda_id' => $agenda->id, 'player_id' => $fourth->id, 'option' => 'Abstain', 'influence_spent' => 0]);
+
+    expect($agenda->fresh()->votersInOrderBy('Speaker'))->toBe([[
+        'option' => 'Speaker',
+        'other' => true,
+        'voters' => [['name' => 'Third', 'influence' => 5], ['name' => 'Other', 'influence' => 2]],
+    ]]);
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->call('endVoting')
+        ->call('toggleAffectedPlayers')
+        ->assertSeeInOrder(['Other players who voted for Speaker, from most votes to least', 'Third', 'Other'])
+        ->assertDontSee('This outcome does not depend on how players voted.');
+});
+
+test('seed of an empire lists the for voters in order instead of a plain list', function () {
+    [$game, $speaker, $other] = makeGame();
+    $agenda = makeAgenda($game);
+    $agenda->update([
+        'title' => 'Seed of an Empire',
+        'description' => "FOR : The player with the most victory points (speaker breaks ties) gains the speaker token and 1 victory point, then gives one promissory note to each other player that voted \"For\" (from most to least votes), if able.\nAGAINST : The player with the least victory points gains 1 victory point.",
+    ]);
+    Vote::create(['agenda_id' => $agenda->id, 'player_id' => $speaker->id, 'option' => 'For', 'influence_spent' => 3]);
+    Vote::create(['agenda_id' => $agenda->id, 'player_id' => $other->id, 'option' => 'For', 'influence_spent' => 3]);
+
+    expect($agenda->fresh()->votersInOrderBy('For')[0]['voters'])->toBe([['name' => 'Other', 'influence' => 3], ['name' => 'Speaker', 'influence' => 3]])
+        ->and($agenda->fresh()->votersInOrderBy('Against'))->toBe([]);
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->call('endVoting')
+        ->call('toggleAffectedPlayers')
+        ->assertSee('Other players who voted &ldquo;For&rdquo;, from most votes to least', false)
+        ->assertDontSee('Players who voted &ldquo;For&rdquo;</p>', false);
 });

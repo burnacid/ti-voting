@@ -27,6 +27,7 @@ class Games extends Component
         'open_votes' => 'Hidden Agenda off',
         'show_results' => 'Results shown to all',
         'representative_government' => 'Representative Government',
+        'term_limits' => 'Term Limits',
         'fracture' => 'Fracture in play',
     ];
 
@@ -150,6 +151,7 @@ class Games extends Component
             'open_votes' => $query->where('hidden_agenda', false),
             'show_results' => $query->where('show_results', true),
             'representative_government' => $query->where('representative_government', true),
+            'term_limits' => $query->where('term_limits', true)->where('absol_agendas', true),
             // Only Thunder's Edge games have the Fracture
             'fracture' => $query->where('fracture_in_play', true)
                 ->where(fn ($query) => $this->whereAnySetting($query, Game::EXPANSIONS['te']['settings'])),
