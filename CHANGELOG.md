@@ -4,7 +4,7 @@ All notable changes to TI Voting are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.10.3] - 2026-10-31
 
 ### Added
 - Agendas that name "the player who cast the most votes", such as many of Absol's agendas, show the Speaker who that is under "Show who is affected". This covers "most votes "For"" or "Against", "most votes for them" or for the elected planet, law or objective, and "the other player" that leaves out the elected player. Ties show every tied player.
@@ -223,6 +223,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Milty draft integration to load factions and planets.
 - Planet agendas (any, industrial, cultural, hazardous, non-home), with extra tiles that can be added by tile number.
 
+[1.10.3]: https://github.com/burnacid/ti-voting/compare/v1.10.2...v1.10.3
 [1.10.2]: https://github.com/burnacid/ti-voting/compare/v1.10.1...v1.10.2
 [1.10.1]: https://github.com/burnacid/ti-voting/compare/v1.10.0...v1.10.1
 [1.10.0]: https://github.com/burnacid/ti-voting/compare/v1.9.0...v1.10.0
