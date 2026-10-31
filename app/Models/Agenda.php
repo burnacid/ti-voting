@@ -60,6 +60,7 @@ class Agenda extends Model
 
     protected $fillable = [
         'game_id',
+        'speaker_id',
         'title',
         'description',
         'type',
@@ -86,6 +87,95 @@ class Agenda extends Model
     public function game(): BelongsTo
     {
         return $this->belongsTo(Game::class);
+    }
+
+    /**
+     * Outcomes like 'each other player that voted for them ... (from most votes to least)': the voters in that order,
+     * one entry per option it mentions, e.g. [['option' => 'Alice', 'other' => true, 'voters' => [['name' => 'Bob', 'influence' => 5]]]].
+     * A plain 'voted for them' means the outcome itself, e.g. the elected player. 'Other' leaves out the elected player.
+     * Equal votes are sorted by name.
+     */
+    public function votersInOrderBy(string $outcome): array
+    {
+        $text = $this->outcomeEffect($outcome) ?? $this->description ?? '';
+        preg_match_all(
+            '/\beach\s+(other\s+)?player\s+(?:that|who)\s+voted\s+(?:["“](for|against)["”]?|for\b)[^.]*?\(from\s+most(?:\s+votes)?\s+to\s+least(?:\s+votes)?\)/i',
+            $text, $matches, PREG_SET_ORDER
+        );
+
+        $results = [];
+
+        foreach ($matches as $match) {
+            $option = ($match[2] ?? '') !== '' ? ucfirst(strtolower($match[2])) : $outcome;
+            $other = trim($match[1] ?? '') !== '';
+
+            $results[$option . ($other ? '|other' : '')] = [
+                'option' => $option,
+                'other' => $other,
+                'voters' => $this->votes()->with('player')->where('option', $option)->where('influence_spent', '>', 0)->get()
+                    ->filter(fn ($vote) => $vote->player && !($other && $vote->player->name === $outcome))
+                    ->map(fn ($vote) => ['name' => $vote->player->name, 'influence' => (int) $vote->influence_spent])
+                    ->sortBy([['influence', 'desc'], ['name', 'asc']])
+                    ->values()
+                    ->all(),
+            ];
+        }
+
+        return array_values($results);
+    }
+
+    // Who was Speaker when the agenda was revealed
+    public function speaker(): BelongsTo
+    {
+        return $this->belongsTo(Player::class, 'speaker_id');
+    }
+
+    /**
+     * Term Limits "For": when the agenda resolves the way the Speaker voted or predicted, or the Speaker broke a tie,
+     * the other player who cast the most votes for an outcome that was not resolved takes the speaker token.
+     *
+     * Returns null when it does not apply: the law is not in effect, this is Term Limits itself, the outcome is not
+     * decided yet, or the Speaker did not vote for, predict or pick the outcome. Otherwise:
+     * - reasons: why it applies, e.g. ['voted', 'tiebreak']
+     * - candidates: the players with the most votes for an outcome that was not resolved, each with their
+     *   'player', 'option' and 'influence'. More than one is a tie, none means the Speaker keeps the token.
+     */
+    public function termLimitsHandover(): ?array
+    {
+        $outcome = $this->outcome();
+
+        if (!$this->game->termLimitsInEffect() || strcasecmp($this->title, Game::TERM_LIMITS) === 0
+            || $this->status !== 'completed' || $outcome === null || !$this->speaker_id) {
+            return null;
+        }
+
+        $reasons = array_values(array_filter([
+            $this->votes()->where('player_id', $this->speaker_id)->where('option', $outcome)->exists() ? 'voted' : null,
+            $this->predictions()->where('player_id', $this->speaker_id)->where('option', $outcome)->exists() ? 'predicted' : null,
+            $this->tiebreak_option !== null ? 'tiebreak' : null,
+        ]));
+
+        if (empty($reasons)) {
+            return null;
+        }
+
+        // Abstaining is not an outcome
+        $votes = $this->votes()->with('player')
+            ->whereNotIn('option', [$outcome, 'Abstain'])
+            ->where('player_id', '!=', $this->speaker_id)
+            ->where('influence_spent', '>', 0)
+            ->get()
+            ->filter(fn ($vote) => $vote->player);
+        $most = (int) $votes->max('influence_spent');
+
+        return [
+            'reasons' => $reasons,
+            'candidates' => $votes->filter(fn ($vote) => (int) $vote->influence_spent === $most)
+                ->sortBy('player.name')
+                ->map(fn ($vote) => ['player' => $vote->player, 'option' => $vote->option, 'influence' => $most])
+                ->values()
+                ->all(),
+        ];
     }
 
     public function votes(): HasMany
@@ -146,10 +236,54 @@ class Agenda extends Model
         return in_array($this->tiebreak_option, $leading, true) ? $this->tiebreak_option : null;
     }
 
+    // 'The player who cast the most votes "For"', 'the other player that cast the most votes for them',
+    // 'the non-elected player that cast the most votes for the elected player'. Group 1: other/non-elected, group 2: For/Against.
+    // Leaves out 'the most votes for an outcome that was not resolved', which is about a later agenda.
+    private const MOST_VOTES_PATTERN = '/\b(other\s+|non-elected\s+)?player\s+(?:that|who)\s+cast\s+the\s+most\s+votes\s+(?:["“](for|against)["”]|for\s+(?!an\b))/i';
+
     // Agendas whose outcome depends on how players voted, e.g. 'Each player who voted "For" gains 1 victory point'
+    // or 'The player who cast the most votes "For" takes the speaker token'
     public function affectsVoters(): bool
     {
-        return preg_match('/\bvoted\s+["“]?(for|against)\b/i', $this->description ?? '') === 1;
+        return preg_match('/\bvoted\s+["“]?(for|against)\b/i', $this->description ?? '') === 1
+            || preg_match(self::MOST_VOTES_PATTERN, $this->description ?? '') === 1;
+    }
+
+    /**
+     * The players an outcome names as having cast the most votes, one entry per option it mentions,
+     * e.g. [['option' => 'For', 'other' => false, 'players' => ['Alice'], 'influence' => 6]].
+     * A plain 'most votes for them' means the outcome itself, e.g. the elected player. 'Other' or 'non-elected'
+     * leaves out the elected player. More than one player is a tie; none means nobody spent influence on it.
+     */
+    public function topVotersBy(string $outcome): array
+    {
+        $text = $this->outcomeEffect($outcome) ?? $this->description ?? '';
+        preg_match_all(self::MOST_VOTES_PATTERN, $text, $matches, PREG_SET_ORDER);
+
+        $results = [];
+
+        foreach ($matches as $match) {
+            $option = ($match[2] ?? '') !== '' ? ucfirst(strtolower($match[2])) : $outcome;
+            $other = trim($match[1] ?? '') !== '';
+            $key = $option . ($other ? '|other' : '');
+
+            if (isset($results[$key])) {
+                continue;
+            }
+
+            $votes = $this->votes()->with('player')->where('option', $option)->where('influence_spent', '>', 0)->get()
+                ->filter(fn ($vote) => $vote->player && !($other && $vote->player->name === $outcome));
+            $most = (int) $votes->max('influence_spent');
+
+            $results[$key] = [
+                'option' => $option,
+                'other' => $other,
+                'players' => $votes->filter(fn ($vote) => (int) $vote->influence_spent === $most)->pluck('player.name')->sort()->values()->all(),
+                'influence' => $most,
+            ];
+        }
+
+        return array_values($results);
     }
 
     /**

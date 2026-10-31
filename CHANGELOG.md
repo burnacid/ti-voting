@@ -4,6 +4,16 @@ All notable changes to TI Voting are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Agendas that name "the player who cast the most votes", such as many of Absol's agendas, show the Speaker who that is under "Show who is affected". This covers "most votes "For"" or "Against", "most votes for them" or for the elected planet, law or objective, and "the other player" that leaves out the elected player. Ties show every tied player.
+- Agendas that go through voters "from most votes to least", such as Imperial Arbiter and Seed of an Empire, show the Speaker those voters as a numbered list in that order, with each player's votes.
+- Absol's law Term Limits can be put in effect, like Representative Government: it turns on when the law passes For, and the Speaker can turn it on or off in the Speaker Settings. Every player sees that it is in effect. It is only available while Absol's agendas are on.
+- Under Term Limits, after an agenda that resolves the way the Speaker voted or predicted, or after the Speaker breaks a tie, the Speaker sees who cast the most votes for an outcome that was not resolved, with a button to give them the speaker token. On a tie it shows each tied player, and when nobody qualifies the Speaker keeps the token.
+- The admin games list can be filtered on Term Limits, and shows it as a badge.
+- With Absol's agendas, Representative Government follows Absol's card: the player who controls Mecatol Rex may cast 1 or 2 votes, and picks which when voting. The Speaker picks who controls Mecatol Rex in the Speaker Settings, and every player sees who it is in the law's banner.
+
 ## [1.10.2] - 2026-10-25
 
 ### Added

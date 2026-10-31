@@ -27,6 +27,8 @@ class Game extends Model
         'milty_draft_data',
         'fracture_in_play',
         'representative_government',
+        'term_limits',
+        'mecatol_rex_player_id',
         'absol_agendas',
         'show_results',
         'hidden_agenda',
@@ -46,6 +48,7 @@ class Game extends Model
         'milty_draft_data' => 'array',
         'fracture_in_play' => 'boolean',
         'representative_government' => 'boolean',
+        'term_limits' => 'boolean',
         'absol_agendas' => 'boolean',
         'show_results' => 'boolean',
         'hidden_agenda' => 'boolean',
@@ -76,6 +79,30 @@ class Game extends Model
 
     // Law that, when voted "For", lets each player cast only 1 vote on each agenda
     public const REPRESENTATIVE_GOVERNMENT = 'Representative Government';
+
+    // Absol's law that, when voted "For", can move the speaker token after each agenda
+    public const TERM_LIMITS = 'Term Limits';
+
+    // Who controls Mecatol Rex, picked by the Speaker for Absol's Representative Government
+    public function mecatolRexPlayer(): BelongsTo
+    {
+        return $this->belongsTo(Player::class, 'mecatol_rex_player_id');
+    }
+
+    /**
+     * The most votes a player may cast under Representative Government. Absol's version lets the player who
+     * controls Mecatol Rex cast up to 2 votes instead of 1.
+     */
+    public function representativeVotesFor(Player $player): int
+    {
+        return $this->absol_agendas && $this->mecatol_rex_player_id === $player->id ? 2 : 1;
+    }
+
+    // Term Limits is one of Absol's agendas, so it only counts while those are in the game
+    public function termLimitsInEffect(): bool
+    {
+        return $this->term_limits && $this->absol_agendas;
+    }
 
     // Page where new players join this game, shared as a link or QR code
     public function joinUrl(): string
