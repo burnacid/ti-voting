@@ -5,7 +5,9 @@ use App\Livewire\FeedbackForm;
 use App\Models\Feedback;
 use App\Models\Game;
 use App\Models\User;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
+use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
 
 beforeEach(function () {
@@ -147,4 +149,16 @@ test('the admin dashboard shows recent feedback', function () {
         ->assertSee('1 unread');
 
     $this->get(route('admin.feedback'))->assertOk()->assertSee('Show a history of past agendas');
+});
+
+test('a request that changes a locked property is refused with a warning instead of a server error', function () {
+    Log::spy();
+    $handler = app(\Illuminate\Contracts\Debug\ExceptionHandler::class);
+    $exception = new CannotUpdateLockedPropertyException('game');
+
+    $handler->report($exception);
+    expect($handler->render(request(), $exception)->getStatusCode())->toBe(403);
+
+    Log::shouldHaveReceived('warning')->once()->withArgs(fn ($message, $context) => $context['property'] === 'game');
+    Log::shouldNotHaveReceived('error');
 });
