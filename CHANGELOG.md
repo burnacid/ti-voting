@@ -4,6 +4,11 @@ All notable changes to TI Voting are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- A request that tries to change a protected value of a page, such as the game of the feedback form, is refused with a 403 and logged as a one-line warning, instead of a server error with a full stack trace.
+
 ## [1.10.3] - 2026-10-31
 
 ### Added
