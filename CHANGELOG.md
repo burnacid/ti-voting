@@ -4,7 +4,7 @@ All notable changes to TI Voting are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.10.4] - 2026-11-13
 
 ### Fixed
 - A request that tries to change a protected value of a page, such as the game of the feedback form, is refused with a 403 and logged as a one-line warning, instead of a server error with a full stack trace.
@@ -228,6 +228,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Milty draft integration to load factions and planets.
 - Planet agendas (any, industrial, cultural, hazardous, non-home), with extra tiles that can be added by tile number.
 
+[1.10.4]: https://github.com/burnacid/ti-voting/compare/v1.10.3...v1.10.4
 [1.10.3]: https://github.com/burnacid/ti-voting/compare/v1.10.2...v1.10.3
 [1.10.2]: https://github.com/burnacid/ti-voting/compare/v1.10.1...v1.10.2
 [1.10.1]: https://github.com/burnacid/ti-voting/compare/v1.10.0...v1.10.1
