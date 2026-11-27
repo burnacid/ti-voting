@@ -42,7 +42,7 @@ class JoinGameForm extends Component
     {
         return [
             'gameCode' => 'required|string|size:6|exists:games,code',
-            'playerName' => 'required|string|max:255',
+            'playerName' => 'required|string|max:' . Player::MAX_NAME_LENGTH,
         ];
     }
 
@@ -55,6 +55,7 @@ class JoinGameForm extends Component
         }
         RateLimiter::hit($throttleKey, 600);
 
+        $this->playerName = trim((string) $this->playerName);
         $this->validate();
 
         $game = Game::where('code', strtoupper($this->gameCode))->first();
@@ -69,16 +70,15 @@ class JoinGameForm extends Component
             return;
         }
 
-        // Check if player name is already taken in this game
-        if ($game->players()->where('name', $this->playerName)->exists()) {
-            $this->addError('playerName', 'This name is already taken in this game.');
-            $this->nameTaken = true;
-            return;
-        }
-
-        // Locks the game, so two players joining at the same time cannot both take the same faction
+        // Locks the game, so two players joining at the same time cannot both take the same name or faction
         $player = DB::transaction(function () use ($game) {
             Game::whereKey($game->id)->lockForUpdate()->first();
+
+            // Names differing only in case are the same name, as players pick theirs from a list to rejoin
+            $taken = $game->players()->whereRaw('lower(name) = ?', [mb_strtolower($this->playerName)])->value('name');
+            if ($taken !== null) {
+                return $taken;
+            }
 
             // With a Milty draft, players choose a drafted faction nobody else has chosen
             $factions = $game->availableFactions();
@@ -97,6 +97,14 @@ class JoinGameForm extends Component
                 'is_speaker' => false,
             ]);
         });
+
+        if (is_string($player)) {
+            // Offers to rejoin as the player with that name, spelled as they joined
+            $this->playerName = $player;
+            $this->addError('playerName', 'This name is already taken in this game.');
+            $this->nameTaken = true;
+            return;
+        }
 
         Log::info('Player joined', ['game' => $game->code, 'player' => $player->name, 'faction' => $player->faction ?: null]);
 

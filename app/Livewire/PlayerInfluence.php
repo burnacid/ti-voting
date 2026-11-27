@@ -17,6 +17,7 @@ class PlayerInfluence extends Component
 {
     use SharesGameLogContext;
 
+    #[Locked]
     public $game;
 
     // Kept as an id and loaded on every request, as the Speaker can remove the player mid-game
@@ -54,6 +55,11 @@ class PlayerInfluence extends Component
             return;
         }
 
+        if ($this->isLocked()) {
+            $this->addError('influence', 'You can change your influence once this agenda ends.');
+            return;
+        }
+
         $this->validate(
             ['influence' => 'nullable|integer|min:0|max:99'],
             ['influence.integer' => 'Enter a whole number.', 'influence.min' => 'Influence cannot be negative.', 'influence.max' => 'Influence can be at most 99.']
@@ -73,8 +79,18 @@ class PlayerInfluence extends Component
         TriggerRefresh::dispatch($this->game);
     }
 
+    /**
+     * With managed influence the votes are taken from the influence, so players cannot change it while an agenda is open.
+     */
+    private function isLocked(): bool
+    {
+        $game = $this->game->fresh();
+
+        return $game->managed_influence && $game->currentAgenda() !== null;
+    }
+
     public function render()
     {
-        return view('livewire.player-influence');
+        return view('livewire.player-influence', ['locked' => $this->isLocked()]);
     }
 }

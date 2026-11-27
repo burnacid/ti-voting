@@ -36,7 +36,7 @@ class CreateGame extends Component
     {
         return [
             'gameName' => 'required|string|max:255',
-            'playerName' => 'required|string|max:255',
+            'playerName' => 'required|string|max:' . Player::MAX_NAME_LENGTH,
             'miltyUrl' => 'nullable|string|max:2000',
         ];
     }
@@ -102,6 +102,7 @@ class CreateGame extends Component
 
     public function createGame()
     {
+        $this->playerName = trim((string) $this->playerName);
         $this->validate();
 
         if (!empty($this->miltyUrl) && !$this->hasMiltyData) {

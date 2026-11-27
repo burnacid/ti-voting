@@ -24,7 +24,7 @@ Route::post('/my-games/{code}/forget', function (string $code) {
     }
 
     return redirect()->route('home');
-})->name('my-games.forget');
+})->middleware('throttle:60,1')->name('my-games.forget');
 
 Route::view('/privacy', 'privacy')->name('privacy');
 
@@ -42,7 +42,7 @@ Route::get('/join/{code}', function (string $code) {
     Log::shareContext(['game' => $game->code]);
 
     return view('join-game', ['code' => $code, 'game' => $game]);
-})->name('join-group');
+})->middleware('throttle:60,1')->name('join-group');
 
 Route::get('/game/{code}', function (string $code) {
     $game = Game::where('code', strtoupper($code))->first();
@@ -78,7 +78,7 @@ Route::get('/game/{code}/rejoin', function (string $code) {
     Log::shareContext(['game' => $game->code]);
 
     return view('join-game', ['code' => $game->code, 'game' => $game, 'rejoin' => true]);
-})->name('game.rejoin');
+})->middleware('throttle:60,1')->name('game.rejoin');
 
 // Admin login with a passkey, at /admin/passkeys/... The package's views expect the route names passkeys.*
 Route::prefix(config('app.admin_path'))->middleware(['guest', 'throttle:20,1'])->group(fn () => Route::passkeys());

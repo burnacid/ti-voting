@@ -47,7 +47,16 @@ class MiltyService
             $response = $http->get("https://milty.shenanigans.be/api/draft/{$draftId}");
 
             if ($response->successful()) {
-                return $response->json();
+                $data = $response->json();
+
+                // The rest of the app reads the players of the draft, so other responses are not a usable draft
+                if (is_array($data) && is_array($data['draft']['players'] ?? null)) {
+                    return $data;
+                }
+
+                Log::error('Milty draft data has no players', ['draft_id' => $draftId]);
+
+                return null;
             }
 
             Log::error('Failed to fetch Milty draft data', [
@@ -65,25 +74,5 @@ class MiltyService
 
             return null;
         }
-    }
-
-    /**
-     * Validate if a URL is a valid Milty URL
-     *
-     * @param string $url
-     * @return bool
-     */
-    public function isValidMiltyUrl(string $url): bool
-    {
-        $draftId = $this->extractDraftId($url);
-
-        if (!$draftId) {
-            return false;
-        }
-
-        // Optionally check if the draft actually exists
-        $draftData = $this->fetchDraftData($draftId);
-
-        return $draftData !== null;
     }
 }

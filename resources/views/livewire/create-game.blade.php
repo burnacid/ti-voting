@@ -48,6 +48,7 @@
                    id="playerName"
                    wire:model="playerName"
                    class="{{ $inputClass }}"
+                   maxlength="{{ \App\Models\Player::MAX_NAME_LENGTH }}"
                    placeholder="Enter your name">
             @error('playerName') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
         </div>

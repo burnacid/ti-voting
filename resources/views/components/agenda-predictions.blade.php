@@ -5,7 +5,7 @@
 @endphp
 
 <!-- Outcomes predicted aloud, e.g. with a Rider, shown to every player -->
-<section class="border-t pt-4 mt-4">
+<section class="border-t border-gray-200 dark:border-gray-700 pt-4 mt-4">
     <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Predictions</h3>
     <p class="text-sm text-gray-600 dark:text-gray-400 mb-3">
         A player who predicts an outcome, for example with a Rider, cannot vote on this agenda.

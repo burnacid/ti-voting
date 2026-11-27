@@ -206,10 +206,16 @@ class Game extends Model
         });
     }
 
+    // Characters of a game code, without the ones that are easily mixed up when read aloud or typed: 0/O and 1/I
+    public const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
     public static function generateCode(): string
     {
         do {
-            $code = strtoupper(substr(str_shuffle('ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'), 0, 6));
+            $code = '';
+            for ($i = 0; $i < 6; $i++) {
+                $code .= self::CODE_ALPHABET[random_int(0, strlen(self::CODE_ALPHABET) - 1)];
+            }
         } while (self::where('code', $code)->exists());
 
         return $code;
@@ -310,7 +316,7 @@ class Game extends Model
             return collect([]);
         }
 
-        $selectedSlices = collect($this->milty_draft_data['draft']['players'])->pluck('slice');
+        $selectedSlices = collect($this->milty_draft_data['draft']['players'] ?? [])->pluck('slice');
 
         $slices = collect([]);
         foreach($selectedSlices as $slice) {
@@ -329,7 +335,7 @@ class Game extends Model
     {
         $tiles = collect([18]);
         foreach($slices as $slice) {
-            $tiles = $tiles->merge(collect($slice['tiles']));
+            $tiles = $tiles->merge(collect($slice['tiles'] ?? []));
         }
 
         return $tiles;
@@ -346,7 +352,7 @@ class Game extends Model
     public function hasArgentFlight(): bool
     {
         return $this->miltyFactionNames()->contains(fn ($faction) => self::isArgentFlight($faction))
-            || $this->players()->get()->contains(fn ($player) => self::isArgentFlight($player->faction));
+            || $this->players()->where('faction', 'like', '%Argent%')->exists();
     }
 
     /**
@@ -354,7 +360,7 @@ class Game extends Model
      */
     public function argentFlightPlayerName(): ?string
     {
-        $player = $this->players()->get()->first(fn ($player) => self::isArgentFlight($player->faction));
+        $player = $this->players()->where('faction', 'like', '%Argent%')->oldest()->first();
         if ($player) {
             return $player->name;
         }
@@ -472,7 +478,7 @@ class Game extends Model
             return collect([]);
         }
 
-        $factionNames = collect($this->milty_draft_data['draft']['players'])->pluck('faction');
+        $factionNames = collect($this->milty_draft_data['draft']['players'] ?? [])->pluck('faction');
 
         return $factionNames;
     }

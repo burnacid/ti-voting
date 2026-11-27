@@ -47,6 +47,9 @@ class Player extends Model
             ->implode('');
     }
 
+    // Longer names do not fit the player list on a phone
+    public const MAX_NAME_LENGTH = 40;
+
     // How long a request to rejoin as this player waits for another player to confirm it
     public const REJOIN_REQUEST_MINUTES = 10;
 
@@ -74,6 +77,19 @@ class Player extends Model
         return $this->rejoin_request_token !== null
             && $this->rejoin_approved_at === null
             && $this->rejoin_requested_at?->gt(now()->subMinutes(self::REJOIN_REQUEST_MINUTES));
+    }
+
+    /**
+     * Whether this player may confirm the rejoin request of another player. Only players who were in the game
+     * before the request was made, so someone cannot join as a new player and approve their own request.
+     */
+    public function canApproveRejoinOf(Player $requested): bool
+    {
+        return $requested->id !== $this->id
+            && $requested->game_id === $this->game_id
+            && $requested->hasPendingRejoinRequest()
+            && $this->created_at !== null
+            && $this->created_at->lt($requested->rejoin_requested_at);
     }
 
     public function clearRejoinRequest(): void

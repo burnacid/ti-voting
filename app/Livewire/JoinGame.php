@@ -2,8 +2,8 @@
 
 namespace App\Livewire;
 
-use App\Events\TriggerRefresh;
 use App\Models\Game;
+use Illuminate\Support\Facades\RateLimiter;
 use Livewire\Component;
 
 class JoinGame extends Component
@@ -19,6 +19,14 @@ class JoinGame extends Component
 
     public function joinGame()
     {
+        // Slows down guessing game codes
+        $throttleKey = 'join-lookup|' . request()->ip();
+        if (RateLimiter::tooManyAttempts($throttleKey, 30)) {
+            $this->addError('gameCode', 'Too many attempts. Try again in ' . ceil(RateLimiter::availableIn($throttleKey) / 60) . ' minutes.');
+            return;
+        }
+        RateLimiter::hit($throttleKey, 600);
+
         $this->validate();
 
         $game = Game::where('code', strtoupper($this->gameCode))->first();
@@ -32,8 +40,6 @@ class JoinGame extends Component
             $this->addError('gameCode', 'This game has already ended.');
             return;
         }
-
-        TriggerRefresh::dispatch($game);
 
         // Redirect to the join page for this specific game
         return redirect()->route('join-group', strtoupper($this->gameCode));
