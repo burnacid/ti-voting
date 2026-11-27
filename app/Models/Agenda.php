@@ -188,13 +188,29 @@ class Agenda extends Model
         return $this->hasMany(Prediction::class);
     }
 
+    // Results of getVoteResults(), kept until the agenda is refreshed, as one render asks for them several times
+    private ?array $voteResults = null;
+
+    /**
+     * The influence on each option and its share of all influence spent, in the order of the options.
+     */
     public function getVoteResults(): array
     {
-        $results = [];
-        $totalInfluence = $this->votes()->sum('influence_spent');
+        if ($this->voteResults !== null) {
+            return $this->voteResults;
+        }
 
+        // One query for all options, as planet agendas have dozens
+        $totals = $this->votes()
+            ->selectRaw('option, SUM(influence_spent) as total')
+            ->groupBy('option')
+            ->pluck('total', 'option')
+            ->map(fn ($total) => (int) $total);
+        $totalInfluence = $totals->sum();
+
+        $results = [];
         foreach ($this->options as $option) {
-            $influenceTotal = $this->votes()->where('option', $option)->sum('influence_spent');
+            $influenceTotal = $totals[$option] ?? 0;
 
             $results[$option] = [
                 'influence' => $influenceTotal,
@@ -202,7 +218,14 @@ class Agenda extends Model
             ];
         }
 
-        return $results;
+        return $this->voteResults = $results;
+    }
+
+    public function refresh()
+    {
+        $this->voteResults = null;
+
+        return parent::refresh();
     }
 
     /**

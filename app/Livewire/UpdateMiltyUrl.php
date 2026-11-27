@@ -18,6 +18,7 @@ class UpdateMiltyUrl extends Component
 {
     use SharesGameLogContext;
 
+    #[Locked]
     public $game;
 
     // Kept as an id and loaded on every request, as the Speaker can remove the player mid-game

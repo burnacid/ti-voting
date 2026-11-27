@@ -33,7 +33,13 @@ class GameDashboard extends Component
         'elect_planet_non_home' => 'non_home',
     ];
 
+    // Set on mount only, a client cannot switch the component to another game
+    #[Locked]
     public Game $game;
+
+    // Limits for the options of a custom agenda
+    private const MAX_CUSTOM_OPTIONS = 30;
+    private const MAX_OPTION_LENGTH = 100;
 
     // Kept as an id and loaded on every request, as the Speaker can remove the player mid-game
     #[Locked]
@@ -169,20 +175,6 @@ class GameDashboard extends Component
         $this->reset(['newAgendaTitle', 'newAgendaDescription', 'newAgendaCardType', 'newAgendaElect', 'newAgendaSource', 'agendaType', 'customOptions', 'customTileNumbers']);
     }
 
-    public function rules()
-    {
-        return [
-            'selectedOption' => 'required|string',
-            'influenceSpent' => 'required|integer|min:0|max:99',
-            'newAgendaTitle' => 'required|string|max:255',
-            'newAgendaDescription' => 'required|string|max:1000',
-            'newAgendaCardType' => 'required|in:law,directive',
-            'agendaType' => 'required|in:for_against,elect_player,elect_planet_any,elect_planet_industrial,elect_planet_cultural,elect_planet_hazardous,elect_planet_non_home,custom',
-            'customOptions' => 'required_if:agendaType,custom|string|max:500',
-            'customTileNumbers' => 'nullable|string|max:255',
-        ];
-    }
-
     #[On('triggerRefresh')]
     #[On('miltyUrlUpdated')]
     #[On('influence-saved')]
@@ -199,20 +191,30 @@ class GameDashboard extends Component
         if (!$this->player) {
             $this->leaveRemovedGame();
         }
+    }
 
-//        $this->dispatch('flashMessage', [
-//            'Data refreshed successfully!',
-//            'success'
-//        ]);
+    // Tells a player who is not the Speaker that only the Speaker can do this
+    private function requireSpeaker(string $message): bool
+    {
+        if ($this->player->is_speaker) {
+            return true;
+        }
+
+        $this->dispatch('flashMessage', [$message, 'error']);
+
+        return false;
+    }
+
+    // After a change to the game: every other screen reloads it through the broadcast, this one right away
+    private function broadcastChange(): void
+    {
+        TriggerRefresh::dispatch($this->game);
+        $this->refreshData();
     }
 
     public function toggleCreateAgenda()
     {
-        if (!$this->player->is_speaker) {
-            $this->dispatch('flashMessage', [
-                'Only the Speaker can create agendas.',
-                'error'
-            ]);
+        if (!$this->requireSpeaker('Only the Speaker can create agendas.')) {
             return;
         }
 
@@ -225,11 +227,7 @@ class GameDashboard extends Component
 
     public function createAgenda()
     {
-        if (!$this->player->is_speaker) {
-            $this->dispatch('flashMessage', [
-                'Only the Speaker can create agendas.',
-                'error'
-            ]);
+        if (!$this->requireSpeaker('Only the Speaker can create agendas.')) {
             return;
         }
 
@@ -256,7 +254,7 @@ class GameDashboard extends Component
 
         if (empty($options)) {
             $this->dispatch('flashMessage', [
-                'Please provide valid options for the agenda.',
+                'Please provide valid options for the agenda: at most ' . self::MAX_CUSTOM_OPTIONS . ', separated by commas, each up to ' . self::MAX_OPTION_LENGTH . ' characters.',
                 'error'
             ]);
             return;
@@ -341,14 +339,18 @@ class GameDashboard extends Component
                 break;
 
             case 'custom':
-                if (empty($this->customOptions)) {
+                // Comma-separated. Abstain is added below, and an option differing only in case is the same option
+                $options = collect(explode(',', (string) $this->customOptions))
+                    ->map(fn ($option) => trim($option))
+                    ->filter(fn ($option) => $option !== '' && strcasecmp($option, 'Abstain') !== 0)
+                    ->unique(fn ($option) => mb_strtolower($option))
+                    ->values()
+                    ->all();
+
+                if (empty($options) || count($options) > self::MAX_CUSTOM_OPTIONS
+                    || collect($options)->contains(fn ($option) => mb_strlen($option) > self::MAX_OPTION_LENGTH)) {
                     return [];
                 }
-                // Split custom options by comma and clean them up
-                $options = array_map('trim', explode(',', $this->customOptions));
-                $options = array_filter($options, function($option) {
-                    return !empty($option);
-                });
                 break;
 
             default:
@@ -363,11 +365,7 @@ class GameDashboard extends Component
 
     public function transferSpeaker($playerId)
     {
-        if (!$this->player->is_speaker) {
-            $this->dispatch('flashMessage', [
-                'Only the Speaker can transfer the Speaker token.',
-                'error'
-            ]);
+        if (!$this->requireSpeaker('Only the Speaker can transfer the Speaker token.')) {
             return;
         }
 
@@ -396,8 +394,7 @@ class GameDashboard extends Component
                 "Speaker token transferred to {$newSpeaker->name}!",
                 'success'
             ]);
-            $this->refreshData();
-            TriggerRefresh::dispatch($this->game);
+            $this->broadcastChange();
 
         } catch (\Exception $e) {
             report($e);
@@ -427,8 +424,8 @@ class GameDashboard extends Component
     // Another player confirms that the person asking to rejoin as this player really is them
     public function approveRejoin($playerId)
     {
-        $requested = $this->game->players()->find($playerId);
-        if (!$requested || $requested->id === $this->player->id || !$requested->hasPendingRejoinRequest()) {
+        $requested = $this->rejoinRequestToAnswer($playerId);
+        if (!$requested) {
             return;
         }
 
@@ -441,8 +438,8 @@ class GameDashboard extends Component
 
     public function declineRejoin($playerId)
     {
-        $requested = $this->game->players()->find($playerId);
-        if (!$requested || $requested->id === $this->player->id || !$requested->hasPendingRejoinRequest()) {
+        $requested = $this->rejoinRequestToAnswer($playerId);
+        if (!$requested) {
             return;
         }
 
@@ -452,13 +449,24 @@ class GameDashboard extends Component
         TriggerRefresh::dispatch($this->game);
     }
 
+    /**
+     * The player whose pending rejoin request this player may answer. Never from the browser that sent the request,
+     * and only for players who were in the game before it was made, see Player::canApproveRejoinOf().
+     */
+    private function rejoinRequestToAnswer($playerId): ?Player
+    {
+        $requested = $this->game->players()->find($playerId);
+
+        if (!$requested || !$this->player->canApproveRejoinOf($requested) || session('rejoin_request.player') === $requested->id) {
+            return null;
+        }
+
+        return $requested;
+    }
+
     public function removePlayer($playerId)
     {
-        if (!$this->player->is_speaker) {
-            $this->dispatch('flashMessage', [
-                'Only the Speaker can remove players.',
-                'error'
-            ]);
+        if (!$this->requireSpeaker('Only the Speaker can remove players.')) {
             return;
         }
 
@@ -474,17 +482,12 @@ class GameDashboard extends Component
             "{$removedPlayer->name} was removed from the game.",
             'info'
         ]);
-        TriggerRefresh::dispatch($this->game);
-        $this->refreshData();
+        $this->broadcastChange();
     }
 
     public function toggleVotingBlock($playerId)
     {
-        if (!$this->player->is_speaker) {
-            $this->dispatch('flashMessage', [
-                'Only the Speaker can decide who may vote.',
-                'error'
-            ]);
+        if (!$this->requireSpeaker('Only the Speaker can decide who may vote.')) {
             return;
         }
 
@@ -514,8 +517,7 @@ class GameDashboard extends Component
         $currentAgenda->update(['blocked_player_ids' => $blockedIds->values()->all()]);
 
         $this->dispatch('flashMessage', [$message, 'info']);
-        TriggerRefresh::dispatch($this->game);
-        $this->refreshData();
+        $this->broadcastChange();
     }
 
     public function makePrediction()
@@ -571,8 +573,7 @@ class GameDashboard extends Component
         ]);
         $this->reset(['predictionSource', 'predictionOption', 'predictionPlayerId']);
 
-        TriggerRefresh::dispatch($this->game);
-        $this->refreshData();
+        $this->broadcastChange();
     }
 
     // A prediction recorded by mistake can be removed by its player or the Speaker, until voting opens
@@ -591,8 +592,7 @@ class GameDashboard extends Component
         $prediction->delete();
         Log::info('Prediction removed', ['agenda' => $currentAgenda->title, 'player' => $prediction->player->name, 'source' => $prediction->source_label]);
 
-        TriggerRefresh::dispatch($this->game);
-        $this->refreshData();
+        $this->broadcastChange();
     }
 
     public function submitVote()
@@ -731,11 +731,7 @@ class GameDashboard extends Component
 
     public function endVoting()
     {
-        if (!$this->player->is_speaker) {
-            $this->dispatch('flashMessage', [
-                'Only the Speaker can end voting.',
-                'error'
-            ]);
+        if (!$this->requireSpeaker('Only the Speaker can end voting.')) {
             return;
         }
 
@@ -756,8 +752,7 @@ class GameDashboard extends Component
                     : 'Voting has ended. Please announce the results to the other players.',
                 'info'
             ]);
-            $this->refreshData();
-            TriggerRefresh::dispatch($this->game);
+            $this->broadcastChange();
         }
     }
 
@@ -851,8 +846,7 @@ class GameDashboard extends Component
         $this->dispatch('flashMessage', ["You broke the tie: {$option} wins.", 'success']);
         $this->applyRepresentativeGovernment($agenda);
         $this->applyTermLimits($agenda);
-        TriggerRefresh::dispatch($this->game);
-        $this->refreshData();
+        $this->broadcastChange();
     }
 
     public function toggleAffectedPlayers()
@@ -879,8 +873,7 @@ class GameDashboard extends Component
                 : 'Representative Government is no longer in effect: players spend influence to vote again.',
             'info'
         ]);
-        TriggerRefresh::dispatch($this->game);
-        $this->refreshData();
+        $this->broadcastChange();
     }
 
     // Absol's Representative Government: the player who controls Mecatol Rex may cast 2 votes. Empty for nobody
@@ -902,8 +895,7 @@ class GameDashboard extends Component
             $controller ? "{$controller->name} controls Mecatol Rex." : 'Nobody controls Mecatol Rex.',
             'info'
         ]);
-        TriggerRefresh::dispatch($this->game);
-        $this->refreshData();
+        $this->broadcastChange();
     }
 
     public function toggleTermLimits()
@@ -921,8 +913,7 @@ class GameDashboard extends Component
                 : 'Term Limits is no longer in effect.',
             'info'
         ]);
-        TriggerRefresh::dispatch($this->game);
-        $this->refreshData();
+        $this->broadcastChange();
     }
 
     // Star Chart: draw a random system tile that is not on the map yet. Any player can draw, everyone sees the result
@@ -941,8 +932,7 @@ class GameDashboard extends Component
 
         Log::info('Star Chart tile drawn', ['tile' => $tile]);
         $this->dispatch('flashMessage', ["Star Chart drew system tile {$tile}.", 'success']);
-        TriggerRefresh::dispatch($this->game);
-        $this->refreshData();
+        $this->broadcastChange();
     }
 
     // The Speaker can undo a draw made by mistake, which puts the tile back in the pool
@@ -954,8 +944,7 @@ class GameDashboard extends Component
 
         $this->game->removeStarChartTile((string) $tile);
         Log::info('Star Chart tile removed', ['tile' => (string) $tile]);
-        TriggerRefresh::dispatch($this->game);
-        $this->refreshData();
+        $this->broadcastChange();
     }
 
     // Hidden Agenda: votes are secret. Only changed between agendas and only applies to the next agenda,
@@ -983,8 +972,7 @@ class GameDashboard extends Component
                 : 'Hidden Agenda is off: every player sees how each player votes on the next agenda.',
             'info',
         ]);
-        TriggerRefresh::dispatch($this->game);
-        $this->refreshData();
+        $this->broadcastChange();
     }
 
     // Managed influence: the Speaker starts the agenda phase, players enter their influence and votes are taken from it
@@ -1012,8 +1000,7 @@ class GameDashboard extends Component
                 : 'Managed influence is off. Players keep track of their own influence.',
             'info',
         ]);
-        TriggerRefresh::dispatch($this->game);
-        $this->refreshData();
+        $this->broadcastChange();
     }
 
     public function startAgendaPhase()
@@ -1042,12 +1029,16 @@ class GameDashboard extends Component
             'success',
         ]);
         $this->dispatch('influence-changed');
-        TriggerRefresh::dispatch($this->game);
-        $this->refreshData();
+        $this->broadcastChange();
     }
 
     public function savePhaseInfluence()
     {
+        // Entered once for the agenda phase. After that it is locked while an agenda is open, as votes are taken from it
+        if (!$this->game->needsInfluenceFrom($this->player) && $this->game->currentAgenda()) {
+            return;
+        }
+
         $this->validate(
             ['phaseInfluence' => 'required|integer|min:0|max:99'],
             [
@@ -1063,8 +1054,7 @@ class GameDashboard extends Component
 
         $this->reset('phaseInfluence');
         $this->dispatch('influence-changed');
-        TriggerRefresh::dispatch($this->game);
-        $this->refreshData();
+        $this->broadcastChange();
     }
 
     public function toggleShowResults()
@@ -1082,8 +1072,7 @@ class GameDashboard extends Component
                 : 'Only you see the results when voting ends.',
             'info',
         ]);
-        TriggerRefresh::dispatch($this->game);
-        $this->refreshData();
+        $this->broadcastChange();
     }
 
     public function toggleAbsolAgendas()
@@ -1104,8 +1093,7 @@ class GameDashboard extends Component
                 : 'The agenda list now shows the official agendas.',
             'info',
         ]);
-        TriggerRefresh::dispatch($this->game);
-        $this->refreshData();
+        $this->broadcastChange();
     }
 
     public function toggleFracture()
@@ -1130,8 +1118,7 @@ class GameDashboard extends Component
         }
 
         $this->dispatch('flashMessage', [$message, 'info']);
-        TriggerRefresh::dispatch($this->game);
-        $this->refreshData();
+        $this->broadcastChange();
     }
 
     /**
@@ -1165,11 +1152,7 @@ class GameDashboard extends Component
 
     public function completeRevealStep()
     {
-        if (!$this->player->is_speaker) {
-            $this->dispatch('flashMessage', [
-                'Only the Speaker can continue the agenda.',
-                'error'
-            ]);
+        if (!$this->requireSpeaker('Only the Speaker can continue the agenda.')) {
             return;
         }
 
@@ -1193,17 +1176,12 @@ class GameDashboard extends Component
         }
 
         $this->dispatch('flashMessage', [$message, 'success']);
-        TriggerRefresh::dispatch($this->game);
-        $this->refreshData();
+        $this->broadcastChange();
     }
 
     public function discardAgenda()
     {
-        if (!$this->player->is_speaker) {
-            $this->dispatch('flashMessage', [
-                'Only the Speaker can discard the agenda.',
-                'error'
-            ]);
+        if (!$this->requireSpeaker('Only the Speaker can discard the agenda.')) {
             return;
         }
 
@@ -1220,8 +1198,7 @@ class GameDashboard extends Component
             'Agenda discarded. Reveal the next agenda.',
             'info'
         ]);
-        TriggerRefresh::dispatch($this->game);
-        $this->refreshData();
+        $this->broadcastChange();
     }
 
     /**
@@ -1247,11 +1224,6 @@ class GameDashboard extends Component
             : collect();
     }
 
-    public function refreshComponent()
-    {
-        $this->refreshData();
-    }
-
     public function render()
     {
         if (!$this->player) {
@@ -1267,7 +1239,10 @@ class GameDashboard extends Component
 
         $players = $this->game->players()->get();
         $hasVoted = $currentAgenda ? $this->player->hasVotedOn($currentAgenda) : false;
-        $allVoted = $currentAgenda ? $currentAgenda->allPlayersVoted() : false;
+        // Same as Agenda::allPlayersVoted(), the counts are also shown as the voting progress
+        $voteCount = $currentAgenda ? $currentAgenda->votes()->count() : 0;
+        $eligibleCount = $currentAgenda ? $currentAgenda->eligiblePlayerCount() : 0;
+        $allVoted = $currentAgenda && $voteCount >= $eligibleCount;
 
         if($currentAgenda) {
             if ($allVoted && $this->player->is_speaker) {
@@ -1308,7 +1283,7 @@ class GameDashboard extends Component
                 'planets' => app(PlanetService::class)->getTile($draw['tile'])['planets'] ?? [],
             ])->values(),
             'starChartPoolSize' => $this->game->milty_draft_data ? $this->game->starChartPool()->count() : 0,
-            'rejoinRequests' => $players->filter(fn ($gamePlayer) => $gamePlayer->id !== $this->player->id && $gamePlayer->hasPendingRejoinRequest()),
+            'rejoinRequests' => $players->filter(fn ($gamePlayer) => $this->player->canApproveRejoinOf($gamePlayer) && session('rejoin_request.player') !== $gamePlayer->id),
             'currentAgenda' => $currentAgenda,
             'players' => $players,
             'noInfluence' => $noInfluence,
@@ -1320,6 +1295,8 @@ class GameDashboard extends Component
             'openVotes' => $currentAgenda && !$currentAgenda->secret_votes ? $currentAgenda->votes()->get()->keyBy('player_id') : collect(),
             'hasVoted' => $hasVoted,
             'allVoted' => $allVoted,
+            'voteCount' => $voteCount,
+            'eligibleCount' => $eligibleCount,
             'showResults' => $showResults,
             'voteResults' => $voteResults,
             'predictions' => $currentAgenda ? $currentAgenda->predictions()->with('player')->oldest()->get() : collect(),

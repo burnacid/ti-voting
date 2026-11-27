@@ -54,3 +54,28 @@ test('an agenda source that is not a known deck is rejected', function () {
 
     expect($game->currentAgenda())->toBeNull();
 });
+
+test('pages send security headers', function () {
+    $this->get('/')
+        ->assertOk()
+        ->assertHeader('X-Frame-Options', 'SAMEORIGIN')
+        ->assertHeader('Content-Security-Policy', "frame-ancestors 'self'")
+        ->assertHeader('X-Content-Type-Options', 'nosniff')
+        ->assertHeader('Referrer-Policy', 'strict-origin-when-cross-origin')
+        ->assertHeaderMissing('Strict-Transport-Security');
+
+    $this->get('https://localhost/')->assertHeader('Strict-Transport-Security');
+});
+
+test('game codes only use characters that are not easily mixed up', function () {
+    foreach (range(1, 50) as $attempt) {
+        expect(Game::generateCode())->toMatch('/^[ABCDEFGHJKLMNPQRSTUVWXYZ2-9]{6}$/');
+    }
+});
+
+test('a milty response without draft players is not a draft', function () {
+    Http::fake(['milty.shenanigans.be/*' => Http::response(['error' => 'not found'])]);
+
+    expect(fn () => (new DraftImporter())->import('https://milty.shenanigans.be/d/abc123'))
+        ->toThrow(InvalidArgumentException::class);
+});

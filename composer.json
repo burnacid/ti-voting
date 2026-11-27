@@ -1,8 +1,8 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
-    "name": "laravel/blank-livewire-starter-kit",
+    "name": "burnacid/ti-voting",
     "type": "project",
-    "description": "The official Laravel starter kit for Livewire.",
+    "description": "Secret agenda voting for Twilight Imperium 4th Edition.",
     "keywords": [
         "laravel",
         "framework"
@@ -14,7 +14,7 @@
         "laravel/framework": "^12.0",
         "laravel/reverb": "^1.0",
         "laravel/tinker": "^2.10.1",
-        "livewire/volt": "^1.7.0",
+        "livewire/livewire": "^4.2",
         "pragmarx/google2fa": "^8.0",
         "spatie/laravel-passkeys": "^1.0"
     },

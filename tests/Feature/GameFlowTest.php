@@ -3,6 +3,7 @@
 use App\Events\TriggerRefresh;
 use App\Livewire\CreateGame;
 use App\Livewire\GameDashboard;
+use App\Livewire\JoinGame;
 use App\Livewire\JoinGameForm;
 use App\Livewire\PlayerInfluence;
 use App\Livewire\UpdateMiltyUrl;
@@ -46,6 +47,20 @@ function makeGame(array $attributes = []): array
     $game->update(['speaker_id' => $speaker->id]);
 
     return [$game, $speaker, $other];
+}
+
+// Runs the callback as another browser: without the session of this one, which has its rejoin request
+function inOtherBrowser(callable $callback): void
+{
+    $session = session()->all();
+    session()->flush();
+
+    try {
+        $callback();
+    } finally {
+        session()->flush();
+        session()->put($session);
+    }
 }
 
 // The games this browser was told to remember in the response, code => session token
@@ -566,6 +581,8 @@ test('every player sees the game rejoin link and no session tokens', function ()
 test('a player who lost access rejoins once another player confirms it', function () {
     Event::fake([TriggerRefresh::class]);
     [$game, $speaker, $other] = makeGame();
+    // Only players who were in the game before the request can confirm it
+    $this->travel(1)->seconds();
 
     // The Speaker lost their session and asks to rejoin from a new browser
     $request = Livewire::test(JoinGameForm::class, ['gameCode' => $game->code, 'rejoin' => true])
@@ -580,16 +597,18 @@ test('a player who lost access rejoins once another player confirms it', functio
     expect(rememberedGames())->toBe([]);
 
     // The requested player cannot confirm themselves, another player can
-    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker->fresh()])
-        ->assertDontSee('Someone wants to rejoin as Speaker')
-        ->assertSee('Someone is asking to rejoin as you')
-        ->call('approveRejoin', $speaker->id);
-    expect($speaker->fresh()->rejoin_approved_at)->toBeNull();
+    inOtherBrowser(function () use ($game, $speaker, $other) {
+        Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker->fresh()])
+            ->assertDontSee('Someone wants to rejoin as Speaker')
+            ->assertSee('Someone is asking to rejoin as you')
+            ->call('approveRejoin', $speaker->id);
+        expect($speaker->fresh()->rejoin_approved_at)->toBeNull();
 
-    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $other])
-        ->assertSee('Someone wants to rejoin as Speaker')
-        ->assertSee('including the Speaker controls')
-        ->call('approveRejoin', $speaker->id);
+        Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $other])
+            ->assertSee('Someone wants to rejoin as Speaker')
+            ->assertSee('including the Speaker controls')
+            ->call('approveRejoin', $speaker->id);
+    });
 
     $request->call('checkRejoin')->assertRedirect(route('game.show', $game->code));
     expect(rememberedGames())->toBe([$game->code => $speaker->session_token])
@@ -599,18 +618,59 @@ test('a player who lost access rejoins once another player confirms it', functio
 test('a declined rejoin request does not let the browser in', function () {
     Event::fake([TriggerRefresh::class]);
     [$game, $speaker, $other] = makeGame();
+    $this->travel(1)->seconds();
 
     $request = Livewire::test(JoinGameForm::class, ['gameCode' => $game->code, 'rejoin' => true])
         ->set('playerName', 'Other')
         ->call('requestRejoin');
 
-    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
-        ->call('declineRejoin', $other->id);
+    inOtherBrowser(fn () => Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->call('declineRejoin', $other->id));
 
     $request->call('checkRejoin')
         ->assertSet('rejoinStatus', 'declined')
         ->assertSee('Your request to rejoin was declined');
     expect(rememberedGames())->toBe([]);
+});
+
+test('the browser that asks to rejoin cannot confirm its own request', function () {
+    [$game, $speaker, $other] = makeGame();
+    $this->travel(1)->seconds();
+
+    // Someone at the table joins as a new player, then asks to rejoin as the Speaker from the same browser
+    $mallory = Player::create(['game_id' => $game->id, 'name' => 'Mallory', 'session_token' => Player::generateSessionToken()]);
+    $this->travel(1)->seconds();
+    Livewire::test(JoinGameForm::class, ['gameCode' => $game->code, 'rejoin' => true])
+        ->set('playerName', 'Speaker')
+        ->call('requestRejoin');
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $mallory])
+        ->assertDontSee('Someone wants to rejoin as Speaker')
+        ->call('approveRejoin', $speaker->id);
+
+    expect($speaker->fresh()->rejoin_approved_at)->toBeNull();
+});
+
+test('a player who joined after a rejoin request cannot confirm it', function () {
+    [$game, $speaker] = makeGame();
+    $this->travel(1)->seconds();
+
+    Livewire::test(JoinGameForm::class, ['gameCode' => $game->code, 'rejoin' => true])
+        ->set('playerName', 'Speaker')
+        ->call('requestRejoin');
+
+    // Joined from another browser after the request was made
+    $this->travel(1)->seconds();
+    $late = Player::create(['game_id' => $game->id, 'name' => 'Late', 'session_token' => Player::generateSessionToken()]);
+
+    inOtherBrowser(fn () => Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $late])
+        ->assertDontSee('Someone wants to rejoin as Speaker')
+        ->call('approveRejoin', $speaker->id)
+        ->call('declineRejoin', $speaker->id));
+
+    expect($speaker->fresh())
+        ->rejoin_approved_at->toBeNull()
+        ->hasPendingRejoinRequest()->toBeTrue();
 });
 
 test('a rejoin request expires when nobody confirms it', function () {
@@ -2233,4 +2293,133 @@ test('seed of an empire lists the for voters in order instead of a plain list', 
         ->call('toggleAffectedPlayers')
         ->assertSee('Other players who voted &ldquo;For&rdquo;, from most votes to least', false)
         ->assertDontSee('Players who voted &ldquo;For&rdquo;</p>', false);
+});
+
+test('with managed influence a player cannot change their influence while an agenda is open', function () {
+    [$game, $speaker, $other] = makeGame();
+    startManagedPhase($game, $speaker);
+    $other->update(['influence' => 3]);
+    $agenda = makeAgenda($game);
+
+    Livewire::test(PlayerInfluence::class, ['game' => $game->fresh(), 'player' => $other->fresh()])
+        ->assertSee('you can change it once this agenda ends')
+        ->set('influence', 99)
+        ->call('save')
+        ->assertHasErrors('influence');
+    // Nor through the prompt of the agenda phase, once entered
+    Livewire::test(GameDashboard::class, ['game' => $game->fresh(), 'player' => $other->fresh()])
+        ->set('phaseInfluence', 99)
+        ->call('savePhaseInfluence');
+    expect($other->fresh()->influence)->toBe(3);
+
+    // Once the agenda ended it can be changed again
+    $agenda->update(['status' => 'completed', 'voting_ended_at' => now()]);
+    Livewire::test(PlayerInfluence::class, ['game' => $game->fresh(), 'player' => $other->fresh()])
+        ->set('influence', 5)
+        ->call('save')
+        ->assertHasNoErrors();
+    expect($other->fresh()->influence)->toBe(5);
+});
+
+test('without managed influence a player can change their influence during an agenda', function () {
+    [$game, , $other] = makeGame();
+    makeAgenda($game);
+
+    Livewire::test(PlayerInfluence::class, ['game' => $game, 'player' => $other])
+        ->set('influence', 7)
+        ->call('save')
+        ->assertHasNoErrors();
+
+    expect($other->fresh()->influence)->toBe(7);
+});
+
+test('a name that differs only in case is taken', function () {
+    [$game, , $other] = makeGame();
+
+    Livewire::test(JoinGameForm::class, ['gameCode' => $game->code])
+        ->set('playerName', '  other ')
+        ->call('joinGame')
+        ->assertHasErrors('playerName')
+        // Offers to rejoin as the player, spelled as they joined
+        ->assertSet('playerName', 'Other')
+        ->assertSet('nameTaken', true);
+
+    expect($game->players()->count())->toBe(2);
+});
+
+test('player names are trimmed and limited in length', function () {
+    [$game] = makeGame();
+
+    Livewire::test(JoinGameForm::class, ['gameCode' => $game->code])
+        ->set('playerName', str_repeat('a', Player::MAX_NAME_LENGTH + 1))
+        ->call('joinGame')
+        ->assertHasErrors(['playerName' => 'max']);
+
+    Livewire::test(JoinGameForm::class, ['gameCode' => $game->code])
+        ->set('playerName', '  Newcomer  ')
+        ->call('joinGame');
+
+    expect($game->players()->where('name', 'Newcomer')->exists())->toBeTrue();
+});
+
+test('looking up a game code does not refresh the game and is throttled', function () {
+    [$game] = makeGame();
+
+    Livewire::test(JoinGame::class)
+        ->set('gameCode', $game->code)
+        ->call('joinGame')
+        ->assertRedirect(route('join-group', $game->code));
+    Event::assertNotDispatched(TriggerRefresh::class);
+
+    foreach (range(1, 30) as $attempt) {
+        Livewire::test(JoinGame::class)->set('gameCode', 'ZZZZZZ')->call('joinGame');
+    }
+    Livewire::test(JoinGame::class)
+        ->set('gameCode', $game->code)
+        ->call('joinGame')
+        ->assertHasErrors('gameCode')
+        ->assertNoRedirect();
+});
+
+test('custom agenda options are deduplicated and get one abstain', function () {
+    [$game, $speaker] = makeGame();
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->set('newAgendaTitle', 'Custom')
+        ->set('newAgendaDescription', 'A custom agenda')
+        ->set('newAgendaCardType', 'directive')
+        ->set('agendaType', 'custom')
+        ->set('customOptions', 'Red, red , Blue,, abstain, Blue')
+        ->call('createAgenda');
+
+    expect($game->currentAgenda()->options)->toBe(['Red', 'Blue', 'Abstain']);
+});
+
+test('a custom agenda with too many or too long options is refused', function (string $options) {
+    [$game, $speaker] = makeGame();
+
+    Livewire::test(GameDashboard::class, ['game' => $game, 'player' => $speaker])
+        ->set('newAgendaTitle', 'Custom')
+        ->set('newAgendaDescription', 'A custom agenda')
+        ->set('newAgendaCardType', 'directive')
+        ->set('agendaType', 'custom')
+        ->set('customOptions', $options)
+        ->call('createAgenda');
+
+    expect($game->currentAgenda())->toBeNull();
+})->with([
+    'too many' => [implode(',', array_map(fn ($i) => "Option {$i}", range(1, 31)))],
+    'too long' => [str_repeat('x', 101) . ', Short'],
+    'only abstain' => ['Abstain, '],
+]);
+
+test('a game with malformed draft data still opens', function () {
+    [$game, $speaker] = makeGame(['milty_draft_data' => ['config' => []]]);
+
+    $this->withCookie(PlayerGames::COOKIE, json_encode([$game->code => $speaker->session_token]))
+        ->get(route('game.show', $game->code))
+        ->assertOk();
+
+    expect($game->getPlanets())->not->toBeEmpty()
+        ->and($game->hasArgentFlight())->toBeFalse();
 });

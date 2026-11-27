@@ -437,8 +437,9 @@
                     @endif
                 </div>
             @elseif($currentAgenda->isVotingOpen() && !$hasVoted)
-                <!-- Voting Form -->
-                <form wire:submit="submitVote" class="space-y-4">
+                <!-- Voting Form. Votes are final, so the first tap shows a summary to confirm -->
+                <form wire:submit="submitVote" class="space-y-4"
+                      x-data="{ confirming: false }" x-on:change="confirming = false" x-on:submit="confirming = false">
                     @if(!$currentAgenda->secret_votes)
                         <p class="text-sm text-blue-800 dark:text-blue-200 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
                             Hidden Agenda is off: every player sees how you vote.
@@ -456,16 +457,18 @@
                         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
                             @foreach($currentAgenda->options as $option)
                                 @php($optionDisabled = $onlyAbstain && $option !== 'Abstain')
-                                <label class="flex items-center p-2 rounded-md
-                                    {{ $option === 'Abstain' ? 'bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/30 border border-red-200 dark:border-red-800' : 'hover:bg-gray-50 dark:hover:bg-gray-700' }}
-                                    {{ $optionDisabled ? 'opacity-50 cursor-not-allowed' : '' }}
-                                    transition-colors">
+                                <label class="flex items-center gap-3 min-h-11 px-3 py-2.5 rounded-lg border transition-colors
+                                    {{ $option === 'Abstain' ? 'border-dashed' : '' }}
+                                    border-gray-200 dark:border-gray-600
+                                    has-checked:border-blue-500 has-checked:bg-blue-50 has-checked:ring-1 has-checked:ring-blue-500
+                                    dark:has-checked:border-blue-400 dark:has-checked:bg-blue-900/30 dark:has-checked:ring-blue-400
+                                    {{ $optionDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50' }}">
                                     <input type="radio"
                                            wire:model.live="selectedOption"
                                            @disabled($optionDisabled)
                                            value="{{ $option }}"
-                                           class="{{ $option === 'Abstain' ? 'text-red-600' : 'text-blue-600' }} mr-2">
-                                    <span class="{{ $option === 'Abstain' ? 'text-red-800 dark:text-red-200' : 'text-gray-900 dark:text-white' }}">{{ $option }}</span>
+                                           class="text-blue-600 shrink-0">
+                                    <span class="{{ $option === 'Abstain' ? 'text-gray-600 dark:text-gray-300' : 'font-medium text-gray-900 dark:text-white' }}">{{ $option }}</span>
                                 </label>
                             @endforeach
                         </div>
@@ -509,20 +512,54 @@
                                 You have {{ $player->influence }} influence available.{{ $managedMax !== null ? ' It goes down by the influence you spend.' : '' }}
                             </p>
                         @endif
-                        <input type="number"
-                               id="influenceSpent"
-                               wire:model="influenceSpent"
-                               min="1"
-                               max="{{ $managedMax ?? 99 }}"
-                               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white">
+                        <!-- Buttons next to the field, as the spinner of a number field is hard to tap on a phone -->
+                        <div class="flex items-stretch gap-2"
+                             x-data="{ max: {{ $managedMax ?? 99 }}, step(by) { $wire.influenceSpent = Math.min(this.max, Math.max(1, (parseInt($wire.influenceSpent) || 0) + by)) } }">
+                            <button type="button" x-on:click="step(-1)" aria-label="Spend less influence"
+                                    class="w-12 shrink-0 rounded-lg border border-gray-300 dark:border-gray-600 text-xl font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 active:bg-gray-100 dark:active:bg-gray-600">&minus;</button>
+                            <input type="number"
+                                   id="influenceSpent"
+                                   wire:model="influenceSpent"
+                                   min="1"
+                                   max="{{ $managedMax ?? 99 }}"
+                                   inputmode="numeric"
+                                   class="w-full min-w-0 px-3 py-2 text-center text-lg font-semibold tabular-nums border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white">
+                            <button type="button" x-on:click="step(1)" aria-label="Spend more influence"
+                                    class="w-12 shrink-0 rounded-lg border border-gray-300 dark:border-gray-600 text-xl font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 active:bg-gray-100 dark:active:bg-gray-600">+</button>
+                        </div>
                         @error('influenceSpent') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
                     </div>
                     @endif
 
-                    <button type="submit"
-                            class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition-colors">
-                        Submit Vote
-                    </button>
+                    <div x-show="!confirming">
+                        {{-- Without an option the vote is sent right away, so its error is shown --}}
+                        <button type="button"
+                                x-on:click="$wire.selectedOption ? confirming = true : $wire.submitVote()"
+                                class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold py-2.5 px-5 rounded-lg transition-colors">
+                            Submit Vote
+                        </button>
+                    </div>
+                    <div x-show="confirming" x-cloak role="alert"
+                         x-data="{ countsVotes: @js((bool) $game->representative_government) }"
+                         class="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 p-3 space-y-3">
+                        <p class="text-sm text-blue-900 dark:text-blue-100" x-text="(() => {
+                            if ($wire.selectedOption === 'Abstain') return 'You abstain. Votes are final.';
+                            const amount = parseInt($wire.influenceSpent) || (countsVotes ? 1 : 0);
+                            const unit = countsVotes ? (amount === 1 ? 'vote' : 'votes') : 'influence';
+                            return `You vote ${$wire.selectedOption} with ${amount} ${unit}. Votes are final.`;
+                        })()"></p>
+                        <div class="flex flex-col-reverse sm:flex-row gap-2">
+                            <button type="button" x-on:click="confirming = false"
+                                    class="w-full sm:w-auto py-2.5 px-5 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 font-medium hover:bg-white dark:hover:bg-gray-700">
+                                Back
+                            </button>
+                            <button type="submit" wire:loading.attr="disabled" wire:target="submitVote"
+                                    class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:opacity-60 text-white font-semibold py-2.5 px-5 rounded-lg transition-colors">
+                                <span wire:loading.remove wire:target="submitVote">Confirm vote</span>
+                                <span wire:loading wire:target="submitVote">Submitting&hellip;</span>
+                            </button>
+                        </div>
+                    </div>
                 </form>
             @elseif($hasVoted && $currentAgenda->status === 'voting')
                 <div class="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
@@ -540,9 +577,7 @@
             @endif
 
             <!-- Vote Progress -->
-            @php($voteCount = $currentAgenda->votes()->count())
-            @php($eligibleCount = $currentAgenda->eligiblePlayerCount())
-            <div class="border-t pt-4 mt-4">
+            <div class="border-t border-gray-200 dark:border-gray-700 pt-4 mt-4">
                 <div class="flex justify-between items-center mb-2">
                     <span class="text-sm text-gray-600 dark:text-gray-300">Voting Progress</span>
                     <span class="text-sm text-gray-600 dark:text-gray-300">
@@ -557,7 +592,7 @@
 
             <!-- Results (Speaker Only or when voting ended) -->
             @if($speakerViewResults || $currentAgenda->status === 'completed')
-                <div class="border-t pt-4 mt-4">
+                <div class="border-t border-gray-200 dark:border-gray-700 pt-4 mt-4">
                     <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Voting Results</h3>
                     @if(collect($voteResults)->sum('influence') == 0)
                         <h4 class="font-semibold text-gray-900 dark:text-white mb-4">All players abstained or no influence was spent on votes. No results to display.</h4>

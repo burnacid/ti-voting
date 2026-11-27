@@ -6,10 +6,12 @@ use App\Events\TriggerRefresh;
 use App\Models\Game;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class GameDetail extends Component
 {
+    #[Locked]
     public Game $game;
 
     // For when the Speaker lost their session and nobody can run the agendas

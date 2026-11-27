@@ -18,6 +18,8 @@ return Application::configure(basePath: dirname(__DIR__))
         // Only admins log in, there are no other user accounts
         $middleware->redirectGuestsTo(fn () => route('admin.login'));
         $middleware->redirectUsersTo(fn () => route('admin.dashboard'));
+
+        $middleware->web(append: [\App\Http\Middleware\SecurityHeaders::class]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         // The app never changes locked properties itself, so this is a crafted or replayed Livewire request.

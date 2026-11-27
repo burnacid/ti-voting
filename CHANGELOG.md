@@ -4,6 +4,28 @@ All notable changes to TI Voting are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.5] - 2026-11-27
+
+### Changed
+- The vote form is easier to use on a phone. Every option is a tap target of the same size that clearly shows when it is selected, and Abstain is no longer red, so it doesn't look like an error. The influence field has − and + buttons. Submit Vote first shows a summary such as "You vote For with 3 influence. Votes are final." with Back and Confirm, and the button can't be tapped twice while the vote is sent.
+- New game codes leave out characters that are easily mixed up, 0/O and 1/I. Existing codes keep working.
+- Player names can be at most 40 characters, and spaces around them are removed. A name that only differs in case from a player in the game, such as "alice" next to "Alice", counts as taken, and offers to rejoin as that player.
+- A custom agenda lists each option once, ignores a typed "Abstain" because one is always added, and can have at most 30 options of up to 100 characters each.
+- The lines above the voting progress and the predictions are light grey instead of black.
+- Vote results are counted with one database query instead of one for each option, which makes planet agendas faster to load.
+
+### Fixed
+- Only players who were in the game before a rejoin request was made can confirm or decline it, and never from the browser that sent it. Before, a player could join as a new player and confirm their own request to take over another player, including the Speaker.
+- With managed influence, players can't change their influence while an agenda is open, as the votes are taken from it. Before, a player could raise it again after spending it.
+- Entering a game code on the home page no longer reloads the game on every player's screen. Entering codes is limited to 30 tries per 10 minutes, and the join and rejoin pages are limited to 60 visits a minute, to slow down guessing codes.
+- A game whose draft data is incomplete opens again instead of showing a server error. A Milty response without the players of the draft is refused when loading the draft.
+
+### Security
+- Pages send security headers: they can't be shown inside a frame on another site, and over https browsers are told to keep using https.
+- The game a page belongs to can't be changed by a crafted request.
+- Updated the PHP and JavaScript dependencies, which fixes the known security advisories in them, including in Laravel and Guzzle. Livewire is now a direct dependency, and the unused Livewire Volt is removed.
+- `.env.example` has `SESSION_SECURE_COOKIE`, to set to `true` in production so the cookies are only sent over https.
+
 ## [1.10.4] - 2026-11-13
 
 ### Fixed

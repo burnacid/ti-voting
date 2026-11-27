@@ -1,9 +1,9 @@
 <div x-data="{ open: false }" x-on:influence-saved.window="open = false"
      x-on:click.outside="open = false" x-on:keydown.escape.window="open = false"
      class="relative shrink-0 ml-auto">
-    <!-- Available influence, as the blue influence value on a TI4 planet card. Tap to change it -->
+    <!-- Available influence, as the blue influence value on a TI4 planet card. Tap to change it, unless managed influence locks it during an agenda -->
     <button type="button" x-on:click="open = !open" x-bind:aria-expanded="open"
-            aria-label="Your influence: {{ $influence === '' ? 'not entered' : $influence }}. Change it"
+            aria-label="Your influence: {{ $influence === '' ? 'not entered' : $influence }}.{{ $locked ? '' : ' Change it' }}"
             class="flex flex-col items-center gap-0.5 p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
         <span class="relative w-11 h-11 grid place-items-center text-base font-bold tabular-nums text-gray-900 dark:text-white">
             <svg class="absolute inset-0 w-full h-full text-blue-600 dark:text-blue-400" viewBox="0 0 36 36" fill="none" aria-hidden="true">
@@ -14,6 +14,13 @@
         <span class="text-[11px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Influence</span>
     </button>
 
+    @if($locked)
+    <div x-show="open" x-cloak x-transition.origin.top.right role="status"
+         class="absolute right-0 top-full mt-1 z-20 w-56 p-3 bg-white dark:bg-gray-800 rounded-lg shadow-lg ring-1 ring-black/10 dark:ring-white/10">
+        <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Your available influence</p>
+        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">The Speaker manages influence: you can change it once this agenda ends.</p>
+    </div>
+    @else
     <form x-show="open" x-cloak x-transition.origin.top.right wire:submit="save"
           class="absolute right-0 top-full mt-1 z-20 w-56 p-3 bg-white dark:bg-gray-800 rounded-lg shadow-lg ring-1 ring-black/10 dark:ring-white/10">
         <label for="influence" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Your available influence</label>
@@ -28,4 +35,5 @@
         </div>
         @error('influence') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
     </form>
+    @endif
 </div>
